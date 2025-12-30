@@ -14,6 +14,18 @@ import (
 
 // initial command just before connection
 // COMMAND DOCS
+// Command handles the COMMAND command.
+// Utility command used for connection testing and protocol compliance.
+//
+// Syntax:
+//   COMMAND
+//
+// Returns:
+//   +OK\r\n
+//
+// Notes:
+//   - Executable without authentication
+
 func Command(c *Client, v *Value, state *AppState) *Value {
 	// cmd := v.arr[0].blk
 	return &Value{
@@ -51,6 +63,17 @@ var Handlers = map[string]Handler{
 	"AUTH": Auth,
 }
 
+// BGRewriteAOF handles the BGREWRITEAOF command.
+// Asynchronously rewrites the Append-Only File.
+//
+// Behavior:
+//   1. Copies current DB state
+//   2. Rewrites AOF with compact SET commands
+//   3. Runs in background goroutine
+//
+// Returns:
+//   +Started.\r\n
+
 func BGRewriteAOF(c *Client, v *Value, state *AppState) *Value {
 
 	go func() {
@@ -68,7 +91,20 @@ func BGRewriteAOF(c *Client, v *Value, state *AppState) *Value {
 	}
 }
 
-// GET <key>
+// Get handles the GET command.
+// Retrieves the value for a key.
+//
+// Syntax:
+//
+//	GET <key>
+//
+// Returns:
+//   - Bulk string if key exists and not expired
+//   - NULL if key does not exist or expired
+//
+// Behavior:
+//   - Automatically deletes expired keys
+//   - Thread-safe (read lock)
 func Get(c *Client, v *Value, state *AppState) *Value {
 	// cmd := v.arr[0].blk
 	args := v.arr[1:]
@@ -109,6 +145,25 @@ func Get(c *Client, v *Value, state *AppState) *Value {
 
 }
 
+// Set handles the SET command.
+// Sets a key to a string value.
+//
+// Syntax:
+//
+//	SET <key> <value>
+//
+// Returns:
+//
+//	+OK\r\n
+//
+// Side Effects:
+//   - Appends command to AOF if enabled
+//   - Flushes AOF if fsync=always
+//   - Updates RDB change trackers
+//
+// Thread-safe:
+//
+//	Uses write lock
 func Set(c *Client, v *Value, state *AppState) *Value {
 	// cmd := v.arr[0].blk
 	args := v.arr[1:]
@@ -147,6 +202,20 @@ func Set(c *Client, v *Value, state *AppState) *Value {
 	}
 }
 
+// Del handles the DEL command.
+// Deletes one or more keys.
+//
+// Syntax:
+//
+//	DEL <key1> [key2 ...]
+//
+// Returns:
+//
+//	Integer count of keys deleted
+//
+// Notes:
+//   - Non-existent keys are ignored
+//   - Thread-safe (write lock)
 func Del(c *Client, v *Value, state *AppState) *Value {
 	// DEL k1 k2 k3 ... kn
 	// returns m, number of keys actually deleted (m <= n)
@@ -171,6 +240,20 @@ func Del(c *Client, v *Value, state *AppState) *Value {
 	}
 }
 
+// Exists handles the EXISTS command.
+// Checks existence of keys.
+//
+// Syntax:
+//
+//	EXISTS <key1> [key2 ...]
+//
+// Returns:
+//
+//	Integer count of keys that exist
+//
+// Thread-safe:
+//
+//	Uses read lock
 func Exists(c *Client, v *Value, state *AppState) *Value {
 	// Exists k1 k2 k3 .. kn
 	// m (m <= n)
@@ -191,6 +274,24 @@ func Exists(c *Client, v *Value, state *AppState) *Value {
 	}
 }
 
+// Keys handles the KEYS command.
+// Finds keys matching a glob pattern.
+//
+// Syntax:
+//
+//	KEYS <pattern>
+//
+// Pattern rules:
+//   - matches any sequence
+//     ?  matches single character
+//
+// Returns:
+//
+//	Array of matching keys
+//
+// Thread-safe:
+//
+//	Uses read lock
 func Keys(c *Client, v *Value, state *AppState) *Value {
 	// Keys pattern
 	// all keys matching pattern (in an array)
@@ -228,6 +329,22 @@ func Keys(c *Client, v *Value, state *AppState) *Value {
 }
 
 // saves with mutex read lock => inefficent, and no other command can be run to write
+// Save handles the SAVE command.
+// Performs a synchronous RDB snapshot.
+//
+// Syntax:
+//   SAVE
+//
+// Returns:
+//   +OK\r\n
+//
+// Behavior:
+//   - Blocks server during save
+//   - Uses read lock, preventing writes
+//
+// Recommendation:
+//   Use BGSAVE for non-blocking persistence
+
 func Save(c *Client, v *Value, state *AppState) *Value {
 	SaveRDB(state)
 	return &Value{
@@ -238,6 +355,22 @@ func Save(c *Client, v *Value, state *AppState) *Value {
 
 // background save
 // using COW is not possible, we will copy map first then save async
+// BGSave handles the BGSAVE command.
+// Performs an asynchronous RDB snapshot.
+//
+// Syntax:
+//
+//	BGSAVE
+//
+// Returns:
+//
+//	+OK\r\n on success
+//	Error if a background save is already running
+//
+// Behavior:
+//   - Copies DB state
+//   - Saves in background goroutine
+//   - Prevents concurrent background saves
 func BGSave(c *Client, v *Value, state *AppState) *Value {
 
 	DB.mu.RLock()
@@ -272,6 +405,24 @@ func BGSave(c *Client, v *Value, state *AppState) *Value {
 	}
 }
 
+// FlushDB handles the FLUSHDB command.
+// Deletes all keys in the database.
+//
+// Syntax:
+//
+//	FLUSHDB
+//
+// Returns:
+//
+//	+OK\r\n
+//
+// Implementation:
+//   - Replaces store map for efficiency
+//   - Thread-safe (write lock)
+//
+// Warning:
+//
+//	This operation is irreversible
 func FlushDB(c *Client, v *Value, state *AppState) *Value {
 	// slower
 	// DB.mu.Lock()
@@ -291,6 +442,20 @@ func FlushDB(c *Client, v *Value, state *AppState) *Value {
 	}
 }
 
+// DBSize handles the DBSIZE command.
+// Returns number of keys.
+//
+// Syntax:
+//
+//	DBSIZE
+//
+// Returns:
+//
+//	Integer key count
+//
+// Thread-safe:
+//
+//	Uses read lock
 func DBSize(c *Client, v *Value, state *AppState) *Value {
 	// DBSIZE
 	args := v.arr
@@ -312,6 +477,21 @@ func DBSize(c *Client, v *Value, state *AppState) *Value {
 
 }
 
+// Auth handles the AUTH command.
+// Authenticates a client.
+//
+// Syntax:
+//
+//	AUTH <password>
+//
+// Returns:
+//
+//	+OK\r\n if successful
+//	Error if password is incorrect
+//
+// Behavior:
+//   - Sets client.authenticated flag
+//   - Safe command (no prior auth required)
 func Auth(c *Client, v *Value, state *AppState) *Value {
 	args := v.arr[1:]
 	if len(args) != 1 {
@@ -337,6 +517,21 @@ func Auth(c *Client, v *Value, state *AppState) *Value {
 
 }
 
+// Expire handles the EXPIRE command.
+// Sets expiration time on a key.
+//
+// Syntax:
+//
+//	EXPIRE <key> <seconds>
+//
+// Returns:
+//
+//	1 if expiration set
+//	0 if key does not exist
+//
+// Notes:
+//   - Expiration stored as absolute timestamp
+//   - Lazy deletion on access
 func Expire(c *Client, v *Value, state *AppState) *Value {
 	// EXPIRE <key> <secondsafter>
 	args := v.arr[1:]
@@ -374,6 +569,21 @@ func Expire(c *Client, v *Value, state *AppState) *Value {
 
 }
 
+// Ttl handles the TTL command.
+// Returns remaining time-to-live for a key.
+//
+// Syntax:
+//
+//	TTL <key>
+//
+// Returns:
+//
+//	>0  remaining seconds
+//	-1  key exists but no expiration
+//	-2  key does not exist or expired
+//
+// Behavior:
+//   - Deletes key if expired
 func Ttl(c *Client, v *Value, state *AppState) *Value {
 	// TTL <key>
 	args := v.arr[1:]
@@ -428,6 +638,19 @@ var safeCommands = []string{
 	"AUTH",
 }
 
+// IsSafeCmd checks whether a command can be executed without authentication.
+//
+// Parameters:
+//   - cmd: command name
+//   - commands: list of safe commands
+//
+// Returns:
+//
+//	true if cmd is in commands, false otherwise
+//
+// Safe commands include:
+//
+//	COMMAND, AUTH
 func IsSafeCmd(cmd string, commands []string) bool {
 	for _, command := range commands {
 		if cmd == command {
@@ -437,6 +660,18 @@ func IsSafeCmd(cmd string, commands []string) bool {
 	return false
 }
 
+// handle is the main command dispatcher.
+//
+// Responsibilities:
+//  1. Extract command name from parsed Value
+//  2. Lookup command handler
+//  3. Enforce authentication rules
+//  4. Execute handler
+//  5. Write response to client
+//
+// Error cases:
+//   - Unknown command → ERR no such command
+//   - Authentication required but missing → NOAUTH error
 func handle(client *Client, v *Value, state *AppState) {
 	// the command is in the first entry of v.arr
 	cmd := v.arr[0].blk
@@ -466,245 +701,3 @@ func handle(client *Client, v *Value, state *AppState) {
 	w.Write(reply)
 	w.Flush()
 }
-
-// Command handles the COMMAND command.
-// This is a utility command used for connection testing and protocol compliance.
-// Returns: "+OK\r\n"
-
-// BGRewriteAOF handles the BGREWRITEAOF command.
-// Performs an asynchronous rewrite of the Append-Only File (AOF) to optimize its size
-// by removing redundant commands and creating a compact representation of the database.
-//
-// The rewrite process:
-// 1. Creates a copy of the current database state
-// 2. Truncates the AOF file
-// 3. Writes SET commands for all keys in the database copy
-// 4. Appends any new commands that arrived during the rewrite
-//
-// Returns: "+Started.\r\n" if the rewrite process begins successfully
-// Note: This operation runs in a background goroutine and does not block the server
-
-// Get handles the GET command.
-// Retrieves the value associated with a key from the database.
-//
-// Syntax: GET <key>
-//
-// Parameters:
-//   - key: The key to retrieve
-//
-// Returns:
-//   - Bulk string: The value if the key exists and is not expired
-//   - NULL: If the key does not exist or has expired
-//
-// Behavior:
-//   - Automatically deletes expired keys when accessed
-//   - Thread-safe read operation using read lock
-
-// Set handles the SET command.
-// Sets a key to hold a string value in the database.
-//
-// Syntax: SET <key> <value>
-//
-// Parameters:
-//   - key: The key to set
-//   - value: The string value to associate with the key
-//
-// Returns: "+OK\r\n" on success
-//
-// Side effects:
-//   - If AOF is enabled, writes the command to the AOF file
-//   - If AOF fsync is set to "always", immediately flushes to disk
-//   - Increments RDB change tracker if RDB persistence is configured
-//   - Thread-safe write operation using write lock
-
-// Del handles the DEL command.
-// Deletes one or more keys from the database.
-//
-// Syntax: DEL <key1> [key2 ...]
-//
-// Parameters:
-//   - key1, key2, ...: One or more keys to delete
-//
-// Returns: Integer representing the number of keys that were successfully deleted
-//          (keys that didn't exist are not counted)
-//
-// Example: DEL key1 key2 key3
-//          Returns: 2 (if key1 and key2 existed, but key3 didn't)
-//
-// Thread-safe: Uses write lock for deletion
-
-// Exists handles the EXISTS command.
-// Checks if one or more keys exist in the database.
-//
-// Syntax: EXISTS <key1> [key2 ...]
-//
-// Parameters:
-//   - key1, key2, ...: One or more keys to check
-//
-// Returns: Integer representing the number of keys that exist
-//          (returns 0 if none exist, or the count of existing keys)
-//
-// Example: EXISTS key1 key2 key3
-//          Returns: 2 (if key1 and key2 exist, but key3 doesn't)
-//
-// Thread-safe: Uses read lock for checking
-
-// Keys handles the KEYS command.
-// Finds all keys matching a given pattern using filepath glob matching.
-//
-// Syntax: KEYS <pattern>
-//
-// Parameters:
-//   - pattern: A glob pattern to match keys against
-//              Supports wildcards: * (matches any sequence), ? (matches single char)
-//
-// Returns: Array of bulk strings containing all matching keys
-//          Returns empty array if no keys match
-//
-// Examples:
-//   - KEYS *              - Returns all keys
-//   - KEYS user:*         - Returns all keys starting with "user:"
-//   - KEYS *name*         - Returns all keys containing "name"
-//
-// Thread-safe: Uses read lock for pattern matching
-
-// Save handles the SAVE command.
-// Synchronously saves the database snapshot to disk using RDB persistence.
-//
-// Syntax: SAVE
-//
-// Returns: "+OK\r\n" on successful save
-//
-// Behavior:
-//   - Blocks the server until the save operation completes
-//   - Uses read lock during the save, preventing write operations
-//   - Computes checksums to verify data integrity
-//   - For background saves, use BGSAVE instead
-//
-// Note: This is a blocking operation and may impact server performance
-//       during large database saves
-
-// BGSave handles the BGSAVE command.
-// Performs an asynchronous background save of the database snapshot to disk.
-//
-// Syntax: BGSAVE
-//
-// Returns:
-//   - "+OK\r\n" if the background save starts successfully
-//   - Error if a background save is already in progress
-//
-// Behavior:
-//   - Creates a copy of the database state before saving
-//   - Runs the save operation in a background goroutine (non-blocking)
-//   - Sets bgsaving flag to prevent concurrent background saves
-//   - Automatically clears the flag when save completes
-//
-// Advantages over SAVE:
-//   - Non-blocking: server continues to handle commands during save
-//   - Uses copy-on-write approach by creating a database copy first
-
-// FlushDB handles the FLUSHDB command.
-// Removes all keys from the current database.
-//
-// Syntax: FLUSHDB
-//
-// Returns: "+OK\r\n" on success
-//
-// Behavior:
-//   - Efficiently clears the database by replacing the store map with a new empty map
-//   - Faster than iterating and deleting individual keys
-//   - Thread-safe: Uses write lock during flush
-//
-// Warning: This operation is irreversible and will delete all data in the database
-
-// DBSize handles the DBSIZE command.
-// Returns the number of keys in the current database.
-//
-// Syntax: DBSIZE
-//
-// Returns: Integer representing the total number of keys in the database
-//
-// Thread-safe: Uses read lock for counting keys
-
-// Auth handles the AUTH command.
-// Authenticates the client with the server using a password.
-//
-// Syntax: AUTH <password>
-//
-// Parameters:
-//   - password: The password to authenticate with (must match requirepass in config)
-//
-// Returns:
-//   - "+OK\r\n" if authentication succeeds
-//   - Error if password is incorrect
-//
-// Behavior:
-//   - Sets the client's authenticated flag to true on success
-//   - Sets the client's authenticated flag to false on failure
-//   - Required before executing other commands if requirepass is set in config
-//
-// Note: This is a "safe" command that can be executed without prior authentication
-
-// Expire handles the EXPIRE command.
-// Sets a timeout on a key. After the timeout expires, the key will be automatically deleted.
-//
-// Syntax: EXPIRE <key> <seconds>
-//
-// Parameters:
-//   - key: The key to set expiration on
-//   - seconds: Number of seconds until the key expires (must be a valid integer)
-//
-// Returns:
-//   - Integer 1: If the timeout was set successfully
-//   - Integer 0: If the key does not exist
-//   - Error: If the seconds parameter is invalid
-//
-// Behavior:
-//   - Calculates expiration time as current time + seconds
-//   - Keys with expiration are automatically deleted when accessed after expiry
-//   - Thread-safe: Uses read lock (updates expiration time atomically)
-
-// Ttl handles the TTL command.
-// Returns the remaining time to live (TTL) of a key in seconds.
-//
-// Syntax: TTL <key>
-//
-// Parameters:
-//   - key: The key to check TTL for
-//
-// Returns:
-//   - Positive integer: Remaining TTL in seconds
-//   - Integer -1: Key exists but has no expiration set
-//   - Integer -2: Key does not exist
-//
-// Behavior:
-//   - Automatically deletes expired keys when checked (returns -2)
-//   - Thread-safe: Uses read lock for checking, write lock for deletion
-
-// IsSafeCmd checks if a command is in the list of safe commands.
-// Safe commands can be executed without authentication even when requirepass is set.
-//
-// Parameters:
-//   - cmd: The command name to check
-//   - commands: List of safe command names
-//
-// Returns: true if the command is safe, false otherwise
-//
-// Safe commands: COMMAND, AUTH
-
-// handle processes incoming commands and routes them to the appropriate handler.
-// This is the main command dispatcher that:
-// 1. Extracts the command name from the Value array
-// 2. Looks up the handler in the Handlers map
-// 3. Checks authentication if required
-// 4. Executes the handler and sends the response to the client
-//
-// Parameters:
-//   - client: The client connection making the request
-//   - v: The parsed command Value containing command and arguments
-//   - state: The application state containing config, AOF, and database state
-//
-// Behavior:
-//   - Returns error if command doesn't exist
-//   - Returns NOAUTH error if authentication is required but client is not authenticated
-//   - Writes response back to client connection

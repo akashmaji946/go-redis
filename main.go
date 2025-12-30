@@ -8,6 +8,37 @@ import (
 	"time"
 )
 
+// main is the entry point of the Go-Redis server application.
+// It initializes the server, loads configuration, restores data from persistence,
+// and starts accepting client connections on port 6379.
+//
+// Server Startup Sequence:
+//  1. Print server banner
+//  2. Read configuration from redis.conf file
+//  3. Initialize application state (AOF, RDB trackers)
+//  4. Restore data from AOF if enabled (Synchronize)
+//  5. Restore data from RDB if configured (SyncRDB)
+//  6. Initialize RDB snapshot trackers if RDB is enabled
+//  7. Start TCP listener on port 6379
+//  8. Accept and handle client connections concurrently
+//
+// Persistence Restoration:
+//   - AOF: Replays all commands from AOF file to rebuild database
+//   - RDB: Loads database snapshot from RDB file
+//   - Both can be enabled simultaneously (AOF takes precedence if both exist)
+//
+// Connection Handling:
+//   - Each client connection is handled in a separate goroutine
+//   - Uses sync.WaitGroup to track active connections
+//   - Server runs indefinitely until terminated (Ctrl+C or kill signal)
+//
+// Port:
+//   - Default Redis port: 6379
+//   - Listens on all network interfaces (":6379")
+//
+// Error Handling:
+//   - Fatal errors (listen failure) cause server to exit
+//   - Individual connection errors are logged but don't stop the server
 func main() {
 
 	fmt.Println(">>> Go-Redis Server v0.1 <<<")
@@ -64,6 +95,54 @@ func main() {
 
 }
 
+// handleOneConnection manages a single client connection for its entire lifetime.
+// This function runs in a separate goroutine for each connected client, allowing
+// the server to handle multiple clients concurrently.
+//
+// Parameters:
+//   - conn: The network connection to the client
+//   - state: The shared application state (config, AOF, database)
+//   - connectionCount: Pointer to the global connection counter (for logging)
+//
+// Behavior:
+//  1. Logs the connection acceptance with connection number
+//  2. Increments the connection counter
+//  3. Creates a new Client instance for this connection
+//  4. Enters a loop to process commands:
+//     a. Reads a RESP array from the connection (parses command)
+//     b. Logs the received command (for debugging)
+//     c. Handles the command and sends response
+//     d. Repeats until connection is closed
+//  5. Decrements connection counter on disconnect
+//
+// Command Processing:
+//   - Each command is parsed as a RESP array using ReadArray()
+//   - Commands are handled by the handle() function which routes to appropriate handlers
+//   - Responses are automatically sent back to the client
+//
+// Connection Lifecycle:
+//   - Connection remains open until client disconnects or error occurs
+//   - On EOF or read error: connection is closed and function returns
+//   - Connection is not explicitly closed here (handled by OS on return)
+//
+// Concurrency:
+//   - Each client connection runs in its own goroutine
+//   - Multiple clients can be served simultaneously
+//   - Shared state (database, AOF) is protected by mutexes in handlers
+//
+// Error Handling:
+//   - Read errors (EOF, network errors): Logged and connection closed gracefully
+//   - Command parsing errors: Handled by handle() function
+//   - Does not crash the server on individual connection errors
+//
+// Example Flow:
+//
+//	Client connects -> handleOneConnection() starts
+//	-> Client sends: "*2\r\n$3\r\nGET\r\n$4\r\nname\r\n"
+//	-> Parsed as: Value{typ: ARRAY, arr: [BULK("GET"), BULK("name")]}
+//	-> handle() routes to Get() handler
+//	-> Response sent back to client
+//	-> Loop continues for next command
 func handleOneConnection(conn net.Conn, state *AppState, connectionCount *int) {
 	log.Printf("[%2d] [ACCEPT] Accepted connection from: %s\n", *connectionCount, conn.LocalAddr().String())
 	*connectionCount += 1
@@ -92,11 +171,44 @@ func handleOneConnection(conn net.Conn, state *AppState, connectionCount *int) {
 	}
 }
 
+// Client represents a connected client session.
+// Each client connection has its own Client instance that tracks connection-specific state.
+//
+// Fields:
+//   - conn: The network connection to the client (used for reading commands and sending responses)
+//   - authenticated: Whether this client has successfully authenticated
+//     (required if requirepass is set in config)
+//
+// Authentication:
+//   - Initially false for all new connections
+//   - Set to true after successful AUTH command
+//   - Checked before executing commands (if requirepass is enabled)
+//   - Safe commands (COMMAND, AUTH) can be executed without authentication
+//
+// Lifecycle:
+//   - Created when client connects (in handleOneConnection)
+//   - Exists for the duration of the client connection
+//   - Destroyed when connection closes (garbage collected)
+//
+// Thread Safety:
+//   - Each Client is used by a single goroutine (one per connection)
+//   - No synchronization needed for Client fields
 type Client struct {
 	conn          net.Conn
 	authenticated bool
 }
 
+// NewClient creates a new Client instance for a network connection.
+// Initializes a client with the given connection and sets authentication to false.
+//
+// Parameters:
+//   - conn: The network connection associated with this client
+//
+// Returns: A pointer to a new Client instance with authenticated=false
+//
+// Usage:
+//   - Called once per client connection in handleOneConnection()
+//   - The Client instance is then used for all command handling for that connection
 func NewClient(conn net.Conn) *Client {
 	return &Client{
 		conn:          conn,
@@ -104,6 +216,37 @@ func NewClient(conn net.Conn) *Client {
 	}
 }
 
+// AppState holds the global application state shared across all client connections.
+// This structure contains configuration, persistence mechanisms, and background operation flags.
+//
+// Fields:
+//   - config: Server configuration (persistence settings, authentication, etc.)
+//   - aof: AOF persistence instance (nil if AOF is disabled)
+//   - bgsaving: Flag indicating if a background RDB save is currently in progress
+//     Used to prevent concurrent background saves
+//   - DBCopy: Copy of the database used during background saves
+//     Contains a snapshot of DB.store taken at the start of BGSAVE
+//     Only populated during background saves, nil otherwise
+//
+// State Management:
+//   - Created once at server startup in main()
+//   - Passed to all command handlers
+//   - Shared across all client connections (protected by mutexes where needed)
+//
+// AOF Integration:
+//   - If AOF is enabled, aof field contains the AOF instance
+//   - AOF writer is used by SET and other write commands
+//   - AOF fsync behavior depends on config.aofFsync mode
+//
+// Background Operations:
+//   - bgsaving flag prevents multiple concurrent BGSAVE operations
+//   - DBCopy is populated at the start of BGSAVE and cleared when complete
+//   - Used by SaveRDB() to save from copy instead of live database
+//
+// Thread Safety:
+//   - Access to bgsaving and DBCopy should be protected by DB.mu
+//   - AOF operations have their own synchronization
+//   - Config is read-only after initialization
 type AppState struct {
 	config   *Config
 	aof      *Aof
@@ -111,6 +254,42 @@ type AppState struct {
 	DBCopy   map[string]*VAL
 }
 
+// NewAppState creates and initializes a new AppState instance.
+// Sets up persistence mechanisms (AOF) and background workers based on configuration.
+//
+// Parameters:
+//   - config: The server configuration containing persistence and other settings
+//
+// Returns: A pointer to a new AppState instance with persistence initialized
+//
+// Behavior:
+//   - Creates AppState with the provided config
+//   - If AOF is enabled:
+//   - Creates and initializes AOF instance (opens AOF file)
+//   - If fsync mode is "everysec", starts a background goroutine that
+//     flushes the AOF writer every second
+//   - If AOF is disabled, aof field remains nil
+//
+// Background Workers:
+//   - AOF fsync worker (if aofFsync == Everysec):
+//   - Runs in a separate goroutine
+//   - Flushes AOF writer every second using a ticker
+//   - Ensures AOF data is written to disk periodically
+//   - Stops automatically when ticker is stopped (on server shutdown)
+//
+// Initialization Order:
+//  1. Create AppState with config
+//  2. Initialize AOF if enabled
+//  3. Start background workers if needed
+//  4. Return initialized state
+//
+// Example:
+//
+//	conf := ReadConf("./redis.conf")
+//	state := NewAppState(conf)
+//	// state is ready to use, AOF initialized if enabled
+//
+// Note: RDB initialization (trackers) happens separately in main() after AppState creation
 func NewAppState(config *Config) *AppState {
 	state := AppState{
 		config: config,
