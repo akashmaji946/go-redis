@@ -25,13 +25,15 @@ func (w *Writer) Deserialize(v *Value) (reply string) {
 			reply += w.Deserialize(&val)
 		}
 	case STRING:
-		reply = fmt.Sprintf("%s%s%s", v.typ, v.str, EOD)
+		reply = fmt.Sprintf("%s%s%s", v.typ, v.str, EOD) //+TATABYE\r\n
 	case BULK:
-		reply = fmt.Sprintf("%s%d%s%s%s", v.typ, len(v.blk), EOD, v.blk, EOD)
+		reply = fmt.Sprintf("%s%d%s%s%s", v.typ, len(v.blk), EOD, v.blk, EOD) //$5\r\nAkash\r\n
 	case ERROR:
-		reply = fmt.Sprintf("%s%s%s", v.typ, v.err, EOD)
+		reply = fmt.Sprintf("%s%s%s", v.typ, v.err, EOD) //-ERR msg\r\n
 	case NULL:
-		reply = fmt.Sprintf("$-1\r\n")
+		reply = fmt.Sprintf("%s%d%s", "$", -1, EOD) //$-1\r\n
+	case INTEGER:
+		reply = fmt.Sprintf("%s%d%s", v.typ, v.num, EOD) //:12\r\n
 	default:
 		fmt.Errorf("invalid typ given to Deserialize")
 		return reply

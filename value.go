@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
+	"fmt"
 	"io"
 	"log"
 	"strconv"
+	"strings"
 )
 
 type ValueType string
@@ -21,6 +24,8 @@ const (
 
 	ERROR ValueType = "-"
 	NULL  ValueType = ""
+
+	INTEGER ValueType = ":"
 )
 
 type Value struct {
@@ -32,42 +37,75 @@ type Value struct {
 
 	err string
 	nul string
+
+	num int
 }
 
-func (v *Value) ReadBulk(reader io.Reader) Value {
-	buf := make([]byte, 4)
-	_, err := reader.Read(buf)
+func ReadLine(reader *bufio.Reader) (string, error) {
+	line, err := reader.ReadString('\n') // line = *123\r\n
 	if err != nil {
-		log.Fatal("Can't read bulk")
+		return "", err
+	}
+	trimmedLine := strings.TrimSuffix(line, "\r\n") // line = *123
+	return trimmedLine, nil
+}
+
+func (v *Value) ReadBulk(reader *bufio.Reader) Value {
+
+	line, err := ReadLine(reader) // line = $1123
+	if err != nil {
+		fmt.Println("error in ReadBulk:", err)
+		return Value{
+			typ: NULL,
+		}
+	}
+	if line[0] != '$' {
+		fmt.Println("error in ReadBulk:", err)
+		return Value{
+			typ: NULL,
+		}
 	}
 
-	n, err := strconv.Atoi(string(buf[1]))
+	n, err := strconv.Atoi(string(line[1:])) // "1123"
 	if err != nil {
-		log.Fatal("Can't convert to get bulk length")
+		log.Fatal("can't convert to get bulk length")
 	}
 
-	bulkData := make([]byte, n+2) // data + \r\n
-	reader.Read(bulkData)
-	bulk := string(bulkData[:n]) // without \r\n
+	bulkDataBuffer := make([]byte, n+2) // data + \r\n
+
+	// read till filling the buffer
+	_, err = io.ReadFull(reader, bulkDataBuffer)
+	if err != nil {
+		fmt.Println("error in ReadBulk:", err)
+		return Value{
+			typ: NULL,
+		}
+	}
+	bulkData := string(bulkDataBuffer[:n]) // data without \r\n
 
 	return Value{
 		typ: BULK,
-		blk: bulk,
+		blk: bulkData,
 	}
 
 }
 
-func (v *Value) ReadArray(reader io.Reader) error {
-	buf := make([]byte, 4)
-	_, err := reader.Read(buf)
+func (v *Value) ReadArray(r io.Reader) error {
+
+	reader := bufio.NewReader(r)
+	line, err := ReadLine(reader) // line = *123
 	if err != nil {
-		log.Println("Can't read array.", err)
+		fmt.Println("error in ReadArray:", err)
 		return err
 	}
+	if line[0] != '*' {
+		fmt.Println("error in ReadArray:", err)
+		return fmt.Errorf("invalid input by user")
+	}
 
-	arrLen, err := strconv.Atoi(string(buf[1]))
+	arrLen, err := strconv.Atoi(line[1:]) // pass "123"
 	if err != nil {
-		log.Println("Can't convert to get array length")
+		log.Println("can't convert to get array length")
 		return err
 	}
 
