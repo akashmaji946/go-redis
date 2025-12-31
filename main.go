@@ -217,7 +217,8 @@ func NewClient(conn net.Conn) *Client {
 }
 
 // AppState holds the global application state shared across all client connections.
-// This structure contains configuration, persistence mechanisms, and background operation flags.
+// This structure contains configuration, persistence mechanisms, background operation flags,
+// and transaction state.
 //
 // Fields:
 //   - config: Server configuration (persistence settings, authentication, etc.)
@@ -227,31 +228,17 @@ func NewClient(conn net.Conn) *Client {
 //   - DBCopy: Copy of the database used during background saves
 //     Contains a snapshot of DB.store taken at the start of BGSAVE
 //     Only populated during background saves, nil otherwise
+//   - tx: Current transaction context for this client connection
+//     Set to non-nil when MULTI is called, cleared by EXEC or DISCARD
+//     Each client connection has its own transaction state
 //
-// State Management:
-//   - Created once at server startup in main()
-//   - Passed to all command handlers
-//   - Shared across all client connections (protected by mutexes where needed)
-//
-// AOF Integration:
-//   - If AOF is enabled, aof field contains the AOF instance
-//   - AOF writer is used by SET and other write commands
-//   - AOF fsync behavior depends on config.aofFsync mode
-//
-// Background Operations:
-//   - bgsaving flag prevents multiple concurrent BGSAVE operations
-//   - DBCopy is populated at the start of BGSAVE and cleared when complete
-//   - Used by SaveRDB() to save from copy instead of live database
-//
-// Thread Safety:
-//   - Access to bgsaving and DBCopy should be protected by DB.mu
-//   - AOF operations have their own synchronization
-//   - Config is read-only after initialization
+// ... rest of existing documentation ...
 type AppState struct {
 	config   *Config
 	aof      *Aof
 	bgsaving bool
 	DBCopy   map[string]*VAL
+	tx       *Transaction
 }
 
 // NewAppState creates and initializes a new AppState instance.

@@ -60,7 +60,233 @@ var Handlers = map[string]Handler{
 	"EXPIRE": Expire,
 	"TTL":    Ttl,
 
+	// authorize
 	"AUTH": Auth,
+
+	// transaction
+	"MULTI":   Multi,
+	"EXEC":    Exec,
+	"DISCARD": Discard,
+}
+
+// Multi handles the MULTI command.
+// Begins a transaction by creating a new transaction context for the client.
+// All subsequent commands (except EXEC, DISCARD, and MULTI) will be queued
+// until EXEC or DISCARD is called.
+//
+// Syntax:
+//
+//	MULTI
+//
+// Returns:
+//
+//	+Started\r\n on success
+//	Error if transaction is already running
+//
+// Behavior:
+//   - Creates a new Transaction instance and stores it in state.tx
+//   - Subsequent commands are queued instead of executed immediately
+//   - Only one transaction can be active per client connection
+//   - Commands return "QUEUED" response instead of actual results
+//
+// Transaction Flow:
+//  1. MULTI - Start transaction (this command)
+//  2. <commands> - Queue commands (GET, SET, etc.)
+//  3. EXEC - Execute all queued commands atomically
+//     OR
+//  3. DISCARD - Abort transaction without executing
+//
+// Error Cases:
+//   - Invalid arguments: Returns error if arguments provided
+//   - Transaction already running: Returns error if tx already exists
+//
+// Example:
+//
+//	127.0.0.1:6379> MULTI
+//	OK
+//	127.0.0.1:6379> SET key1 "value1"
+//	QUEUED
+//	127.0.0.1:6379> SET key2 "value2"
+//	QUEUED
+//	127.0.0.1:6379> EXEC
+//	1) OK
+//	2) OK
+func Multi(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 0 {
+		log.Println("invalid use of MULTI")
+		return &Value{
+			typ: ERROR,
+			err: "ERR inavlid argument to MULTI",
+		}
+	}
+	// check if some tx running, then don't run
+	if state.tx != nil {
+		log.Println("tx already running")
+		return &Value{
+			typ: ERROR,
+			err: "ERR tx already running",
+		}
+	}
+
+	state.tx = NewTransaction()
+
+	log.Println("tx started")
+	return &Value{
+		typ: STRING,
+		str: "Started",
+	}
+
+}
+
+// Exec handles the EXEC command.
+// Executes all commands queued in the current transaction atomically.
+// All queued commands are executed in order and their replies are returned
+// as an array.
+//
+// Syntax:
+//
+//	EXEC
+//
+// Returns:
+//
+//	Array of replies: One reply per queued command, in order
+//	Error if no transaction is running
+//
+// Behavior:
+//   - Executes all commands in state.tx.cmds sequentially
+//   - Each command is executed with its stored handler and value
+//   - All replies are collected and returned as an array
+//   - Transaction is cleared after execution (state.tx = nil)
+//   - Commands are executed in the order they were queued
+//
+// Atomicity:
+//   - All commands succeed or fail individually (no rollback on error)
+//   - Commands are executed sequentially, not concurrently
+//   - If a command fails, subsequent commands still execute
+//
+// Error Cases:
+//   - Invalid arguments: Returns error if arguments provided
+//   - No transaction running: Returns error if state.tx is nil
+//
+// Example:
+//
+//	127.0.0.1:6379> MULTI
+//	OK
+//	127.0.0.1:6379> SET a "1"
+//	QUEUED
+//	127.0.0.1:6379> SET b "2"
+//	QUEUED
+//	127.0.0.1:6379> EXEC
+//	1) OK
+//	2) OK
+//
+// Note: Unlike Redis, this implementation does not support WATCH for
+//
+//	optimistic locking or rollback on conflicts.
+func Exec(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 0 {
+		log.Println("invalid use of EXEC")
+		return &Value{
+			typ: ERROR,
+			err: "ERR inavlid argument to EXEC",
+		}
+	}
+	// check if some tx running
+	if state.tx == nil {
+		log.Println("tx already NOT running")
+		return &Value{
+			typ: ERROR,
+			err: "ERR tx already NOT running",
+		}
+	}
+
+	// commmit queued commands first
+	replies := make([]Value, len(state.tx.cmds))
+	for idx, txCmd := range state.tx.cmds {
+		reply := txCmd.handler(c, txCmd.value, state)
+		replies[idx] = *reply
+	}
+
+	state.tx = nil
+	log.Println("tx executed")
+
+	return &Value{
+		typ: ARRAY,
+		arr: replies,
+	}
+}
+
+// Discard handles the DISCARD command.
+// Aborts the current transaction by discarding all queued commands
+// without executing them. The transaction context is cleared.
+//
+// Syntax:
+//
+//	DISCARD
+//
+// Returns:
+//
+//	+Discarded\r\n on success
+//	Error if no transaction is running
+//
+// Behavior:
+//   - Clears the transaction context (state.tx = nil)
+//   - All queued commands are discarded and never executed
+//   - No changes are made to the database
+//   - Client can start a new transaction with MULTI after discarding
+//
+// Use Cases:
+//   - Client wants to abort a transaction without executing commands
+//   - Error occurred during transaction building
+//   - Client changed their mind about the transaction
+//
+// Error Cases:
+//   - Invalid arguments: Returns error if arguments provided
+//   - No transaction running: Returns error if state.tx is nil
+//
+// Example:
+//
+//	127.0.0.1:6379> MULTI
+//	OK
+//	127.0.0.1:6379> SET key1 "value1"
+//	QUEUED
+//	127.0.0.1:6379> SET key2 "value2"
+//	QUEUED
+//	127.0.0.1:6379> DISCARD
+//	OK
+//	# All queued commands are discarded, no changes made
+//
+// Note: After DISCARD, the client must call MULTI again to start
+//
+//	a new transaction.
+func Discard(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 0 {
+		log.Println("invalid use of DISCARD")
+		return &Value{
+			typ: ERROR,
+			err: "ERR inavlid argument to DISCARD",
+		}
+	}
+	// check if some tx running
+	if state.tx == nil {
+		log.Println("tx already NOT running")
+		return &Value{
+			typ: ERROR,
+			err: "ERR tx already NOT running",
+		}
+	}
+
+	// discard without commiting
+	state.tx = nil
+	log.Println("tx discarded")
+
+	return &Value{
+		typ: STRING,
+		str: "Discarded",
+	}
 }
 
 // BGRewriteAOF handles the BGREWRITEAOF command.
@@ -129,7 +355,7 @@ func Get(c *Client, v *Value, state *AppState) *Value {
 
 	// delete if expired
 	// if expiry is set and ttl is <= 0, delete and return NULL
-	if Val.exp.Unix() != UNIX_TS_EPOCH && time.Until(Val.exp).Seconds() <= 0 {
+	if Val.Exp.Unix() != UNIX_TS_EPOCH && time.Until(Val.Exp).Seconds() <= 0 {
 		DB.mu.Lock()
 		DB.Del(key)
 		DB.mu.Unlock()
@@ -140,7 +366,7 @@ func Get(c *Client, v *Value, state *AppState) *Value {
 
 	return &Value{
 		typ: BULK,
-		blk: Val.v,
+		blk: Val.V,
 	}
 
 }
@@ -559,7 +785,7 @@ func Expire(c *Client, v *Value, state *AppState) *Value {
 			num: 0,
 		}
 	}
-	Val.exp = time.Now().Add(time.Second * time.Duration(expirySeconds))
+	Val.Exp = time.Now().Add(time.Second * time.Duration(expirySeconds))
 	DB.mu.RUnlock()
 
 	return &Value{
@@ -604,7 +830,7 @@ func Ttl(c *Client, v *Value, state *AppState) *Value {
 			num: -2,
 		}
 	}
-	exp := Val.exp
+	exp := Val.Exp
 	DB.mu.RUnlock()
 
 	// is exp not set
@@ -664,18 +890,39 @@ func IsSafeCmd(cmd string, commands []string) bool {
 //
 // Responsibilities:
 //  1. Extract command name from parsed Value
-//  2. Lookup command handler
-//  3. Enforce authentication rules
-//  4. Execute handler
-//  5. Write response to client
+//  2. Lookup command handler in Handlers map
+//  3. Enforce authentication rules (if requirepass is set)
+//  4. Handle transaction queuing (if transaction is active)
+//  5. Execute handler or queue command
+//  6. Write response to client
+//
+// Transaction Support:
+//   - If state.tx is not nil (transaction active):
+//   - Commands (except MULTI, EXEC, DISCARD) are queued
+//   - Returns "QUEUED" response instead of executing
+//   - Commands are stored with their handler for later execution
+//   - Transaction control commands (MULTI, EXEC, DISCARD) execute immediately
 //
 // Error cases:
 //   - Unknown command → ERR no such command
 //   - Authentication required but missing → NOAUTH error
+//   - Transaction already running (for MULTI) → handled by Multi handler
+//   - No transaction running (for EXEC/DISCARD) → handled by respective handlers
+//
+// Command Flow:
+//  1. Parse command name from Value array
+//  2. Check if command exists in Handlers map
+//  3. Check authentication (if required)
+//  4. Check transaction state:
+//     - If transaction active: queue command (unless MULTI/EXEC/DISCARD)
+//     - If no transaction: execute command immediately
+//  5. Send response to client
 func handle(client *Client, v *Value, state *AppState) {
+
 	// the command is in the first entry of v.arr
 	cmd := v.arr[0].blk
 	handler, ok := Handlers[cmd]
+
 	if !ok {
 		log.Println("ERROR: no such command:", cmd)
 		reply := &Value{
@@ -688,16 +935,39 @@ func handle(client *Client, v *Value, state *AppState) {
 		return
 	}
 
-	var reply *Value
+	// handle authentication: if password needed & not authenticated, then block running command
 	if state.config.requirepass && !client.authenticated && !IsSafeCmd(cmd, safeCommands) {
-		reply = &Value{
+		reply := &Value{
 			typ: ERROR,
 			err: "NOAUTH client not authenticated, use AUTH <password>",
 		}
-	} else {
-		reply = handler(client, v, state)
+		w := NewWriter(client.conn)
+		w.Write(reply)
+		w.Flush()
+		return
 	}
+
+	// handle transaction: if already running, then queue
+	if state.tx != nil && cmd != "EXEC" && cmd != "DISCARD" && cmd != "MULTI" {
+		txCmd := &TxCommand{
+			value:   v,
+			handler: handler,
+		}
+		state.tx.cmds = append(state.tx.cmds, txCmd)
+		reply := &Value{
+			typ: STRING,
+			str: "QUEUED",
+		}
+		w := NewWriter(client.conn)
+		w.Write(reply)
+		w.Flush()
+		return
+	}
+
+	reply := handler(client, v, state)
 	w := NewWriter(client.conn)
 	w.Write(reply)
 	w.Flush()
+	return
+
 }

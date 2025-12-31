@@ -239,7 +239,7 @@ func (aof *Aof) Rewrite(cp map[string]*VAL) {
 	for k, v := range cp {
 		cmd := Value{typ: BULK, blk: "SET"}
 		key := Value{typ: BULK, blk: k}     // string
-		value := Value{typ: BULK, blk: v.v} // actual string
+		value := Value{typ: BULK, blk: v.V} // actual string
 
 		arr := Value{typ: ARRAY, arr: []Value{cmd, key, value}}
 		fwriter.Write(&arr)
