@@ -1,5 +1,7 @@
 # Go-Redis
 
+![go-redis logo](go-redis.png)
+
 A Redis-compatible in-memory key-value store server written in Go. This implementation supports core Redis commands, persistence mechanisms (AOF and RDB), authentication, expiration, transactions, monitoring, and memory management with eviction policies.
 
 ## Features
@@ -242,9 +244,31 @@ Implements full Redis RESP:
 
 ## Docker Deployment
 
-The project includes a Dockerfile for containerized deployment. See the Dockerfile for details.
+**Prerequisites**
+- docker
+- redis-cli
+
+
+The project includes a Dockerfile for containerized deployment. See the `Dockerfile` for details.
+
+**Very Quick Docker usage:**
+Use an image:
+```bash
+# Pull the image
+docker pull akashmaji/go-redis:latest
+
+# Run it
+docker run -d -p 6379:6379 \
+  -v $(pwd)/data:/app/data \
+  akashmaji/go-redis:latest
+
+## Access it from host
+redis-cli
+
+```
 
 **Quick Docker usage:**
+Build the image:
 ```bash
 # Build
 docker build -t go-redis:latest .
@@ -257,7 +281,11 @@ docker run -d -p 6379:6379 \
   -v $(pwd)/config/redis.conf:/app/config/redis.conf:ro \
   -v $(pwd)/data:/app/data \
   go-redis:latest /app/config/redis.conf /app/data
+
+## Access it from host
+redis-cli
 ```
+See `DOCKER.md` for more detail
 
 ## Limitations
 
