@@ -4,6 +4,9 @@
 
 A Redis-compatible in-memory key-value store server written in Go. This implementation supports core Redis commands, persistence mechanisms (AOF and RDB), authentication, expiration, transactions, monitoring, and memory management with eviction policies.
 
+## Docs
+Access it here: [Docs](https://akashmaji946.github.io/go-redis/)
+
 ## Features
 
 - **Core Commands**: GET, SET, DEL, EXISTS, KEYS, DBSIZE, FLUSHDB
