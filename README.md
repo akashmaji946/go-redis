@@ -30,7 +30,7 @@ A Redis-compatible in-memory key-value store server written in Go. This implemen
 ```bash
 sudo systemctl stop redis-server.service
 sudo systemctl status redis-server.service
-````
+```
 
 ## Building
 
@@ -38,22 +38,29 @@ sudo systemctl status redis-server.service
 go build
 ```
 
+This will create an executable named `go-redis` that you can run.
+
 ## Configuration
 
-The server reads configuration from `redis.conf`:
+The server reads configuration from a `redis.conf` file. Create a configuration file with the following options:
 
 ```conf
+# Data directory (where persistence files are stored)
 dir ./data
 
+# AOF Configuration
 appendonly yes
 appendfilename backup.aof
 appendfsync always
 
+# RDB Configuration
 save 5 3
 dbfilename backup.rdb
 
+# Authentication
 requirepass dsl
 
+# Memory Management
 maxmemory 256
 maxmemory-policy allkeys-random
 maxmemory-samples 5
@@ -61,11 +68,64 @@ maxmemory-samples 5
 
 ## Running
 
+### Basic Usage
+
+The server accepts command-line arguments for configuration file and data directory:
+
+```bash
+./go-redis [config_file] [data_directory]
+```
+
+**Arguments:**
+- `config_file` (optional): Path to the configuration file
+  - Default: `./config/redis.conf`
+- `data_directory` (optional): Path to the data directory for persistence files
+  - Default: `./data/` (or value from config file if specified)
+
+### Examples
+
+**1. Default configuration (uses `./config/redis.conf` and `./data/`):**
 ```bash
 ./go-redis
 ```
 
-Server listens on port **6379**.
+**2. Custom configuration file:**
+```bash
+./go-redis /etc/go-redis/redis.conf
+```
+
+**3. Custom configuration and data directory:**
+```bash
+./go-redis /etc/go-redis/redis.conf /var/lib/go-redis
+```
+
+**4. Relative paths:**
+```bash
+./go-redis ./myconfig.conf ./mydata
+```
+
+**5. Absolute paths:**
+```bash
+./go-redis /home/user/config/redis.conf /home/user/data
+```
+
+### Behavior
+
+- If the configuration file doesn't exist, the server will warn and use default settings
+- The data directory will be created automatically if it doesn't exist
+- If both command-line argument and config file specify a data directory, the command-line argument takes precedence
+- The server listens on port **6379** (default Redis port)
+
+### Server Startup
+
+When you run the server, you'll see output like:
+
+```
+>>> Go-Redis Server v0.1 <<<
+reading the config file...
+Data directory: /app/data
+listening on port 6379
+```
 
 ## Available Commands
 
@@ -161,9 +221,12 @@ go-redis/
 ├── appstate.go
 ├── info.go
 ├── mem.go
-├── redis.conf
-├── go.mod
-└── data/
+├── config/
+│   └── redis.conf
+├── data/
+│   ├── backup.aof
+│   └── backup.rdb
+└── go.mod
 ```
 
 ## Protocol
@@ -176,6 +239,25 @@ Implements full Redis RESP:
 * Integers
 * Errors
 * Null
+
+## Docker Deployment
+
+The project includes a Dockerfile for containerized deployment. See the Dockerfile for details.
+
+**Quick Docker usage:**
+```bash
+# Build
+docker build -t go-redis:latest .
+
+# Run with default config
+docker run -d -p 6379:6379 -v $(pwd)/data:/app/data go-redis:latest
+
+# Run with custom paths
+docker run -d -p 6379:6379 \
+  -v $(pwd)/config/redis.conf:/app/config/redis.conf:ro \
+  -v $(pwd)/data:/app/data \
+  go-redis:latest /app/config/redis.conf /app/data
+```
 
 ## Limitations
 
@@ -196,4 +278,3 @@ Educational project implementing Redis-like functionality in Go.
 
 ## Author
 **Akash Maji (akashmaji@iisc.ac.in) - Contact for bugs and support**
-
