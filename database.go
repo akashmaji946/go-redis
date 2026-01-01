@@ -1,20 +1,28 @@
 package main
 
 import (
+	"errors"
+	"fmt"
+	"log"
+	"sort"
 	"sync"
 	"time"
 )
 
-// VAL represents a value stored in the database along with its expiration time.
+// Item represents a value stored in the database along with its expiration time.
 // This structure allows the database to support key expiration functionality.
 //
 // Fields:
 //   - V: The actual string value stored in the database
 //   - Exp: The expiration time for this key-value pair
 //     If exp is the zero time (time.Time{}), the key has no expiration
-type VAL struct {
-	V   string
-	Exp time.Time
+//   - LastAccessed: The time when the key was last accessed
+//   - AccessCount: The number of times the key was accessed
+type Item struct {
+	V            string
+	Exp          time.Time
+	LastAccessed time.Time
+	AccessCount  int
 }
 
 // Database represents the main in-memory key-value store.
@@ -30,8 +38,10 @@ type VAL struct {
 //   - The RWMutex allows multiple goroutines to read simultaneously while ensuring
 //     exclusive access for write operations
 type Database struct {
-	store map[string]*VAL
-	mu    sync.RWMutex
+	store   map[string]*Item
+	mu      sync.RWMutex
+	mem     int64
+	mempeak int64
 }
 
 // NewDatabase creates and returns a new empty Database instance.
@@ -45,7 +55,7 @@ type Database struct {
 //	// db is ready to use with empty store
 func NewDatabase() *Database {
 	return &Database{
-		store: map[string]*VAL{},
+		store: map[string]*Item{},
 		mu:    sync.RWMutex{},
 	}
 }
@@ -60,14 +70,46 @@ func NewDatabase() *Database {
 // Behavior:
 //   - If the key already exists, it will be overwritten with the new value
 //   - The new value will have no expiration time (zero time)
+//   - The new item will have the current time as the last accessed time
+//   - The new item will have the access count set to 0
 //   - This method directly accesses DB.store without locking
 //     (caller must ensure proper locking is in place)
 //
-// Note: This is a low-level method. For thread-safe operations, ensure
-//
-//	the caller holds the appropriate lock (write lock for writes)
-func (db *Database) Put(k string, v string) {
-	DB.store[k] = &VAL{V: v}
+// Note: This is a low-level method. For thread-safe operations, ensure lock is held.
+func (DB *Database) Put(k string, v string, state *AppState) (err error) {
+
+	// if already exists, decrease meory
+	if oldItem, ok := DB.store[k]; ok {
+		oldmemory := oldItem.approxMemoryUsage(k)
+		DB.mem -= int64(oldmemory)
+	}
+
+	// value to put
+	item := &Item{V: v}
+
+	// get memory
+	memory := item.approxMemoryUsage(k)
+
+	oom := state.config.maxmemory > 0 && DB.mem+memory >= state.config.maxmemory
+	if oom {
+		err := DB.EvictKeys(state, memory)
+		if err != nil {
+			return err
+		}
+	}
+
+	// increase memory
+	DB.mem += int64(memory)
+	// track peak memory
+	if DB.mem > DB.mempeak {
+		DB.mempeak = DB.mem
+	}
+
+	// put value
+	DB.store[k] = item
+
+	log.Printf("memory = %d\n", DB.mem)
+	return nil
 }
 
 // Poll retrieves a value from the database by key.
@@ -92,16 +134,31 @@ func (db *Database) Put(k string, v string) {
 //
 // Example:
 //
-//	val, ok := db.Poll("mykey")
+//	item, ok := DB.Poll("mykey")
 //	if ok {
-//	    // Use val.v for the value, val.exp for expiration
+//	    // Use item.V for the value, item.Exp for expiration
 //	}
-func (db *Database) Poll(k string) (val *VAL, ok bool) {
-	Val, ok := DB.store[k]
-	if ok != true {
-		return &VAL{}, ok
+func (DB *Database) Poll(k string) (item *Item, ok bool) {
+
+	// get the item from the database
+	item, ok = DB.store[k]
+	if !ok {
+		// not found
+		return nil, false
 	}
-	return Val, ok
+
+	// Check if expired, but don't delete here (would need write lock)
+	// Return expired status and let caller handle deletion if needed
+	if item.IsExpired() {
+		return nil, false // Treat expired as not found
+	}
+
+	// update last accessed time and access count
+	item.LastAccessed = time.Now()
+	item.AccessCount++
+
+	// all good, return the item
+	return item, true
 }
 
 // Del removes a key-value pair from the database.
@@ -123,8 +180,47 @@ func (db *Database) Poll(k string) (val *VAL, ok bool) {
 // Example:
 //
 //	db.Del("mykey")  // Removes "mykey" from the database
-func (db *Database) Del(k string) {
-	delete(DB.store, k)
+func (DB *Database) Rem(k string) {
+	if item, ok := DB.store[k]; ok {
+		mem := item.approxMemoryUsage(k)
+		DB.mem -= int64(mem)
+		delete(DB.store, k)
+	}
+	log.Printf("memory = %d\n", DB.mem)
+}
+
+// RemIfExpired removes a key-value pair from the database if it is expired.
+// Deletes the key from the store if it exists and is expired.
+//
+// Parameters:
+//   - k: The key to delete
+//   - item: The item to delete
+//
+// Returns:
+//   - true if the key was deleted, false otherwise
+//
+// Behavior:
+//   - If the key exists and is expired, it is removed from the store
+//   - If the key doesn't exist or is not expired, the operation is a no-op (no error)
+//   - This method directly accesses DB.store without locking
+//     (caller must ensure proper locking is in place)
+//
+// Note: This is a low-level method. For thread-safe operations, ensure
+//
+//	the caller holds the appropriate lock (write lock for deletions)
+//
+// Example:
+//
+//	db.RemIfExpired("mykey", item)
+//	if deleted {
+//	    // item is deleted
+//	}
+func (DB *Database) RemIfExpired(k string, item *Item) (deleted bool) {
+	if item.IsExpired() { // check if expired
+		DB.Rem(k)
+		return true
+	}
+	return false
 }
 
 // DB is the global database instance used throughout the application.
@@ -209,4 +305,166 @@ func NewTransaction() *Transaction {
 type TxCommand struct {
 	value   *Value
 	handler Handler
+}
+
+// approxMemoryUsage calculates the approximate memory usage of an Item.
+// Returns the size in bytes of the Item.
+//
+// Parameters:
+//   - key: The key of the Item
+//
+// Returns:
+//   - size: The approximate memory usage of the Item in bytes
+//   - stringHeader: The size of the string header (16 bytes)
+//   - expHeader: The size of the expiration time header (24 bytes)
+//   - mapEntrySize: The size of the map entry (32 bytes)
+//   - k: The key of the Item
+func (Val *Item) approxMemoryUsage(key string) (size int64) {
+	stringHeader := 16
+	expHeader := 24
+	mapEntrySize := 32
+	lastAccessedSize := 16
+	accessCountSize := 4
+	// stringHeader + key + stringHeader + value + expHeader + lastAccessed + accessCount + mapEntrySize
+	return int64(stringHeader + len(key) + stringHeader + len(Val.V) + expHeader + mapEntrySize + lastAccessedSize + accessCountSize)
+
+}
+
+// UNIX_TS_EPOCH is the Unix timestamp of the epoch time.
+var UNIX_TS_EPOCH = time.Time{}.Unix()
+
+// IsExpired checks if the item is expired.
+// Returns true if the item is expired, false otherwise.
+//
+// Parameters:
+//   - item: The item to check
+//
+// Returns:
+//   - true if the item is expired, false otherwise
+//
+// Behavior:
+//   - If the item has no expiration time, returns false
+//   - If the item has an expiration time and it is in the past, returns true
+//   - If the item has an expiration time and it is in the future, returns false
+//   - This method directly accesses item.Exp without locking
+//     (caller must ensure proper locking is in place)
+//
+// Note: This is a low-level method. For thread-safe operations, ensure
+//
+//	the caller holds the appropriate lock (read lock for reads)
+func (item *Item) IsExpired() bool {
+	return item.Exp.Unix() != UNIX_TS_EPOCH && time.Until(item.Exp).Seconds() <= 0
+}
+
+// EvictKeys removes keys from the database to free up memory when the maximum
+// memory limit is reached. This function implements the eviction policy configured
+// in the server settings to automatically free space for new keys.
+//
+// Parameters:
+//   - state: The application state containing eviction policy configuration
+//   - requiredMemBytes: The minimum number of bytes that must be freed to make
+//     room for the new operation
+//
+// Returns:
+//   - error: nil on success, or an error if eviction fails or is not allowed
+//
+// Behavior:
+//   - Checks if eviction is enabled (returns error if policy is NoEviction)
+//   - Samples keys from the database based on the eviction policy
+//   - Iteratively removes keys until enough memory is freed
+//   - Stops when DB.mem + requiredMemBytes < maxmemory
+//
+// Supported Eviction Policies:
+//   - AllKeysRandom: Randomly selects and removes keys from all keys in the database
+//     until sufficient memory is freed. Uses random sampling for efficiency.
+//   - AllKeysLRU: Not yet implemented (returns error)
+//   - AllKeysLFU: Not yet implemented (returns error)
+//   - Volatile* policies: Not yet implemented
+//
+// Eviction Process:
+//  1. Samples keys using sampleKeysRandom() based on maxmemory-samples config
+//  2. For each sampled key, removes it using DB.Rem()
+//  3. Checks after each removal if enough memory has been freed
+//  4. Continues until sufficient memory is available or all samples are processed
+//  5. Returns error if unable to free enough memory
+//
+// Thread Safety:
+//   - This function acquires its own locks internally
+//   - MUST NOT be called while holding DB.mu lock (will cause deadlock)
+//   - Should be called before acquiring write locks for Put operations
+//
+// Error Cases:
+//   - NoEviction policy: Returns error immediately (eviction disabled)
+//   - Insufficient memory freed: Returns error if all samples processed but
+//     still not enough memory available
+//   - Unimplemented policies: Returns error for LRU/LFU policies (not yet supported)
+//
+// Example Usage:
+//
+//	// Check memory before Put operation
+//	if DB.mem + newMemory >= state.config.maxmemory {
+//	    err := DB.EvictKeys(state, newMemory)
+//	    if err != nil {
+//	        return err  // Handle eviction failure
+//	    }
+//	}
+//	// Now safe to proceed with Put
+//
+// Note:
+//   - Eviction is a best-effort operation and may not always free exactly
+//     the required amount due to sampling limitations
+//   - The function uses random sampling for performance (not all keys are examined)
+//   - Memory calculation includes key size, value size, and metadata overhead
+func (db *Database) EvictKeys(state *AppState, requiredMemBytes int64) (err error) {
+	if state.config.eviction == NoEviction {
+		return errors.New("maxmemory reached : can't call eviction when policy is no-eviction")
+	}
+
+	samples := sampleKeysRandom(state)
+	enoughMemFreed := func() bool {
+		if DB.mem+requiredMemBytes < state.config.maxmemory {
+			return true
+		}
+		return false
+	}
+
+	EvictKeysFromSample := func(samples []Sample) error {
+		// iterate till needed
+		for _, sample := range samples {
+			if enoughMemFreed() {
+				break
+			}
+			fmt.Printf("evicting key=%s\n", sample.key)
+			DB.Rem(sample.key)
+		}
+		if !enoughMemFreed() {
+			return errors.New("maxmemory reached : can't free enough memory")
+		}
+		return nil
+	}
+
+	switch state.config.eviction {
+	case AllKeysRandom:
+		// no sort, randomly delete till needed
+		return EvictKeysFromSample(samples)
+	case AllKeysLRU:
+
+		// sort based by Least Recent Usage
+		sort.Slice(samples, func(i, j int) bool {
+			return samples[i].value.LastAccessed.After(samples[j].value.LastAccessed)
+		})
+		// delete lru ones
+		return EvictKeysFromSample(samples)
+
+	case AllKeysLFU:
+
+		// sort based by Least Frequent Usage
+		sort.Slice(samples, func(i, j int) bool {
+			return samples[i].value.AccessCount < samples[j].value.AccessCount
+		})
+		// delete lfu ones
+		return EvictKeysFromSample(samples)
+
+	}
+	return nil
 }

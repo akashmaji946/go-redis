@@ -106,6 +106,7 @@ func ReadLine(reader *bufio.Reader) (string, error) {
 // Returns:
 //   - Value: A Value struct with typ=BULK and blk containing the string data
 //     Returns NULL value on error
+//   - Error: an error
 //
 // Behavior:
 //   - Reads the length prefix (e.g., "$5" means 5 bytes)
@@ -122,20 +123,21 @@ func ReadLine(reader *bufio.Reader) (string, error) {
 //
 //	Input: "$5\r\nhello\r\n"
 //	Returns: Value{typ: BULK, blk: "hello"}
-func (v *Value) ReadBulk(reader *bufio.Reader) Value {
+func (v *Value) ReadBulk(reader *bufio.Reader) (Value, error) {
 
 	line, err := ReadLine(reader) // line = $1123
 	if err != nil {
 		fmt.Println("error in ReadBulk:", err)
 		return Value{
 			typ: NULL,
-		}
+		}, err
 	}
 	if line[0] != '$' {
+		err := fmt.Errorf("must have $ with readbulk")
 		fmt.Println("error in ReadBulk:", err)
 		return Value{
 			typ: NULL,
-		}
+		}, err
 	}
 
 	n, err := strconv.Atoi(string(line[1:])) // "1123"
@@ -151,14 +153,14 @@ func (v *Value) ReadBulk(reader *bufio.Reader) Value {
 		fmt.Println("error in ReadBulk:", err)
 		return Value{
 			typ: NULL,
-		}
+		}, err
 	}
 	bulkData := string(bulkDataBuffer[:n]) // data without \r\n
 
 	return Value{
 		typ: BULK,
 		blk: bulkData,
-	}
+	}, nil
 
 }
 
@@ -196,9 +198,9 @@ func (v *Value) ReadBulk(reader *bufio.Reader) Value {
 // Note: This method is typically used to parse Redis commands from clients,
 //
 //	where the first element is the command name and subsequent elements are arguments.
-func (v *Value) ReadArray(r io.Reader) error {
+func (v *Value) ReadArray(reader *bufio.Reader) error {
 
-	reader := bufio.NewReader(r)
+	// reader := bufio.NewReader(r) // creates problem with aof file sync
 	line, err := ReadLine(reader) // line = *123
 	if err != nil {
 		fmt.Println("error in ReadArray:", err)
@@ -216,7 +218,11 @@ func (v *Value) ReadArray(r io.Reader) error {
 	}
 
 	for range arrLen {
-		bulk := v.ReadBulk(reader)
+		bulk, err := v.ReadBulk(reader)
+		if err != nil {
+			log.Printf("can't proceed with readbulk")
+			break
+		}
 		v.arr = append(v.arr, bulk)
 	}
 	return nil

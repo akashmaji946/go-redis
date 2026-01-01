@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -117,11 +118,11 @@ func NewAof(config *Config) *Aof {
 //
 //	Other commands may cause unexpected behavior during replay.
 func (aof *Aof) Synchronize() {
-
+	reader := bufio.NewReader(aof.f)
 	total := 0
 	for {
 		v := Value{}
-		err := v.ReadArray(aof.f)
+		err := v.ReadArray(reader)
 		if err == io.EOF {
 			break
 		}
@@ -217,7 +218,7 @@ func (aof *Aof) Synchronize() {
 //
 //	blocking the server. The file is rewritten atomically (old file
 //	is replaced only after successful rewrite).
-func (aof *Aof) Rewrite(cp map[string]*VAL) {
+func (aof *Aof) Rewrite(cp map[string]*Item) {
 	// future SET commands will go to to buffer
 	var b bytes.Buffer
 	aof.w = NewWriter(&b) // writer to buffer

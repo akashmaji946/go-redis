@@ -1,11 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"net"
 	"sync"
-	"time"
 )
 
 // main is the entry point of the Go-Redis server application.
@@ -144,10 +144,24 @@ func main() {
 //	-> Response sent back to client
 //	-> Loop continues for next command
 func handleOneConnection(conn net.Conn, state *AppState, connectionCount *int) {
-	log.Printf("[%2d] [ACCEPT] Accepted connection from: %s\n", *connectionCount, conn.LocalAddr().String())
+
 	*connectionCount += 1
+	state.clients = *connectionCount
+	log.Printf("[%2d] [ACCEPT] Accepted connection from: %s\n", *connectionCount, conn.LocalAddr().String())
 
 	client := NewClient(conn)
+	reader := bufio.NewReader(conn)
+
+	// remove from monitors list if there
+	defer func() {
+		newmonitors := state.monitors[:0] // same capacity but zero size
+		for _, mon := range state.monitors {
+			if mon != *client {
+				newmonitors = append(newmonitors, mon)
+			}
+		}
+		state.monitors = newmonitors
+	}()
 
 	for {
 
@@ -156,7 +170,7 @@ func handleOneConnection(conn net.Conn, state *AppState, connectionCount *int) {
 		}
 
 		// receive a Value and print it
-		err := v.ReadArray(conn)
+		err := v.ReadArray(reader)
 		if err != nil {
 			log.Println("[CLOSE] Closing connection due to: ", err)
 			*connectionCount -= 1
@@ -169,130 +183,9 @@ func handleOneConnection(conn net.Conn, state *AppState, connectionCount *int) {
 		// handle the Value (abstracting the command and its args)
 		handle(client, &v, state)
 	}
-}
 
-// Client represents a connected client session.
-// Each client connection has its own Client instance that tracks connection-specific state.
-//
-// Fields:
-//   - conn: The network connection to the client (used for reading commands and sending responses)
-//   - authenticated: Whether this client has successfully authenticated
-//     (required if requirepass is set in config)
-//
-// Authentication:
-//   - Initially false for all new connections
-//   - Set to true after successful AUTH command
-//   - Checked before executing commands (if requirepass is enabled)
-//   - Safe commands (COMMAND, AUTH) can be executed without authentication
-//
-// Lifecycle:
-//   - Created when client connects (in handleOneConnection)
-//   - Exists for the duration of the client connection
-//   - Destroyed when connection closes (garbage collected)
-//
-// Thread Safety:
-//   - Each Client is used by a single goroutine (one per connection)
-//   - No synchronization needed for Client fields
-type Client struct {
-	conn          net.Conn
-	authenticated bool
-}
+	*connectionCount -= 1
+	state.clients = *connectionCount
+	log.Printf("[%2d] [CLOSED] Closed connection from: %s\n", *connectionCount, conn.LocalAddr().String())
 
-// NewClient creates a new Client instance for a network connection.
-// Initializes a client with the given connection and sets authentication to false.
-//
-// Parameters:
-//   - conn: The network connection associated with this client
-//
-// Returns: A pointer to a new Client instance with authenticated=false
-//
-// Usage:
-//   - Called once per client connection in handleOneConnection()
-//   - The Client instance is then used for all command handling for that connection
-func NewClient(conn net.Conn) *Client {
-	return &Client{
-		conn:          conn,
-		authenticated: false,
-	}
-}
-
-// AppState holds the global application state shared across all client connections.
-// This structure contains configuration, persistence mechanisms, background operation flags,
-// and transaction state.
-//
-// Fields:
-//   - config: Server configuration (persistence settings, authentication, etc.)
-//   - aof: AOF persistence instance (nil if AOF is disabled)
-//   - bgsaving: Flag indicating if a background RDB save is currently in progress
-//     Used to prevent concurrent background saves
-//   - DBCopy: Copy of the database used during background saves
-//     Contains a snapshot of DB.store taken at the start of BGSAVE
-//     Only populated during background saves, nil otherwise
-//   - tx: Current transaction context for this client connection
-//     Set to non-nil when MULTI is called, cleared by EXEC or DISCARD
-//     Each client connection has its own transaction state
-//
-// ... rest of existing documentation ...
-type AppState struct {
-	config   *Config
-	aof      *Aof
-	bgsaving bool
-	DBCopy   map[string]*VAL
-	tx       *Transaction
-}
-
-// NewAppState creates and initializes a new AppState instance.
-// Sets up persistence mechanisms (AOF) and background workers based on configuration.
-//
-// Parameters:
-//   - config: The server configuration containing persistence and other settings
-//
-// Returns: A pointer to a new AppState instance with persistence initialized
-//
-// Behavior:
-//   - Creates AppState with the provided config
-//   - If AOF is enabled:
-//   - Creates and initializes AOF instance (opens AOF file)
-//   - If fsync mode is "everysec", starts a background goroutine that
-//     flushes the AOF writer every second
-//   - If AOF is disabled, aof field remains nil
-//
-// Background Workers:
-//   - AOF fsync worker (if aofFsync == Everysec):
-//   - Runs in a separate goroutine
-//   - Flushes AOF writer every second using a ticker
-//   - Ensures AOF data is written to disk periodically
-//   - Stops automatically when ticker is stopped (on server shutdown)
-//
-// Initialization Order:
-//  1. Create AppState with config
-//  2. Initialize AOF if enabled
-//  3. Start background workers if needed
-//  4. Return initialized state
-//
-// Example:
-//
-//	conf := ReadConf("./redis.conf")
-//	state := NewAppState(conf)
-//	// state is ready to use, AOF initialized if enabled
-//
-// Note: RDB initialization (trackers) happens separately in main() after AppState creation
-func NewAppState(config *Config) *AppState {
-	state := AppState{
-		config: config,
-	}
-	if config.aofEnabled {
-		state.aof = NewAof(config)
-		if config.aofFsync == Everysec {
-			go func() {
-				t := time.NewTicker(time.Second)
-				defer t.Stop()
-
-				for range t.C {
-					state.aof.w.Flush()
-				}
-			}()
-		}
-	}
-	return &state
 }

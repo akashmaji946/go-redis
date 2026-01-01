@@ -26,15 +26,35 @@ import (
 //   - All fields are zero values (empty/false) when created with NewConfig()
 //   - Configuration is populated by reading from redis.conf file
 type Config struct {
-	rdb         []RDBSnapshot
-	rdbFn       string
-	dir         string
-	aofEnabled  bool
-	aofFn       string
-	aofFsync    FSyncMode
-	requirepass bool
-	password    string
+	rdb              []RDBSnapshot
+	rdbFn            string
+	dir              string
+	aofEnabled       bool
+	aofFn            string
+	aofFsync         FSyncMode
+	requirepass      bool
+	password         string
+	maxmemory        int64
+	eviction         Eviction
+	maxmemorySamples int
+	filepath         string
 }
+
+type Eviction string
+
+const (
+	NoEviction Eviction = "no-eviction"
+
+	AllKeysRandom Eviction = "allkeys-random"
+
+	AllKeysLRU Eviction = "allkeys-lru"
+	AllKeysLFU Eviction = "allkeys-lfu"
+
+	VolatileRandom Eviction = "volatile-random"
+	VolatileLRU    Eviction = "volatile-lru"
+	VolatileLFU    Eviction = "volatile-lfu"
+	VolatileTTL    Eviction = "volatile-ttl"
+)
 
 // RDBSnapshot defines a snapshot trigger condition for RDB persistence.
 // When both conditions are met (time elapsed AND keys changed), a snapshot is saved.
@@ -155,6 +175,9 @@ func ReadConf(filename string) *Config {
 	}
 	defer f.Close()
 
+	// we know file exists
+	config.filepath = filename
+
 	// now we will read the file
 	s := bufio.NewScanner(f)
 	for s.Scan() {
@@ -269,5 +292,44 @@ func parseLine(l string, config *Config) {
 	case "requirepass":
 		config.requirepass = true
 		config.password = args[1]
+	case "maxmemory":
+		mem, err := parseMemory(args[1])
+		if err != nil {
+			config.maxmemory = 1024 // 1kb
+		} else {
+			config.maxmemory = mem
+		}
+	case "maxmemory-policy":
+		config.eviction = Eviction(args[1])
+	case "maxmemory-samples":
+		samples, err := strconv.Atoi(args[1])
+		if err != nil {
+			fmt.Println("invalid maxmemory-samples, setting to default 5")
+			config.maxmemorySamples = 5
+		} else {
+			config.maxmemorySamples = samples
+		}
+
 	}
+}
+
+func parseMemory(s string) (mem int64, err error) {
+	s = strings.TrimSpace(strings.ToLower(s))
+	var mult int64
+	switch {
+	case strings.HasSuffix(s, "gb"):
+		mult = 1024 * 1024 * 1024
+	case strings.HasSuffix(s, "mb"):
+		mult = 1024 * 1024
+	case strings.HasSuffix(s, "kb"):
+		mult = 1024
+	default:
+		mult = 1
+	}
+
+	num, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return num * mult, nil
 }

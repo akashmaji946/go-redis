@@ -34,8 +34,6 @@ func Command(c *Client, v *Value, state *AppState) *Value {
 	}
 }
 
-var UNIX_TS_EPOCH = time.Time{}.Unix()
-
 type Handler func(*Client, *Value, *AppState) *Value
 
 var Handlers = map[string]Handler{
@@ -67,6 +65,35 @@ var Handlers = map[string]Handler{
 	"MULTI":   Multi,
 	"EXEC":    Exec,
 	"DISCARD": Discard,
+
+	"MONITOR": Monitor,
+	"INFO":    Info,
+}
+
+func Info(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 0 {
+		log.Println("invalid use of INFO")
+		return &Value{
+			typ: ERROR,
+			err: "ERR inavlid argument to INFO",
+		}
+	}
+	msg := state.redisInfo.Print(state)
+	return &Value{typ: BULK, blk: msg}
+}
+
+func Monitor(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 0 {
+		log.Println("invalid use of MONITOR")
+		return &Value{
+			typ: ERROR,
+			err: "ERR inavlid argument to MONITOR",
+		}
+	}
+	state.monitors = append(state.monitors, *c)
+	return &Value{typ: STRING, str: "OK"}
 }
 
 // Multi handles the MULTI command.
@@ -304,7 +331,7 @@ func BGRewriteAOF(c *Client, v *Value, state *AppState) *Value {
 
 	go func() {
 		DB.mu.RLock()
-		cp := make(map[string]*VAL, len(DB.store))
+		cp := make(map[string]*Item, len(DB.store))
 		maps.Copy(cp, DB.store)
 		DB.mu.RUnlock()
 
@@ -342,10 +369,11 @@ func Get(c *Client, v *Value, state *AppState) *Value {
 	}
 	key := args[0].blk // grab the key
 
-	// lock before read
+	// get the item from the database
 	DB.mu.RLock()
-	Val, ok := DB.Poll(key)
+	item, ok := DB.Poll(key)
 	DB.mu.RUnlock()
+
 	if !ok {
 		fmt.Println("Not Found: ", key)
 		return &Value{
@@ -354,11 +382,8 @@ func Get(c *Client, v *Value, state *AppState) *Value {
 	}
 
 	// delete if expired
-	// if expiry is set and ttl is <= 0, delete and return NULL
-	if Val.Exp.Unix() != UNIX_TS_EPOCH && time.Until(Val.Exp).Seconds() <= 0 {
-		DB.mu.Lock()
-		DB.Del(key)
-		DB.mu.Unlock()
+	deleted := DB.RemIfExpired(key, item)
+	if deleted {
 		return &Value{
 			typ: NULL,
 		}
@@ -366,7 +391,7 @@ func Get(c *Client, v *Value, state *AppState) *Value {
 
 	return &Value{
 		typ: BULK,
-		blk: Val.V,
+		blk: item.V,
 	}
 
 }
@@ -404,7 +429,14 @@ func Set(c *Client, v *Value, state *AppState) *Value {
 	val := args[1].blk // grab the value
 
 	DB.mu.Lock()
-	DB.Put(key, val)
+	err := DB.Put(key, val, state)
+	if err != nil {
+		DB.mu.Unlock()
+		return &Value{
+			typ: ERROR,
+			err: "ERR some error occured while PUT:" + err.Error(),
+		}
+	}
 	// record it for AOF
 	if state.config.aofEnabled {
 		state.aof.w.Write(v)
@@ -450,13 +482,13 @@ func Del(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.Lock()
 	for _, arg := range args {
 		key := arg.blk
-		_, ok := DB.store[key]
+		_, ok := DB.Poll(key)
 		if !ok {
 			// doesnot exist
 			continue
 		}
 		// delete
-		delete(DB.store, key)
+		DB.Rem(key)
 		m += 1
 	}
 	DB.mu.Unlock()
@@ -609,7 +641,7 @@ func BGSave(c *Client, v *Value, state *AppState) *Value {
 		}
 	}
 
-	copy := make(map[string]*VAL, len(DB.store)) // actual copy of DB.store
+	copy := make(map[string]*Item, len(DB.store)) // actual copy of DB.store
 	maps.Copy(copy, DB.store)
 	state.bgsaving = true
 	state.DBCopy = copy // points to that
@@ -659,7 +691,7 @@ func FlushDB(c *Client, v *Value, state *AppState) *Value {
 
 	// fast
 	DB.mu.Lock()
-	DB.store = map[string]*VAL{}
+	DB.store = map[string]*Item{}
 	DB.mu.Unlock()
 
 	return &Value{
@@ -843,7 +875,7 @@ func Ttl(c *Client, v *Value, state *AppState) *Value {
 	secondsToExpire := time.Until(exp).Seconds() //float
 	if secondsToExpire <= 0.0 {
 		DB.mu.Lock()
-		DB.Del(k)
+		DB.Rem(k)
 		DB.mu.Unlock()
 		return &Value{
 			typ: INTEGER,
@@ -968,6 +1000,14 @@ func handle(client *Client, v *Value, state *AppState) {
 	w := NewWriter(client.conn)
 	w.Write(reply)
 	w.Flush()
-	return
+
+	// for MONITOR handle will send to all monitors
+	go func() {
+		for _, mon := range state.monitors {
+			if mon != *client {
+				mon.writerMonitorLog(v, client)
+			}
+		}
+	}()
 
 }
