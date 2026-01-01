@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"sort"
 	"sync"
@@ -92,10 +91,12 @@ func (DB *Database) Put(k string, v string, state *AppState) (err error) {
 
 	oom := state.config.maxmemory > 0 && DB.mem+memory >= state.config.maxmemory
 	if oom {
-		err := DB.EvictKeys(state, memory)
+		count, err := DB.EvictKeys(state, memory)
 		if err != nil {
 			return err
 		}
+		state.genStats.total_evicted_keys += count
+		log.Printf("%d keys evicted\n", count)
 	}
 
 	// increase memory
@@ -215,9 +216,10 @@ func (DB *Database) Rem(k string) {
 //	if deleted {
 //	    // item is deleted
 //	}
-func (DB *Database) RemIfExpired(k string, item *Item) (deleted bool) {
+func (DB *Database) RemIfExpired(k string, item *Item, state *AppState) (deleted bool) {
 	if item.IsExpired() { // check if expired
 		DB.Rem(k)
+		state.genStats.total_expired_keys += 1
 		return true
 	}
 	return false
@@ -415,9 +417,9 @@ func (item *Item) IsExpired() bool {
 //     the required amount due to sampling limitations
 //   - The function uses random sampling for performance (not all keys are examined)
 //   - Memory calculation includes key size, value size, and metadata overhead
-func (db *Database) EvictKeys(state *AppState, requiredMemBytes int64) (err error) {
+func (db *Database) EvictKeys(state *AppState, requiredMemBytes int64) (count int, err error) {
 	if state.config.eviction == NoEviction {
-		return errors.New("maxmemory reached : can't call eviction when policy is no-eviction")
+		return 0, errors.New("maxmemory reached : can't call eviction when policy is no-eviction")
 	}
 
 	samples := sampleKeysRandom(state)
@@ -428,19 +430,21 @@ func (db *Database) EvictKeys(state *AppState, requiredMemBytes int64) (err erro
 		return false
 	}
 
-	EvictKeysFromSample := func(samples []Sample) error {
+	EvictKeysFromSample := func(samples []Sample) (int, error) {
 		// iterate till needed
+		count := 0
 		for _, sample := range samples {
 			if enoughMemFreed() {
 				break
 			}
-			fmt.Printf("evicting key=%s\n", sample.key)
+			log.Printf("evicting key=%s\n", sample.key)
 			DB.Rem(sample.key)
+			count += 1
 		}
 		if !enoughMemFreed() {
-			return errors.New("maxmemory reached : can't free enough memory")
+			return count, errors.New("maxmemory reached : can't free enough memory")
 		}
-		return nil
+		return count, nil
 	}
 
 	switch state.config.eviction {
@@ -466,5 +470,5 @@ func (db *Database) EvictKeys(state *AppState, requiredMemBytes int64) (err erro
 		return EvictKeysFromSample(samples)
 
 	}
-	return nil
+	return 0, nil
 }

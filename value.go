@@ -127,14 +127,14 @@ func (v *Value) ReadBulk(reader *bufio.Reader) (Value, error) {
 
 	line, err := ReadLine(reader) // line = $1123
 	if err != nil {
-		fmt.Println("error in ReadBulk:", err)
+		log.Println("error in ReadBulk:", err)
 		return Value{
 			typ: NULL,
 		}, err
 	}
 	if line[0] != '$' {
 		err := fmt.Errorf("must have $ with readbulk")
-		fmt.Println("error in ReadBulk:", err)
+		log.Println("error in ReadBulk:", err)
 		return Value{
 			typ: NULL,
 		}, err
@@ -150,7 +150,7 @@ func (v *Value) ReadBulk(reader *bufio.Reader) (Value, error) {
 	// read till filling the buffer
 	_, err = io.ReadFull(reader, bulkDataBuffer)
 	if err != nil {
-		fmt.Println("error in ReadBulk:", err)
+		log.Println("error in ReadBulk:", err)
 		return Value{
 			typ: NULL,
 		}, err
@@ -203,11 +203,11 @@ func (v *Value) ReadArray(reader *bufio.Reader) error {
 	// reader := bufio.NewReader(r) // creates problem with aof file sync
 	line, err := ReadLine(reader) // line = *123
 	if err != nil {
-		fmt.Println("error in ReadArray:", err)
+		log.Println("error in ReadArray:", err)
 		return err
 	}
 	if line[0] != '*' {
-		fmt.Println("error in ReadArray:", err)
+		log.Println("error in ReadArray:", err)
 		return fmt.Errorf("invalid input by user")
 	}
 

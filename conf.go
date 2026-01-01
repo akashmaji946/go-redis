@@ -26,18 +26,23 @@ import (
 //   - All fields are zero values (empty/false) when created with NewConfig()
 //   - Configuration is populated by reading from redis.conf file
 type Config struct {
-	rdb              []RDBSnapshot
-	rdbFn            string
-	dir              string
-	aofEnabled       bool
-	aofFn            string
-	aofFsync         FSyncMode
-	requirepass      bool
-	password         string
+	rdb   []RDBSnapshot
+	rdbFn string
+
+	dir string
+
+	aofEnabled bool
+	aofFn      string
+	aofFsync   FSyncMode
+
+	requirepass bool
+	password    string
+
 	maxmemory        int64
 	eviction         Eviction
-	maxmemorySamples int
-	filepath         string
+	maxmemorySamples int64
+
+	filepath string
 }
 
 type Eviction string
@@ -307,7 +312,7 @@ func parseLine(l string, config *Config) {
 			fmt.Println("invalid maxmemory-samples, setting to default 5")
 			config.maxmemorySamples = 5
 		} else {
-			config.maxmemorySamples = samples
+			config.maxmemorySamples = int64(samples)
 		}
 
 	}

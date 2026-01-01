@@ -12,26 +12,128 @@ import (
 // Success Message:
 // +OK\r\n
 
-// initial command just before connection
-// COMMAND DOCS
-// Command handles the COMMAND command.
-// Utility command used for connection testing and protocol compliance.
+// can run these even if authenticated=0
+var safeCommands = []string{
+	"COMMAND",
+	"AUTH",
+}
+
+// IsSafeCmd checks whether a command can be executed without authentication.
 //
-// Syntax:
-//   COMMAND
+// Parameters:
+//   - cmd: command name
+//   - commands: list of safe commands
 //
 // Returns:
-//   +OK\r\n
 //
-// Notes:
-//   - Executable without authentication
-
-func Command(c *Client, v *Value, state *AppState) *Value {
-	// cmd := v.arr[0].blk
-	return &Value{
-		typ: STRING,
-		str: "OK",
+//	true if cmd is in commands, false otherwise
+//
+// Safe commands include:
+//
+//	COMMAND, AUTH
+func IsSafeCmd(cmd string, commands []string) bool {
+	for _, command := range commands {
+		if cmd == command {
+			return true
+		}
 	}
+	return false
+}
+
+// handle is the main command dispatcher.
+//
+// Responsibilities:
+//  1. Extract command name from parsed Value
+//  2. Lookup command handler in Handlers map
+//  3. Enforce authentication rules (if requirepass is set)
+//  4. Handle transaction queuing (if transaction is active)
+//  5. Execute handler or queue command
+//  6. Write response to client
+//
+// Transaction Support:
+//   - If state.tx is not nil (transaction active):
+//   - Commands (except MULTI, EXEC, DISCARD) are queued
+//   - Returns "QUEUED" response instead of executing
+//   - Commands are stored with their handler for later execution
+//   - Transaction control commands (MULTI, EXEC, DISCARD) execute immediately
+//
+// Error cases:
+//   - Unknown command → ERR no such command
+//   - Authentication required but missing → NOAUTH error
+//   - Transaction already running (for MULTI) → handled by Multi handler
+//   - No transaction running (for EXEC/DISCARD) → handled by respective handlers
+//
+// Command Flow:
+//  1. Parse command name from Value array
+//  2. Check if command exists in Handlers map
+//  3. Check authentication (if required)
+//  4. Check transaction state:
+//     - If transaction active: queue command (unless MULTI/EXEC/DISCARD)
+//     - If no transaction: execute command immediately
+//  5. Send response to client
+func handle(client *Client, v *Value, state *AppState) {
+
+	state.genStats.total_commands_executed += 1
+
+	// the command is in the first entry of v.arr
+	cmd := v.arr[0].blk
+	handler, ok := Handlers[cmd]
+
+	if !ok {
+		log.Println("ERROR: no such command:", cmd)
+		reply := &Value{
+			typ: ERROR,
+			err: "ERR no such command",
+		}
+		w := NewWriter(client.conn)
+		w.Write(reply)
+		w.Flush()
+		return
+	}
+
+	// handle authentication: if password needed & not authenticated, then block running command
+	if state.config.requirepass && !client.authenticated && !IsSafeCmd(cmd, safeCommands) {
+		reply := &Value{
+			typ: ERROR,
+			err: "NOAUTH client not authenticated, use AUTH <password>",
+		}
+		w := NewWriter(client.conn)
+		w.Write(reply)
+		w.Flush()
+		return
+	}
+
+	// handle transaction: if already running, then queue
+	if state.tx != nil && cmd != "EXEC" && cmd != "DISCARD" && cmd != "MULTI" {
+		txCmd := &TxCommand{
+			value:   v,
+			handler: handler,
+		}
+		state.tx.cmds = append(state.tx.cmds, txCmd)
+		reply := &Value{
+			typ: STRING,
+			str: "QUEUED",
+		}
+		w := NewWriter(client.conn)
+		w.Write(reply)
+		w.Flush()
+		return
+	}
+
+	reply := handler(client, v, state)
+	w := NewWriter(client.conn)
+	w.Write(reply)
+	w.Flush()
+
+	// for MONITOR handle will send to all monitors
+	go func() {
+		for _, mon := range state.monitors {
+			if mon != *client {
+				mon.writerMonitorLog(v, client)
+			}
+		}
+	}()
+
 }
 
 type Handler func(*Client, *Value, *AppState) *Value
@@ -70,6 +172,123 @@ var Handlers = map[string]Handler{
 	"INFO":    Info,
 }
 
+// initial command just before connection
+// COMMAND DOCS
+// Command handles the COMMAND command.
+// Utility command used for connection testing and protocol compliance.
+//
+// Syntax:
+//   COMMAND
+//
+// Returns:
+//   +OK\r\n
+//
+// Notes:
+//   - Executable without authentication
+
+func Command(c *Client, v *Value, state *AppState) *Value {
+	// cmd := v.arr[0].blk
+	return &Value{
+		typ: STRING,
+		str: "OK",
+	}
+}
+
+// Info handles the INFO command.
+// Returns server information and statistics in a human-readable format.
+// This command provides comprehensive details about the server's current state,
+// including server metadata, client connections, memory usage, persistence status,
+// and general statistics.
+//
+// Syntax:
+//
+//	INFO
+//
+// Parameters:
+//   - None (takes no arguments)
+//
+// Returns:
+//   - Bulk string: Formatted server information organized into categories
+//   - Error: If arguments are provided (INFO takes no arguments)
+//
+// Information Categories:
+//
+//	Server:
+//	  - redis_version: Server version (0.1)
+//	  - author: Author information
+//	  - process_id: Operating system process ID
+//	  - tcp_port: Port the server is listening on (6379)
+//	  - server_time: Current server time in Unix microseconds
+//	  - server_uptime: Server uptime in seconds
+//	  - server_path: Path to the server executable
+//	  - config_path: Path to the configuration file
+//
+//	Clients:
+//	  - clients: Number of currently connected clients
+//
+//	Memory:
+//	  - used_memory: Current memory usage in bytes
+//	  - used_memory_peak: Peak memory usage in bytes
+//	  - total_memory: Total system memory in bytes
+//	  - eviction_policy: Currently configured eviction policy
+//
+//	Persistence:
+//	  - rdb_bgsave_running: Whether a background RDB save is in progress (true/false)
+//	  - rdb_last_save_time: Unix timestamp of last RDB save
+//	  - rdb_saves_count: Total number of RDB saves performed
+//	  - aof_enabled: Whether AOF persistence is enabled (true/false)
+//	  - aof_rewrite_running: Whether an AOF rewrite is in progress (true/false)
+//	  - aof_last_rewrite_time: Unix timestamp of last AOF rewrite
+//	  - rdb_rewrite_count: Total number of AOF rewrites performed
+//
+//	General:
+//	  - total_connections_received: Total number of client connections since startup
+//	  - total_commands_executed: Total number of commands executed
+//	  - total_txn_executed: Total number of transactions (EXEC) executed
+//	  - total_keys_expired: Total number of keys expired
+//	  - total_keys_evicted: Total number of keys evicted due to memory limits
+//
+// Output Format:
+//
+//	Information is formatted with category headers (prefixed with #) and
+//	key-value pairs with aligned formatting for readability.
+//
+// Example Output:
+//
+//	# Server
+//	             redis_version  : 0.1
+//	                     author : akashmaji(@iisc.ac.in)
+//	                 process_id : 12345
+//	                   tcp_port : 6379
+//	                server_time : 1704067200000000
+//	              server_uptime : 3600
+//	                server_path : /path/to/go-redis
+//	                config_path : ./redis.conf
+//
+//	# Clients
+//	                     clients : 3
+//
+//	# Memory
+//	                 used_memory : 1024 B
+//	           used_memory_peak : 2048 B
+//	                total_memory : 8589934592 B
+//	           eviction_policy : allkeys-random
+//
+// Usage:
+//
+//	127.0.0.1:6379> INFO
+//	# Server
+//	redis_version  : 0.1
+//	...
+//
+// Thread Safety:
+//   - Reads from AppState which is protected by appropriate synchronization
+//   - Safe to call from any client connection concurrently
+//
+// Note:
+//   - Information is generated dynamically on each call
+//   - Statistics are cumulative since server startup
+//   - Memory information uses gopsutil library to get system memory
 func Info(c *Client, v *Value, state *AppState) *Value {
 	args := v.arr[1:]
 	if len(args) != 0 {
@@ -83,6 +302,83 @@ func Info(c *Client, v *Value, state *AppState) *Value {
 	return &Value{typ: BULK, blk: msg}
 }
 
+// Monitor handles the MONITOR command.
+// Enables real-time monitoring mode for the client, causing all commands executed
+// by other clients to be streamed to this client's connection.
+//
+// Syntax:
+//
+//	MONITOR
+//
+// Parameters:
+//   - None (takes no arguments)
+//
+// Returns:
+//   - "+OK\r\n" on success
+//   - Error if arguments are provided (MONITOR takes no arguments)
+//
+// Behavior:
+//  1. Adds the current client to the server's monitoring list
+//  2. Client remains in monitoring mode until connection is closed
+//  3. All commands executed by other clients are streamed to this client
+//  4. The monitoring client does not receive its own commands
+//  5. Multiple clients can be in monitoring mode simultaneously
+//
+// Monitoring Format:
+//
+//	Each monitored command is sent as a RESP simple string with the format:
+//	"<timestamp> [<client_ip>] \"<command>\" \"<arg1>\" \"<arg2>\" ... \"<argN>\"\r\n"
+//
+//	Where:
+//	  - timestamp: Unix timestamp when the command was executed
+//	  - client_ip: IP address and port of the client that executed the command
+//	  - command: The command name (e.g., SET, GET, DEL)
+//	  - arg1, arg2, ...: Command arguments in quoted format
+//
+// Example Output:
+//
+//	+1704067200 [127.0.0.1:54321] "SET" "key1" "value1"\r\n
+//	+1704067201 [127.0.0.1:54322] "GET" "key1"\r\n
+//	+1704067202 [127.0.0.1:54323] "DEL" "key1"\r\n
+//
+// Usage:
+//
+//	# In one terminal, connect and enable monitoring
+//	127.0.0.1:6379> MONITOR
+//	OK
+//
+//	# In another terminal, execute commands
+//	127.0.0.1:6379> SET test "value"
+//	OK
+//
+//	# Monitor terminal will show:
+//	1704067200 [127.0.0.1:54321] "SET" "test" "value"
+//
+// Thread Safety:
+//   - Adds client to shared monitors slice (protected by connection handling)
+//   - Monitoring logs are sent asynchronously in a goroutine to avoid blocking
+//   - Safe for multiple clients to enable monitoring concurrently
+//
+// Lifecycle:
+//   - Client remains in monitoring mode for the lifetime of the connection
+//   - Monitoring automatically stops when client disconnects
+//   - Client is removed from monitoring list on connection close
+//
+// Performance:
+//   - Monitoring adds minimal overhead (asynchronous logging)
+//   - Each command execution triggers a goroutine to send logs to all monitors
+//   - Does not block command execution
+//
+// Use Cases:
+//   - Debugging: See all commands being executed in real-time
+//   - Monitoring: Track server activity and usage patterns
+//   - Development: Understand command flow and interactions
+//
+// Note:
+//   - Use `redis-cli --raw` or similar to see the raw output properly formatted
+//   - Monitoring can generate significant output on busy servers
+//   - The client cannot disable monitoring without disconnecting
+//   - Commands executed by the monitoring client itself are not logged to it
 func Monitor(c *Client, v *Value, state *AppState) *Value {
 	args := v.arr[1:]
 	if len(args) != 0 {
@@ -237,6 +533,7 @@ func Exec(c *Client, v *Value, state *AppState) *Value {
 	}
 
 	state.tx = nil
+	state.genStats.total_txn_executed += 1
 	log.Println("tx executed")
 
 	return &Value{
@@ -320,24 +617,30 @@ func Discard(c *Client, v *Value, state *AppState) *Value {
 // Asynchronously rewrites the Append-Only File.
 //
 // Behavior:
-//   1. Copies current DB state
-//   2. Rewrites AOF with compact SET commands
-//   3. Runs in background goroutine
+//  1. Copies current DB state
+//  2. Rewrites AOF with compact SET commands
+//  3. Runs in background goroutine
 //
 // Returns:
-//   +Started.\r\n
-
+//
+//	+Started.\r\n
 func BGRewriteAOF(c *Client, v *Value, state *AppState) *Value {
 
 	go func() {
+		state.aofrewriting = true
 		DB.mu.RLock()
 		cp := make(map[string]*Item, len(DB.store))
 		maps.Copy(cp, DB.store)
 		DB.mu.RUnlock()
-
 		state.aof.Rewrite(cp)
+		state.aofrewriting = false
 
 	}()
+
+	// update the stats
+	state.aofStats.aof_last_rewrite_ts = time.Now().Unix()
+	state.aofStats.aof_rewrite_count += 1
+
 	return &Value{
 		typ: STRING,
 		str: "Started.",
@@ -382,7 +685,7 @@ func Get(c *Client, v *Value, state *AppState) *Value {
 	}
 
 	// delete if expired
-	deleted := DB.RemIfExpired(key, item)
+	deleted := DB.RemIfExpired(key, item, state)
 	if deleted {
 		return &Value{
 			typ: NULL,
@@ -591,18 +894,20 @@ func Keys(c *Client, v *Value, state *AppState) *Value {
 // Performs a synchronous RDB snapshot.
 //
 // Syntax:
-//   SAVE
+//
+//	SAVE
 //
 // Returns:
-//   +OK\r\n
+//
+//	+OK\r\n
 //
 // Behavior:
 //   - Blocks server during save
 //   - Uses read lock, preventing writes
 //
 // Recommendation:
-//   Use BGSAVE for non-blocking persistence
-
+//
+//	Use BGSAVE for non-blocking persistence
 func Save(c *Client, v *Value, state *AppState) *Value {
 	SaveRDB(state)
 	return &Value{
@@ -855,14 +1160,14 @@ func Ttl(c *Client, v *Value, state *AppState) *Value {
 	k := args[0].blk
 
 	DB.mu.RLock()
-	Val, ok := DB.store[k]
+	item, ok := DB.store[k]
 	if !ok {
 		return &Value{
 			typ: INTEGER,
 			num: -2,
 		}
 	}
-	exp := Val.Exp
+	exp := item.Exp
 	DB.mu.RUnlock()
 
 	// is exp not set
@@ -872,142 +1177,20 @@ func Ttl(c *Client, v *Value, state *AppState) *Value {
 			num: -1,
 		}
 	}
-	secondsToExpire := time.Until(exp).Seconds() //float
-	if secondsToExpire <= 0.0 {
-		DB.mu.Lock()
-		DB.Rem(k)
-		DB.mu.Unlock()
+
+	expired := DB.RemIfExpired(k, item, state)
+	if expired {
 		return &Value{
 			typ: INTEGER,
 			num: -2,
 		}
 	}
-	fmt.Println(secondsToExpire)
+
+	secondsToExpire := time.Until(exp).Seconds() //float
+	// fmt.Println(secondsToExpire)
 	return &Value{
 		typ: INTEGER,
 		num: int(secondsToExpire),
 	}
-
-}
-
-// can run these even if authenticated=0
-var safeCommands = []string{
-	"COMMAND",
-	"AUTH",
-}
-
-// IsSafeCmd checks whether a command can be executed without authentication.
-//
-// Parameters:
-//   - cmd: command name
-//   - commands: list of safe commands
-//
-// Returns:
-//
-//	true if cmd is in commands, false otherwise
-//
-// Safe commands include:
-//
-//	COMMAND, AUTH
-func IsSafeCmd(cmd string, commands []string) bool {
-	for _, command := range commands {
-		if cmd == command {
-			return true
-		}
-	}
-	return false
-}
-
-// handle is the main command dispatcher.
-//
-// Responsibilities:
-//  1. Extract command name from parsed Value
-//  2. Lookup command handler in Handlers map
-//  3. Enforce authentication rules (if requirepass is set)
-//  4. Handle transaction queuing (if transaction is active)
-//  5. Execute handler or queue command
-//  6. Write response to client
-//
-// Transaction Support:
-//   - If state.tx is not nil (transaction active):
-//   - Commands (except MULTI, EXEC, DISCARD) are queued
-//   - Returns "QUEUED" response instead of executing
-//   - Commands are stored with their handler for later execution
-//   - Transaction control commands (MULTI, EXEC, DISCARD) execute immediately
-//
-// Error cases:
-//   - Unknown command → ERR no such command
-//   - Authentication required but missing → NOAUTH error
-//   - Transaction already running (for MULTI) → handled by Multi handler
-//   - No transaction running (for EXEC/DISCARD) → handled by respective handlers
-//
-// Command Flow:
-//  1. Parse command name from Value array
-//  2. Check if command exists in Handlers map
-//  3. Check authentication (if required)
-//  4. Check transaction state:
-//     - If transaction active: queue command (unless MULTI/EXEC/DISCARD)
-//     - If no transaction: execute command immediately
-//  5. Send response to client
-func handle(client *Client, v *Value, state *AppState) {
-
-	// the command is in the first entry of v.arr
-	cmd := v.arr[0].blk
-	handler, ok := Handlers[cmd]
-
-	if !ok {
-		log.Println("ERROR: no such command:", cmd)
-		reply := &Value{
-			typ: ERROR,
-			err: "ERR no such command",
-		}
-		w := NewWriter(client.conn)
-		w.Write(reply)
-		w.Flush()
-		return
-	}
-
-	// handle authentication: if password needed & not authenticated, then block running command
-	if state.config.requirepass && !client.authenticated && !IsSafeCmd(cmd, safeCommands) {
-		reply := &Value{
-			typ: ERROR,
-			err: "NOAUTH client not authenticated, use AUTH <password>",
-		}
-		w := NewWriter(client.conn)
-		w.Write(reply)
-		w.Flush()
-		return
-	}
-
-	// handle transaction: if already running, then queue
-	if state.tx != nil && cmd != "EXEC" && cmd != "DISCARD" && cmd != "MULTI" {
-		txCmd := &TxCommand{
-			value:   v,
-			handler: handler,
-		}
-		state.tx.cmds = append(state.tx.cmds, txCmd)
-		reply := &Value{
-			typ: STRING,
-			str: "QUEUED",
-		}
-		w := NewWriter(client.conn)
-		w.Write(reply)
-		w.Flush()
-		return
-	}
-
-	reply := handler(client, v, state)
-	w := NewWriter(client.conn)
-	w.Write(reply)
-	w.Flush()
-
-	// for MONITOR handle will send to all monitors
-	go func() {
-		for _, mon := range state.monitors {
-			if mon != *client {
-				mon.writerMonitorLog(v, client)
-			}
-		}
-	}()
 
 }

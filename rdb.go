@@ -119,6 +119,9 @@ func SaveRDB(state *AppState) {
 		return
 	}
 
+	// save stats
+	state.rdbStats.rdb_last_saved_ts = time.Now().Unix()
+	state.rdbStats.rdb_saves_count += 1
 	log.Println("saved rdb file")
 
 }
@@ -135,7 +138,7 @@ func SyncRDB(conf *Config, state *AppState) {
 
 	err = gob.NewDecoder(f).Decode(&DB.store)
 	if err != nil {
-		fmt.Println("error restoring rdb file using gob: ", err)
+		log.Println("error restoring rdb file using gob: ", err)
 		return
 	}
 	log.Println("restored rdb file")

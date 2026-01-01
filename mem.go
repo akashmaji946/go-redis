@@ -12,6 +12,20 @@ type Sample struct {
 	value *Item
 }
 
+type Mem struct {
+	maxmemory        int64
+	maxmemorySamples int64
+	evictionPolicy   string
+}
+
+func NewMem(config *Config) *Mem {
+	return &Mem{
+		maxmemory:        config.maxmemory,
+		maxmemorySamples: config.maxmemorySamples,
+		evictionPolicy:   string(config.eviction),
+	}
+}
+
 // sampleKeysRandom randomly samples a subset of keys from the database for eviction algorithms.
 // This function is used by eviction policies (like AllKeysRandom) to select candidate
 // keys for removal when memory limits are reached.
@@ -71,7 +85,7 @@ func sampleKeysRandom(state *AppState) []Sample {
 	keys := make([]Sample, 0, numSamples) // size, room
 	for key, item := range DB.store {     // maps are random order
 		keys = append(keys, Sample{key: key, value: item})
-		if len(keys) >= numSamples {
+		if len(keys) >= int(numSamples) {
 			break
 		}
 	}

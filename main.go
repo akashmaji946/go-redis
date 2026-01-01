@@ -51,7 +51,8 @@ func main() {
 	// if aof
 	if conf.aofEnabled {
 		log.Println("syncing records")
-		state.aof.Synchronize()
+		mem := NewMem(conf)
+		state.aof.Synchronize(mem)
 	}
 
 	// if rdb
@@ -147,6 +148,7 @@ func handleOneConnection(conn net.Conn, state *AppState, connectionCount *int) {
 
 	*connectionCount += 1
 	state.clients = *connectionCount
+	state.genStats.total_connections_received += 1
 	log.Printf("[%2d] [ACCEPT] Accepted connection from: %s\n", *connectionCount, conn.LocalAddr().String())
 
 	client := NewClient(conn)

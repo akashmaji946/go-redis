@@ -117,7 +117,7 @@ func NewAof(config *Config) *Aof {
 // Note: Only SET commands are expected in the AOF file during normal operation.
 //
 //	Other commands may cause unexpected behavior during replay.
-func (aof *Aof) Synchronize() {
+func (aof *Aof) Synchronize(mem *Mem) {
 	reader := bufio.NewReader(aof.f)
 	total := 0
 	for {
@@ -131,7 +131,11 @@ func (aof *Aof) Synchronize() {
 			break
 		}
 
-		config := Config{}                 //empty
+		config := Config{
+			maxmemory:        mem.maxmemory,
+			maxmemorySamples: mem.maxmemorySamples,
+			eviction:         Eviction(mem.evictionPolicy),
+		}
 		blankState := NewAppState(&config) // new blank state with empty config
 		blankClient := Client{}            // dummy
 

@@ -2,6 +2,24 @@ package main
 
 import "time"
 
+type RDBStats struct {
+	rdb_last_saved_ts int64
+	rdb_saves_count   int
+}
+
+type AOFStats struct {
+	aof_last_rewrite_ts int64
+	aof_rewrite_count   int
+}
+
+type GeneralStats struct {
+	total_connections_received int
+	total_commands_executed    int
+	total_txn_executed         int
+	total_expired_keys         int
+	total_evicted_keys         int
+}
+
 // AppState holds the global application state shared across all client connections.
 // This structure contains configuration, persistence mechanisms, background operation flags,
 // and transaction state.
@@ -11,7 +29,7 @@ import "time"
 //   - aof: AOF persistence instance (nil if AOF is disabled)
 //   - bgsaving: Flag indicating if a background RDB save is currently in progress
 //     Used to prevent concurrent background saves
-//   - DBCopy: Copy of the database used during background saves
+//   - DBCopy: Copy of the databastructse used during background saves
 //     Contains a snapshot of DB.store taken at the start of BGSAVE
 //     Only populated during background saves, nil otherwise
 //   - tx: Current transaction context for this client connection
@@ -21,15 +39,25 @@ import "time"
 // ... rest of existing documentation ...
 type AppState struct {
 	serverStartTime time.Time
-	config          *Config
-	configPath      string
-	aof             *Aof
-	bgsaving        bool
-	DBCopy          map[string]*Item
-	tx              *Transaction
-	monitors        []Client
-	clients         int
-	redisInfo       *RedisInfo
+
+	config     *Config
+	configPath string
+
+	aof *Aof
+
+	bgsaving     bool
+	aofrewriting bool
+
+	DBCopy map[string]*Item
+	tx     *Transaction
+
+	monitors []Client
+	clients  int
+
+	redisInfo *RedisInfo
+	rdbStats  *RDBStats
+	aofStats  *AOFStats
+	genStats  *GeneralStats
 }
 
 // NewAppState creates and initializes a new AppState instance.
@@ -73,6 +101,9 @@ func NewAppState(config *Config) *AppState {
 		config:          config,
 		serverStartTime: time.Now(),
 		redisInfo:       NewRedisInfo(),
+		rdbStats:        &RDBStats{},
+		aofStats:        &AOFStats{},
+		genStats:        &GeneralStats{},
 	}
 
 	if config.aofEnabled {
