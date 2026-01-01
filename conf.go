@@ -3,7 +3,9 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -171,11 +173,13 @@ func NewConfig() *Config {
 //   - File not found: Returns default config with warning
 //   - Parse errors: Prints error but continues processing
 //   - Invalid values: Prints error message, uses default or skips invalid entry
-func ReadConf(filename string) *Config {
+func ReadConf(filename string, dataDir string) *Config {
+
 	config := NewConfig()
+
 	f, err := os.Open(filename)
 	if err != nil {
-		fmt.Printf("can't read file %s - using default config\n", filename)
+		log.Printf("can't read file %s - using default config\n", filename)
 		return config
 	}
 	defer f.Close()
@@ -183,7 +187,7 @@ func ReadConf(filename string) *Config {
 	// we know file exists
 	config.filepath = filename
 
-	// now we will read the file
+	// now we will read the file into config
 	s := bufio.NewScanner(f)
 	for s.Scan() {
 		l := s.Text()
@@ -192,12 +196,29 @@ func ReadConf(filename string) *Config {
 	}
 
 	if err := s.Err(); err != nil {
-		fmt.Printf("Error scanning config file %s", filename)
+		log.Printf("error scanning config file %s", filename)
 		return config
 	}
 
+	// if user has provided dataDir then use that and that in 'config' file
+	// Override data directory if provided as command line argument
+	if dataDir != "" {
+		// Convert to absolute path
+		absDataDir, err := filepath.Abs(dataDir)
+		if err != nil {
+			log.Printf("warning: Could not resolve absolute path for '%s', using as-is\n", dataDir)
+			absDataDir = dataDir
+		}
+		config.dir = absDataDir
+		log.Printf("using data directory from command line: %s\n", absDataDir)
+	}
+
+	// Ensure data directory exists
 	if config.dir != "" {
-		os.MkdirAll(config.dir, 0755)
+		if err := os.MkdirAll(config.dir, 0755); err != nil {
+			log.Fatalf("failed to create data directory '%s': %v\n", config.dir, err)
+		}
+		log.Printf("data directory: %s\n", config.dir)
 	}
 	return config
 }

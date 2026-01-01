@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"sync"
 )
 
@@ -43,9 +44,21 @@ func main() {
 
 	fmt.Println(">>> Go-Redis Server v0.1 <<<")
 
+	configFilePath := "./config/redis.conf"
+	dataDirectoryPath := "./data/"
+
+	args := os.Args[1:]
+	if len(args) > 0 {
+		configFilePath = args[0]
+	}
+	if len(args) > 1 {
+		dataDirectoryPath = args[1]
+	}
+
 	// read the config file
 	log.Println("reading the config file...")
-	conf := ReadConf("./redis.conf")
+
+	conf := ReadConf(configFilePath, dataDirectoryPath)
 	state := NewAppState(conf)
 
 	// if aof
