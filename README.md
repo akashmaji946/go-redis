@@ -1,308 +1,321 @@
-# Go-Redis
+# Go-Redis — Developer Documentation (DOCS)
 
-![go-redis logo](go-redis.png)
+This document provides **detailed technical documentation** for the Go-Redis project, covering internal architecture, command semantics, persistence internals, concurrency model, and lifecycle behavior.  
+For build/run instructions, see `README.md`. Access it here: [README](https://github.com/akashmaji946/go-redis/blob/main/README.md)
 
-A Redis-compatible in-memory key-value store server written in Go. This implementation supports core Redis commands, persistence mechanisms (AOF and RDB), authentication, expiration, transactions, monitoring, and memory management with eviction policies.
+---
 
-## Features
+## 1. System Overview
 
-- **Core Commands**: GET, SET, DEL, EXISTS, KEYS, DBSIZE, FLUSHDB
-- **Persistence**:
-  - **AOF (Append-Only File)**: Logs every write operation with configurable fsync modes
-  - **RDB (Redis Database)**: Point-in-time snapshots with automatic triggers
-- **Expiration**: EXPIRE and TTL support for keys with automatic cleanup
-- **Authentication**: Password-based authentication with configurable requirements
-- **Transactions**: MULTI, EXEC, DISCARD for atomic command execution
-- **Monitoring**: MONITOR command for real-time command streaming
-- **Server Info**: INFO command for server statistics and metrics
-- **Memory Management**: Configurable memory limits with eviction policies
-- **Background Operations**: BGSAVE and BGREWRITEAOF for non-blocking persistence
-- **Thread-Safe**: Concurrent access with read-write locks (RWMutex)
-- **Redis Protocol**: Full RESP (Redis Serialization Protocol) compatibility
-- **Checksum Verification**: SHA-256 checksums for RDB data integrity
+Go-Redis is a **Redis-compatible, in-memory key-value store** written in Go, implementing the RESP protocol and a subset of Redis functionality.
 
-## Prerequisites
+### Design Goals
+- Protocol compatibility with `redis-cli`
+- Clear, readable Go implementation
+- Deterministic persistence behavior
+- Educational clarity over maximum performance
 
-- **Go 1.24.4** or later
-- **redis-cli** (for testing and connecting to the server)
-- **Linux/Unix environment** (tested on Linux)
+### Non-Goals
+- Cluster support
+- Replication
+- Advanced Redis data types
+- Full Redis command coverage
 
-### Stopping Default Redis (if running)
+---
 
-```bash
-sudo systemctl stop redis-server.service
-sudo systemctl status redis-server.service
-```
-
-## Building
-
-```bash
-go build
-```
-
-This will create an executable named `go-redis` that you can run.
-
-## Configuration
-
-The server reads configuration from a `redis.conf` file. Create a configuration file with the following options:
-
-```conf
-# Data directory (where persistence files are stored)
-dir ./data
-
-# AOF Configuration
-appendonly yes
-appendfilename backup.aof
-appendfsync always
-
-# RDB Configuration
-save 5 3
-dbfilename backup.rdb
-
-# Authentication
-requirepass dsl
-
-# Memory Management
-maxmemory 256
-maxmemory-policy allkeys-random
-maxmemory-samples 5
-```
-
-## Running
-
-### Basic Usage
-
-The server accepts command-line arguments for configuration file and data directory:
-
-```bash
-./go-redis [config_file] [data_directory]
-```
-
-**Arguments:**
-- `config_file` (optional): Path to the configuration file
-  - Default: `./config/redis.conf`
-- `data_directory` (optional): Path to the data directory for persistence files
-  - Default: `./data/` (or value from config file if specified)
-
-### Examples
-
-**1. Default configuration (uses `./config/redis.conf` and `./data/`):**
-```bash
-./go-redis
-```
-
-**2. Custom configuration file:**
-```bash
-./go-redis /etc/go-redis/redis.conf
-```
-
-**3. Custom configuration and data directory:**
-```bash
-./go-redis /etc/go-redis/redis.conf /var/lib/go-redis
-```
-
-**4. Relative paths:**
-```bash
-./go-redis ./myconfig.conf ./mydata
-```
-
-**5. Absolute paths:**
-```bash
-./go-redis /home/user/config/redis.conf /home/user/data
-```
-
-### Behavior
-
-- If the configuration file doesn't exist, the server will warn and use default settings
-- The data directory will be created automatically if it doesn't exist
-- If both command-line argument and config file specify a data directory, the command-line argument takes precedence
-- The server listens on port **6379** (default Redis port)
-
-### Server Startup
-
-When you run the server, you'll see output like:
+## 2. High-Level Architecture
 
 ```
->>> Go-Redis Server v0.1 <<<
-reading the config file...
-Data directory: /app/data
-listening on port 6379
-```
 
-## Available Commands
-
-### String Operations
-
-* GET
-* SET
-
-### Key Management
-
-* DEL
-* EXISTS
-* KEYS
-* DBSIZE
-* FLUSHDB
-
-### Expiration
-
-* EXPIRE
-* TTL
-
-### Transactions
-
-* MULTI
-* EXEC
-* DISCARD
-
-### Persistence
-
-* SAVE
-* BGSAVE
-* BGREWRITEAOF
-
-### Monitoring and Information
-
-* MONITOR
-* INFO
-
-### Authentication
-
-* AUTH
-
-### Utility
-
-* COMMAND
-
-## Persistence
-
-### AOF
-
-* Logs every write
-* Replayed on startup
-* Supports `always`, `everysec`, `no` fsync modes
-* Rewritten using BGREWRITEAOF
-
-### RDB
-
-* Snapshot-based persistence
-* Triggered via `save` rules
-* Uses Go `gob` encoding
-* SHA-256 checksum verification
-
-## Memory Management
-
-### Eviction Policies
-
-* no-eviction
-* allkeys-random (implemented)
-* allkeys-lru (not implemented)
-* allkeys-lfu (not implemented)
-
-## Architecture
-
-* RWMutex-based concurrency
-* Per-connection goroutines
-* Background workers for persistence
-* Lazy expiration
-* Automatic eviction
-
-## Project Structure
-
-```
-go-redis/
-├── main.go
-├── handlers.go
-├── database.go
-├── value.go
-├── writer.go
-├── conf.go
-├── aof.go
-├── rdb.go
-├── client.go
-├── appstate.go
-├── info.go
-├── mem.go
-├── config/
-│   └── redis.conf
-├── data/
-│   ├── backup.aof
-│   └── backup.rdb
-└── go.mod
-```
-
-## Protocol
-
-Implements full Redis RESP:
-
-* Simple Strings
-* Bulk Strings
-* Arrays
-* Integers
-* Errors
-* Null
-
-## Docker Deployment
-
-**Prerequisites**
-- docker
-- redis-cli
-
-
-The project includes a Dockerfile for containerized deployment. See the `Dockerfile` for details.
-
-**Very Quick Docker usage:**
-Use an image:
-```bash
-# Pull the image
-docker pull akashmaji/go-redis:latest
-
-# Run it
-docker run -d -p 6379:6379 \
-  -v $(pwd)/data:/app/data \
-  akashmaji/go-redis:latest
-
-## Access it from host
-redis-cli
+Client (redis-cli)
+|
+TCP
+|
+RESP Parser
+|
+Command Dispatcher
+|
++-------------------------+
+| In-Memory Database      |
+| map[string]*Value      |
+| RWMutex protected      |
++-------------------------+
+|
++-------------------------+
+| Persistence Layer       |
+|  - AOF                 |
+|  - RDB                 |
++-------------------------+
 
 ```
 
-**Quick Docker usage:**
-Build the image:
-```bash
-# Build
-docker build -t go-redis:latest .
+### Key Components
 
-# Run with default config
-docker run -d -p 6379:6379 -v $(pwd)/data:/app/data go-redis:latest
+| Component | Responsibility |
+|---------|----------------|
+| `main.go` | Server startup, TCP accept loop |
+| `client.go` | Per-client connection lifecycle |
+| `handlers.go` | Command execution logic |
+| `database.go` | Thread-safe key-value storage |
+| `value.go` | Data model & expiration metadata |
+| `writer.go` | RESP serialization |
+| `aof.go` | Append-Only File persistence |
+| `rdb.go` | Snapshot persistence |
+| `mem.go` | Memory tracking & eviction |
+| `info.go` | INFO command reporting |
 
-# Run with custom paths
-docker run -d -p 6379:6379 \
-  -v $(pwd)/config/redis.conf:/app/config/redis.conf:ro \
-  -v $(pwd)/data:/app/data \
-  go-redis:latest /app/config/redis.conf /app/data
+---
 
-## Access it from host
-redis-cli
-```
-See `DOCKER.md` for more detail
+## 3. Data Model
 
-## Limitations
+### Value Structure
 
-* Single database only
-* No replication
-* No Pub/Sub
-* Only string data type
-* No WATCH
-* Partial eviction support
+Each key maps to a `Value` object containing:
 
-## License
+- Raw string value
+- Expiration timestamp (optional)
+- Last access time
+- Access frequency counter
 
-Educational project implementing Redis-like functionality in Go.
+This enables:
+- TTL handling
+- Lazy expiration
+- Future LRU/LFU eviction support
 
-## Version
+---
 
-**v0.1**
+## 4. Concurrency Model
 
-## Author
-**Akash Maji (akashmaji@iisc.ac.in) - Contact for bugs and support**
+### Threading Strategy
+
+- **One goroutine per client connection**
+- **Single shared database**
+- Protected by `sync.RWMutex`
+
+### Locking Rules
+
+- Read-only commands (GET, EXISTS, TTL) acquire `RLock`
+- Write commands (SET, DEL, EXPIRE) acquire `Lock`
+- Persistence snapshots copy state to avoid blocking clients
+
+This design favors **simplicity and correctness** over extreme parallelism.
+
+---
+
+## 5. Command Execution Pipeline
+
+1. Client sends RESP-encoded request
+2. RESP parser decodes command + arguments
+3. Authentication check (if enabled)
+4. Transaction check (MULTI mode)
+5. Command handler execution
+6. Response encoded in RESP
+7. Optional AOF append
+
+---
+
+## 6. Command Semantics
+
+### String Commands
+
+#### SET
+- Overwrites existing key
+- Clears previous expiration
+- Triggers eviction if memory limit exceeded
+- Appended to AOF (if enabled)
+
+#### GET
+- Performs lazy expiration
+- Updates access metadata
+- Returns NULL if expired or missing
+
+---
+
+### Key Commands
+
+#### DEL
+- Deletes key immediately
+- Removes expiration metadata
+- Updates memory counters
+
+#### KEYS
+- Uses glob-style pattern matching
+- Iterates entire keyspace (O(N))
+- Intended for debugging, not production
+
+---
+
+### Expiration Commands
+
+#### EXPIRE
+- Stores absolute expiration timestamp
+- Does not create background timer
+- Key removed lazily on access
+
+#### TTL
+Return values:
+- `>0` seconds remaining
+- `-1` key exists without expiration
+- `-2` key does not exist
+
+---
+
+## 7. Transactions
+
+### MULTI / EXEC Model
+
+- Commands queued per client
+- No optimistic locking (`WATCH` unsupported)
+- EXEC executes atomically under write lock
+- Errors inside transaction do **not** abort execution
+
+### DISCARD
+- Clears transaction queue
+- Leaves database unchanged
+
+---
+
+## 8. Persistence Internals
+
+## 8.1 AOF (Append-Only File)
+
+### Write Path
+1. Command executes in memory
+2. Serialized in RESP
+3. Appended to AOF buffer
+4. Flushed based on fsync policy
+
+### fsync Modes
+- `always` — fsync after every write
+- `everysec` — background fsync goroutine
+- `no` — OS-managed flushing
+
+### AOF Replay
+- On startup, AOF is replayed command-by-command
+- Rebuilds in-memory state deterministically
+
+---
+
+## 8.2 RDB (Snapshot)
+
+### Snapshot Trigger
+- Based on `save <seconds> <keys>` rules
+- Tracks key mutation count
+
+### Snapshot Flow
+1. Copy database state
+2. Serialize using Go `gob`
+3. Compute SHA-256 checksum
+4. Write to disk atomically
+
+### Verification
+- Snapshot rejected if checksum mismatch
+- Prevents corrupted saves
+
+---
+
+## 9. Memory Management
+
+### Memory Accounting Includes
+- Key size
+- Value size
+- Expiration metadata
+- Map overhead
+
+### Eviction Flow
+1. Write exceeds `maxmemory`
+2. Sample keys (`maxmemory-samples`)
+3. Select eviction candidates
+4. Delete keys until enough memory freed
+
+### Supported Policies
+- `no-eviction`
+- `allkeys-random`
+
+(LRU/LFU scaffolding exists but not active)
+
+---
+
+## 10. Monitoring & Observability
+
+### MONITOR
+- Streams all executed commands
+- Includes timestamp and client address
+- Useful for debugging and education
+
+### INFO
+Reports:
+- Server uptime
+- Client count
+- Memory usage
+- Persistence state
+- Eviction statistics
+
+---
+
+## 11. RESP Protocol Support
+
+Supported RESP Types:
+- `+` Simple String
+- `$` Bulk String
+- `*` Array
+- `:` Integer
+- `-` Error
+- `$-1` Null
+
+RESP compliance allows unmodified use of `redis-cli`.
+
+---
+
+## 12. Startup & Shutdown Lifecycle
+
+### Startup
+1. Parse `redis.conf`
+2. Load AOF (if enabled)
+3. Load RDB (if present)
+4. Start TCP listener
+5. Launch background workers
+
+### Shutdown
+- No signal handling yet
+- OS termination may interrupt persistence
+- Intended for controlled educational use
+
+---
+
+## 13. Limitations (Intentional)
+
+- Single database only
+- No replication / clustering
+- No Pub/Sub
+- No advanced Redis types
+- No background expiration sweep
+- No Lua scripting
+
+---
+
+## 14. Intended Use
+
+This project is best suited for:
+- Learning Redis internals
+- Studying RESP
+- Understanding persistence tradeoffs
+- Go concurrency patterns
+- Systems programming coursework
+
+---
+
+## 15. Versioning
+
+Current version: **v0.1**
+
+Semantic versioning not yet enforced.
+
+---
+
+## 16. Further Reading
+
+- Redis Design Notes
+- Redis Persistence Internals
+- Go net/http and net TCP patterns
+- RWMutex performance tradeoffs
