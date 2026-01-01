@@ -1,7 +1,7 @@
 # Go-Redis — Developer Documentation (DOCS)
 
 This document provides **detailed technical documentation** for the Go-Redis project, covering internal architecture, command semantics, persistence internals, concurrency model, and lifecycle behavior.  
-For build/run instructions, see `README.md`.
+For build/run instructions, see `README.md`. Access it here: [README](https://github.com/akashmaji946/go-redis/blob/main/README.md)
 
 ---
 
