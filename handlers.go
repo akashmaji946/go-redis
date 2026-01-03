@@ -81,10 +81,7 @@ func handle(client *Client, v *Value, state *AppState) {
 
 	if !ok {
 		log.Println("ERROR: no such command:", cmd)
-		reply := &Value{
-			typ: ERROR,
-			err: "ERR no such command",
-		}
+		reply := NewErrorValue("ERR no such command")
 		w := NewWriter(client.conn)
 		w.Write(reply)
 		w.Flush()
@@ -93,10 +90,7 @@ func handle(client *Client, v *Value, state *AppState) {
 
 	// handle authentication: if password needed & not authenticated, then block running command
 	if state.config.requirepass && !client.authenticated && !IsSafeCmd(cmd, safeCommands) {
-		reply := &Value{
-			typ: ERROR,
-			err: "NOAUTH client not authenticated, use AUTH <password>",
-		}
+		reply := NewErrorValue("NOAUTH client not authenticated, use AUTH <password>")
 		w := NewWriter(client.conn)
 		w.Write(reply)
 		w.Flush()
@@ -110,10 +104,7 @@ func handle(client *Client, v *Value, state *AppState) {
 			handler: handler,
 		}
 		state.tx.cmds = append(state.tx.cmds, txCmd)
-		reply := &Value{
-			typ: STRING,
-			str: "QUEUED",
-		}
+		reply := NewStringValue("QUEUED")
 		w := NewWriter(client.conn)
 		w.Write(reply)
 		w.Flush()
@@ -188,10 +179,7 @@ var Handlers = map[string]Handler{
 
 func Command(c *Client, v *Value, state *AppState) *Value {
 	// cmd := v.arr[0].blk
-	return &Value{
-		typ: STRING,
-		str: "OK",
-	}
+	return NewStringValue("OK")
 }
 
 // Info handles the INFO command.
@@ -293,10 +281,7 @@ func Info(c *Client, v *Value, state *AppState) *Value {
 	args := v.arr[1:]
 	if len(args) != 0 {
 		log.Println("invalid use of INFO")
-		return &Value{
-			typ: ERROR,
-			err: "ERR inavlid argument to INFO",
-		}
+		return NewErrorValue("ERR inavlid argument to INFO")
 	}
 	msg := state.redisInfo.Print(state)
 	return &Value{typ: BULK, blk: msg}
@@ -383,13 +368,10 @@ func Monitor(c *Client, v *Value, state *AppState) *Value {
 	args := v.arr[1:]
 	if len(args) != 0 {
 		log.Println("invalid use of MONITOR")
-		return &Value{
-			typ: ERROR,
-			err: "ERR inavlid argument to MONITOR",
-		}
+		return NewErrorValue("ERR inavlid argument to MONITOR")
 	}
 	state.monitors = append(state.monitors, *c)
-	return &Value{typ: STRING, str: "OK"}
+	return NewStringValue("OK")
 }
 
 // Multi handles the MULTI command.
@@ -438,27 +420,18 @@ func Multi(c *Client, v *Value, state *AppState) *Value {
 	args := v.arr[1:]
 	if len(args) != 0 {
 		log.Println("invalid use of MULTI")
-		return &Value{
-			typ: ERROR,
-			err: "ERR inavlid argument to MULTI",
-		}
+		return NewErrorValue("ERR inavlid argument to MULTI")
 	}
 	// check if some tx running, then don't run
 	if state.tx != nil {
 		log.Println("tx already running")
-		return &Value{
-			typ: ERROR,
-			err: "ERR tx already running",
-		}
+		return NewErrorValue("ERR tx already running")
 	}
 
 	state.tx = NewTransaction()
 
 	log.Println("tx started")
-	return &Value{
-		typ: STRING,
-		str: "Started",
-	}
+	return NewStringValue("Started")
 
 }
 
@@ -511,18 +484,12 @@ func Exec(c *Client, v *Value, state *AppState) *Value {
 	args := v.arr[1:]
 	if len(args) != 0 {
 		log.Println("invalid use of EXEC")
-		return &Value{
-			typ: ERROR,
-			err: "ERR inavlid argument to EXEC",
-		}
+		return NewErrorValue("ERR inavlid argument to EXEC")
 	}
 	// check if some tx running
 	if state.tx == nil {
 		log.Println("tx already NOT running")
-		return &Value{
-			typ: ERROR,
-			err: "ERR tx already NOT running",
-		}
+		return NewErrorValue("ERR tx already NOT running")
 	}
 
 	// commmit queued commands first
@@ -589,28 +556,19 @@ func Discard(c *Client, v *Value, state *AppState) *Value {
 	args := v.arr[1:]
 	if len(args) != 0 {
 		log.Println("invalid use of DISCARD")
-		return &Value{
-			typ: ERROR,
-			err: "ERR inavlid argument to DISCARD",
-		}
+		return NewErrorValue("ERR inavlid argument to DISCARD")
 	}
 	// check if some tx running
 	if state.tx == nil {
 		log.Println("tx already NOT running")
-		return &Value{
-			typ: ERROR,
-			err: "ERR tx already NOT running",
-		}
+		return NewErrorValue("ERR tx already NOT running")
 	}
 
 	// discard without commiting
 	state.tx = nil
 	log.Println("tx discarded")
 
-	return &Value{
-		typ: STRING,
-		str: "Discarded",
-	}
+	return NewStringValue("Discarded")
 }
 
 // BGRewriteAOF handles the BGREWRITEAOF command.
@@ -641,10 +599,7 @@ func BGRewriteAOF(c *Client, v *Value, state *AppState) *Value {
 	state.aofStats.aof_last_rewrite_ts = time.Now().Unix()
 	state.aofStats.aof_rewrite_count += 1
 
-	return &Value{
-		typ: STRING,
-		str: "Started.",
-	}
+	return NewStringValue("Started.")
 }
 
 // Get handles the GET command.
@@ -665,10 +620,7 @@ func Get(c *Client, v *Value, state *AppState) *Value {
 	// cmd := v.arr[0].blk
 	args := v.arr[1:]
 	if len(args) != 1 {
-		return &Value{
-			typ: ERROR,
-			err: "ERR invalid command uage with GET",
-		}
+		return NewErrorValue("ERR invalid command uage with GET")
 	}
 	key := args[0].blk // grab the key
 
@@ -679,23 +631,16 @@ func Get(c *Client, v *Value, state *AppState) *Value {
 
 	if !ok {
 		fmt.Println("Not Found: ", key)
-		return &Value{
-			typ: NULL,
-		}
+		return NewNullValue()
 	}
 
 	// delete if expired
 	deleted := DB.RemIfExpired(key, item, state)
 	if deleted {
-		return &Value{
-			typ: NULL,
-		}
+		return NewNullValue()
 	}
 
-	return &Value{
-		typ: BULK,
-		blk: item.V,
-	}
+	return NewBulkValue(item.V)
 
 }
 
@@ -722,10 +667,7 @@ func Set(c *Client, v *Value, state *AppState) *Value {
 	// cmd := v.arr[0].blk
 	args := v.arr[1:]
 	if len(args) != 2 {
-		return &Value{
-			typ: ERROR,
-			err: "ERR invalid command usage with SET",
-		}
+		return NewErrorValue("ERR invalid command usage with SET")
 	}
 
 	key := args[0].blk // grab the key
@@ -735,10 +677,7 @@ func Set(c *Client, v *Value, state *AppState) *Value {
 	err := DB.Put(key, val, state)
 	if err != nil {
 		DB.mu.Unlock()
-		return &Value{
-			typ: ERROR,
-			err: "ERR some error occured while PUT:" + err.Error(),
-		}
+		return NewErrorValue("ERR some error occured while PUT:" + err.Error())
 	}
 	// record it for AOF
 	if state.config.aofEnabled {
@@ -757,10 +696,7 @@ func Set(c *Client, v *Value, state *AppState) *Value {
 
 	DB.mu.Unlock()
 
-	return &Value{
-		typ: STRING,
-		str: "OK",
-	}
+	return NewStringValue("OK")
 }
 
 // Del handles the DEL command.
@@ -795,10 +731,7 @@ func Del(c *Client, v *Value, state *AppState) *Value {
 		m += 1
 	}
 	DB.mu.Unlock()
-	return &Value{
-		typ: INTEGER,
-		num: m,
-	}
+	return NewIntegerValue(int64(m))
 }
 
 // Exists handles the EXISTS command.
@@ -829,10 +762,7 @@ func Exists(c *Client, v *Value, state *AppState) *Value {
 	}
 	DB.mu.RUnlock()
 
-	return &Value{
-		typ: INTEGER,
-		num: m,
-	}
+	return NewIntegerValue(int64(m))
 }
 
 // Keys handles the KEYS command.
@@ -858,10 +788,7 @@ func Keys(c *Client, v *Value, state *AppState) *Value {
 	// all keys matching pattern (in an array)
 	args := v.arr[1:]
 	if len(args) != 1 {
-		return &Value{
-			typ: ERROR,
-			err: "ERR invlid arg to Keys",
-		}
+		return NewErrorValue("ERR invlid arg to Keys")
 	}
 
 	pattern := args[0].blk // string representing the pattern e.g. "*name*" matches name, names, firstname, lastname
@@ -910,10 +837,7 @@ func Keys(c *Client, v *Value, state *AppState) *Value {
 //	Use BGSAVE for non-blocking persistence
 func Save(c *Client, v *Value, state *AppState) *Value {
 	SaveRDB(state)
-	return &Value{
-		typ: STRING,
-		str: "OK",
-	}
+	return NewStringValue("OK")
 }
 
 // background save
@@ -940,10 +864,7 @@ func BGSave(c *Client, v *Value, state *AppState) *Value {
 	if state.bgsaving {
 		// already running, return
 		DB.mu.RUnlock()
-		return &Value{
-			typ: ERROR,
-			err: "already in progress",
-		}
+		return NewErrorValue("already in progress")
 	}
 
 	copy := make(map[string]*Item, len(DB.store)) // actual copy of DB.store
@@ -962,10 +883,7 @@ func BGSave(c *Client, v *Value, state *AppState) *Value {
 		SaveRDB(state)
 	}()
 
-	return &Value{
-		typ: STRING,
-		str: "OK",
-	}
+	return NewStringValue("OK")
 }
 
 // FlushDB handles the FLUSHDB command.
@@ -999,10 +917,7 @@ func FlushDB(c *Client, v *Value, state *AppState) *Value {
 	DB.store = map[string]*Item{}
 	DB.mu.Unlock()
 
-	return &Value{
-		typ: STRING,
-		str: "OK",
-	}
+	return NewStringValue("OK")
 }
 
 // DBSize handles the DBSIZE command.
@@ -1023,20 +938,14 @@ func DBSize(c *Client, v *Value, state *AppState) *Value {
 	// DBSIZE
 	args := v.arr
 	if len(args) != 1 {
-		return &Value{
-			typ: ERROR,
-			err: "ERR invalid argument to DBSIZE",
-		}
+		return NewErrorValue("ERR invalid argument to DBSIZE")
 	}
 
 	DB.mu.RLock()
 	size := len(DB.store)
 	DB.mu.RUnlock()
 
-	return &Value{
-		typ: INTEGER,
-		num: size,
-	}
+	return NewIntegerValue(int64(size))
 
 }
 
@@ -1058,25 +967,16 @@ func DBSize(c *Client, v *Value, state *AppState) *Value {
 func Auth(c *Client, v *Value, state *AppState) *Value {
 	args := v.arr[1:]
 	if len(args) != 1 {
-		return &Value{
-			typ: ERROR,
-			err: fmt.Sprintf("ERR invalid argument to AUTH, given=%d, needed=1\n", len(args)),
-		}
+		return NewErrorValue(fmt.Sprintf("ERR invalid argument to AUTH, given=%d, needed=1\n", len(args)))
 	}
 
 	password := args[0].blk // AUTH <password>
 	if state.config.password == password {
 		c.authenticated = true
-		return &Value{
-			typ: STRING,
-			str: "OK",
-		}
+		return NewStringValue("OK")
 	}
 	c.authenticated = false
-	return &Value{
-		typ: ERROR,
-		err: fmt.Sprintf("ERR invalid password, given=%s", password),
-	}
+	return NewErrorValue(fmt.Sprintf("ERR invalid password, given=%s", password))
 
 }
 
@@ -1099,36 +999,24 @@ func Expire(c *Client, v *Value, state *AppState) *Value {
 	// EXPIRE <key> <secondsafter>
 	args := v.arr[1:]
 	if len(args) != 2 {
-		return &Value{
-			typ: ERROR,
-			err: "ERR invalid args for EXPIRE",
-		}
+		return NewErrorValue("ERR invalid args for EXPIRE")
 	}
 	k := args[0].blk
 	exp := args[1].blk
 	expirySeconds, err := strconv.Atoi(exp)
 	if err != nil {
-		return &Value{
-			typ: ERROR,
-			err: "ERR invalid 2nd arg for EXPIRE",
-		}
+		return NewErrorValue("ERR invalid 2nd arg for EXPIRE")
 	}
 
 	DB.mu.RLock()
 	Val, ok := DB.store[k]
 	if !ok {
-		return &Value{
-			typ: INTEGER,
-			num: 0,
-		}
+		return NewIntegerValue(0)
 	}
 	Val.Exp = time.Now().Add(time.Second * time.Duration(expirySeconds))
 	DB.mu.RUnlock()
 
-	return &Value{
-		typ: INTEGER,
-		num: 1,
-	}
+	return NewIntegerValue(1)
 
 }
 
@@ -1151,10 +1039,7 @@ func Ttl(c *Client, v *Value, state *AppState) *Value {
 	// TTL <key>
 	args := v.arr[1:]
 	if len(args) != 1 {
-		return &Value{
-			typ: ERROR,
-			err: "ERR invalid arg for TTL",
-		}
+		return NewErrorValue("ERR invalid arg for TTL")
 	}
 
 	k := args[0].blk
@@ -1162,35 +1047,23 @@ func Ttl(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.RLock()
 	item, ok := DB.store[k]
 	if !ok {
-		return &Value{
-			typ: INTEGER,
-			num: -2,
-		}
+		return NewIntegerValue(-2)
 	}
 	exp := item.Exp
 	DB.mu.RUnlock()
 
 	// is exp not set
 	if exp.Unix() == UNIX_TS_EPOCH {
-		return &Value{
-			typ: INTEGER,
-			num: -1,
-		}
+		return NewIntegerValue(-1)
 	}
 
 	expired := DB.RemIfExpired(k, item, state)
 	if expired {
-		return &Value{
-			typ: INTEGER,
-			num: -2,
-		}
+		return NewIntegerValue(-2)
 	}
 
 	secondsToExpire := time.Until(exp).Seconds() //float
 	// fmt.Println(secondsToExpire)
-	return &Value{
-		typ: INTEGER,
-		num: int(secondsToExpire),
-	}
+	return NewIntegerValue(int64(secondsToExpire))
 
 }
