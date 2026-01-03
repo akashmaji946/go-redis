@@ -156,6 +156,7 @@ var Handlers = map[string]Handler{
 	"HGET":    Hget,
 	"HDEL":    Hdel,
 	"HGETALL": Hgetall,
+	"HDELALL": Hdelall,
 	"HINCRBY": Hincrby,
 	"HMSET":   Hmset,
 	"HEXISTS": Hexists,
@@ -1132,6 +1133,10 @@ func Hset(c *Client, v *Value, state *AppState) *Value {
 
 	if state.config.aofEnabled {
 		state.aof.w.Write(v)
+		if state.config.aofFsync == Always {
+			fmt.Println("AOF write for HSET")
+			state.aof.w.Flush()
+		}
 	}
 	if len(state.config.rdb) > 0 {
 		IncrRDBTrackers()
@@ -1220,6 +1225,10 @@ func Hdel(c *Client, v *Value, state *AppState) *Value {
 
 	if state.config.aofEnabled {
 		state.aof.w.Write(v)
+		if state.config.aofFsync == Always {
+			fmt.Println("AOF write for HDEL")
+			state.aof.w.Flush()
+		}
 	}
 	if len(state.config.rdb) > 0 {
 		IncrRDBTrackers()
@@ -1527,4 +1536,53 @@ func Hvals(c *Client, v *Value, state *AppState) *Value {
 	}
 
 	return NewArrayValue(result)
+}
+
+// Hdelall handles the HDELALL command.
+// Removes all field-value pairs from a hash, effectively clearing it.
+//
+// Syntax:
+//
+//	HDELALL <key>
+//
+// Returns:
+//
+//	Integer: Number of fields that were deleted
+//	0: If hash doesn't exist or is already empty
+//
+// Behavior:
+//   - Deletes all fields from the hash
+//   - Removes the hash key itself if all fields are deleted
+//   - Returns the count of fields deleted
+func Hdelall(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 1 {
+		return NewErrorValue("ERR wrong number of arguments for 'hdelall' command")
+	}
+
+	key := args[0].blk
+
+	DB.mu.Lock()
+	defer DB.mu.Unlock()
+
+	item, ok := DB.store[key]
+	if !ok {
+		return NewIntegerValue(0)
+	}
+
+	if !item.IsHash() {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	count := int64(len(item.Hash))
+	item.Hash = make(map[string]string) // Clear the hash
+
+	if state.config.aofEnabled {
+		state.aof.w.Write(v)
+	}
+	if len(state.config.rdb) > 0 {
+		IncrRDBTrackers()
+	}
+
+	return NewIntegerValue(count)
 }

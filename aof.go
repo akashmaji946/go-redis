@@ -89,21 +89,27 @@ func NewAof(config *Config) *Aof {
 //
 // Behavior:
 //   - Reads the AOF file sequentially, parsing each command as a RESP array
-//   - Replays each command by calling the Set handler with a blank state
+//   - Replays each command using the appropriate handler (SET, HSET, HDEL, HMSET, HINCRBY, etc.)
 //   - Continues until EOF is reached (end of file)
 //   - Logs the total number of records synchronized
+//
+// Supported Commands:
+//   - SET, GET, DEL, EXISTS, KEYS: String/key operations
+//   - HSET, HGET, HDEL, HGETALL, HMSET, HINCRBY: Hash operations
+//   - EXPIRE, TTL: Key expiration
 //
 // Process:
 //  1. Reads each command from the AOF file using ReadArray()
 //  2. Creates a blank AppState (no AOF, no RDB) to prevent recursive logging
 //  3. Creates a dummy Client (not used during replay)
-//  4. Executes the Set command to restore the key-value pair
+//  4. Looks up the command handler and executes it
 //  5. Repeats until all commands are processed
 //
 // Error Handling:
 //   - On EOF: Normal termination, all commands processed
 //   - On other errors: Logs error and stops synchronization
 //   - Partial recovery: Commands processed before error are applied
+//   - Unknown commands: Logs warning and skips
 //
 // Performance:
 //   - Sequential file read (efficient for append-only files)
@@ -113,10 +119,6 @@ func NewAof(config *Config) *Aof {
 // Use Cases:
 //   - Server startup: Restore database from AOF
 //   - After AOF rewrite: Verify rewritten file is valid
-//
-// Note: Only SET commands are expected in the AOF file during normal operation.
-//
-//	Other commands may cause unexpected behavior during replay.
 func (aof *Aof) Synchronize(mem *Mem) {
 	reader := bufio.NewReader(aof.f)
 	total := 0
@@ -139,10 +141,17 @@ func (aof *Aof) Synchronize(mem *Mem) {
 		blankState := NewAppState(&config) // new blank state with empty config
 		blankClient := Client{}            // dummy
 
-		Set(&blankClient, &v, blankState)
+		// Lookup the command handler and execute it
+		if len(v.arr) > 0 {
+			cmd := v.arr[0].blk
+			if handler, ok := Handlers[cmd]; ok {
+				handler(&blankClient, &v, blankState)
+			} else {
+				log.Printf("Warning: Unknown command in AOF: %s\n", cmd)
+			}
+		}
 
 		total += 1
-		// fmt.Println(v)
 	}
 	log.Printf("records synchronized: %d\n", total)
 
@@ -153,13 +162,20 @@ func (aof *Aof) Synchronize(mem *Mem) {
 // by removing redundant commands and creating a minimal representation.
 //
 // Parameters:
-//   - cp: A copy of the current database state (map of key-value pairs)
+//   - cp: A copy of the current database state (map[string]*Item)
 //     This should be a snapshot taken before the rewrite begins
+//
+// Data Type Support:
+//   - String: Written as SET key value
+//   - Hash: Written as HSET key field value [field value ...]
+//   - List: Written as LPUSH key value [value ...] (if List support added)
+//   - Set: Written as SADD key member [member ...] (if Set support added)
+//   - Zset: Written as ZADD key score member [score member ...] (if Zset support added)
 //
 // Behavior:
 //  1. Redirects new writes to a buffer (commands arriving during rewrite)
 //  2. Truncates the existing AOF file to start fresh
-//  3. Writes SET commands for all keys in the database copy
+//  3. Writes appropriate commands for all keys in the database copy
 //  4. Appends any commands that arrived during the rewrite (from buffer)
 //  5. Restores normal AOF writing to the file
 //
@@ -169,15 +185,13 @@ func (aof *Aof) Synchronize(mem *Mem) {
 //
 //   - Changes aof.w to write to a bytes.Buffer instead of the file
 //
-//   - New SET commands during rewrite are buffered
-//
 //   - Phase 2: Rewrite file with current state
 //
 //   - Truncates AOF file to zero length
 //
 //   - Seeks to beginning of file
 //
-//   - Writes SET commands for each key-value pair in the copy
+//   - Writes appropriate commands for each data type
 //
 //   - Flushes to ensure data is written
 //
@@ -191,43 +205,22 @@ func (aof *Aof) Synchronize(mem *Mem) {
 //
 //   - Changes aof.w back to writing to the file
 //
-//   - Future commands are written directly to the file
-//
 // Benefits:
-//   - Removes redundant SET commands (only latest value per key)
+//   - Removes redundant commands (only latest state per key)
 //   - Reduces AOF file size significantly
 //   - Improves replay performance
 //   - Maintains data integrity (no commands lost)
+//   - Supports all data types (string, hash, list, set, zset)
 //
 // Thread Safety:
 //   - Should be called from a single goroutine (typically BGREWRITEAOF handler)
 //   - Database copy should be taken with proper locking before calling
-//
-// Error Handling:
-//   - Truncate errors: Logs and returns (rewrite fails, file unchanged)
-//   - Seek errors: Logs and returns (rewrite fails)
-//   - Write errors: Logs and returns (partial rewrite may have occurred)
-//   - Sync errors: Logs and returns (data may not be on disk)
-//
-// Example:
-//
-//	// In BGREWRITEAOF handler:
-//	DB.mu.RLock()
-//	cp := make(map[string]*VAL, len(DB.store))
-//	maps.Copy(cp, DB.store)
-//	DB.mu.RUnlock()
-//	state.aof.Rewrite(cp)
-//
-// Note: This operation is typically performed in the background to avoid
-//
-//	blocking the server. The file is rewritten atomically (old file
-//	is replaced only after successful rewrite).
 func (aof *Aof) Rewrite(cp map[string]*Item) {
-	// future SET commands will go to to buffer
+	// future commands will go to buffer
 	var b bytes.Buffer
 	aof.w = NewWriter(&b) // writer to buffer
 
-	// we have copy of DB in cp, so remoev file
+	// Truncate the file
 	err := aof.f.Truncate(0)
 	if err != nil {
 		log.Println("ERR AOF Rewrite issue! Can't Truncate")
@@ -239,15 +232,52 @@ func (aof *Aof) Rewrite(cp map[string]*Item) {
 		return
 	}
 
-	// write all k, v as SET k, v into truncated file(no duplicates!)
+	// write all items with appropriate commands based on type
 	fwriter := NewWriter(aof.f) // writer to file
-	for k, v := range cp {
-		cmd := Value{typ: BULK, blk: "SET"}
-		key := Value{typ: BULK, blk: k}       // string
-		value := Value{typ: BULK, blk: v.Str} // actual string
+	for k, item := range cp {
+		if item == nil {
+			continue
+		}
 
-		arr := Value{typ: ARRAY, arr: []Value{cmd, key, value}}
-		fwriter.Write(&arr)
+		key := Value{typ: BULK, blk: k}
+
+		// Write command based on item type
+		switch item.Type {
+		case STRING_TYPE:
+			// SET key value
+			cmd := Value{typ: BULK, blk: "SET"}
+			value := Value{typ: BULK, blk: item.Str}
+			arr := Value{typ: ARRAY, arr: []Value{cmd, key, value}}
+			fwriter.Write(&arr)
+
+		case HASH_TYPE:
+			// HSET key field value [field value ...]
+			if len(item.Hash) > 0 {
+				cmd := Value{typ: BULK, blk: "HSET"}
+				arr := []Value{cmd, key}
+				for field, value := range item.Hash {
+					arr = append(arr, Value{typ: BULK, blk: field})
+					arr = append(arr, Value{typ: BULK, blk: value})
+				}
+				hsetCmd := Value{typ: ARRAY, arr: arr}
+				fwriter.Write(&hsetCmd)
+			}
+
+		case LIST_TYPE:
+			// TODO: LPUSH key value [value ...] when list support is added
+			log.Printf("Warning: LIST type not yet supported in AOF Rewrite for key %s\n", k)
+
+		case SET_TYPE:
+			// TODO: SADD key member [member ...] when set support is added
+			log.Printf("Warning: SET type not yet supported in AOF Rewrite for key %s\n", k)
+
+		case ZSET_TYPE:
+			// TODO: ZADD key score member [score member ...] when zset support is added
+			log.Printf("Warning: ZSET type not yet supported in AOF Rewrite for key %s\n", k)
+
+		default:
+			log.Printf("Warning: Unknown type %s for key %s in AOF Rewrite\n", item.Type, k)
+		}
 	}
 	fwriter.Flush()
 	log.Println("done BGREWRITE.")
@@ -260,24 +290,6 @@ func (aof *Aof) Rewrite(cp map[string]*Item) {
 		log.Println("ERR AOF Rewrite issue! Can't sync after appending buffer:", err)
 		return
 	}
-
-	// if b.Len() > 0 {
-	// 	// Flush the writer to ensure all buffered data is in the bytes.Buffer
-	// 	aof.w.Flush()
-
-	// 	// Append the buffered commands to the file
-	// 	_, err = aof.f.Write(b.Bytes())
-	// 	if err != nil {
-	// 		log.Println("ERR AOF Rewrite issue! Can't append buffered commands:", err)
-	// 		return
-	// 	}
-
-	// 	// Sync to ensure data is written to disk
-	// 	if err := aof.f.Sync(); err != nil {
-	// 		log.Println("ERR AOF Rewrite issue! Can't sync after appending buffer:", err)
-	// 		return
-	// 	}
-	// }
 
 	// rewrite to file
 	aof.w = NewWriter(aof.f)

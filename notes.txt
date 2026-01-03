@@ -1,3 +1,1 @@
-// how keys are deleted?
-// samples few keys say n = 5
-// performs the eviction on that sample
+sudo kill $(sudo lsof -t -i :6379)

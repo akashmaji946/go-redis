@@ -10,14 +10,17 @@ import (
 )
 
 // Item represents a value stored in the database along with its expiration time.
-// This structure allows the database to support key expiration functionality.
+// This structure allows the database to support key expiration functionality and multiple data types.
 //
 // Fields:
 //
 //	-Type: The data type of the value (e.g., "string", "hash", "list", "set", "zset")
 //
 // -Str: The actual string value stored in the database
-// -Hash: A map representing a hash data type (for future hash support)
+// -Int: Integer value stored in the database
+// -Bool: Boolean value stored in the database
+// -Float: Float value stored in the database
+// -Hash: A map representing a hash data type, where each field is itself an Item (supports per-field expiration)
 // -List: A slice representing a list data type (for future list support)
 // -ItemSet: A map representing a set data type (for future set support)
 // -ZSet: A map representing a sorted set data type (for future sorted set support)
@@ -27,13 +30,16 @@ import (
 //   - LastAccessed: The time when the key was last accessed
 //   - AccessCount: The number of times the key was accessed
 type Item struct {
-	Type string // NEW: Data type: "string", "hash", "list", "set", "zset"
+	Type string // Data type: "string", "int", "bool", "float", "hash", "list", "set", "zset"
 
-	Str     string             // Current: string value
-	Hash    map[string]string  // NEW: For hash type
-	List    []string           // NEW: For list type (future)
-	ItemSet map[string]bool    // NEW: For set type (future)
-	ZSet    map[string]float64 // NEW: For sorted set type (future)
+	Str     string            // String value
+	Int     int64             // Integer value
+	Bool    bool              // Boolean value
+	Float   float64           // Float value
+	Hash    map[string]*Item  // Hash type: field -> Item (each field can have expiration)
+	List    []string          // List type (future)
+	ItemSet map[string]bool   // Set type (future)
+	ZSet    map[string]float64 // Sorted set type (future)
 
 	Exp          time.Time
 	LastAccessed time.Time
