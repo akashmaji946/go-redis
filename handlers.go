@@ -640,7 +640,7 @@ func Get(c *Client, v *Value, state *AppState) *Value {
 		return NewNullValue()
 	}
 
-	return NewBulkValue(item.V)
+	return NewBulkValue(item.Str)
 
 }
 

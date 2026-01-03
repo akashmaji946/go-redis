@@ -18,7 +18,7 @@ import (
 //   - LastAccessed: The time when the key was last accessed
 //   - AccessCount: The number of times the key was accessed
 type Item struct {
-	V            string
+	Str          string
 	Exp          time.Time
 	LastAccessed time.Time
 	AccessCount  int
@@ -84,7 +84,7 @@ func (DB *Database) Put(k string, v string, state *AppState) (err error) {
 	}
 
 	// value to put
-	item := &Item{V: v}
+	item := &Item{Str: v}
 
 	// get memory
 	memory := item.approxMemoryUsage(k)
@@ -328,7 +328,7 @@ func (Val *Item) approxMemoryUsage(key string) (size int64) {
 	lastAccessedSize := 16
 	accessCountSize := 4
 	// stringHeader + key + stringHeader + value + expHeader + lastAccessed + accessCount + mapEntrySize
-	return int64(stringHeader + len(key) + stringHeader + len(Val.V) + expHeader + mapEntrySize + lastAccessedSize + accessCountSize)
+	return int64(stringHeader + len(key) + stringHeader + len(Val.Str) + expHeader + mapEntrySize + lastAccessedSize + accessCountSize)
 
 }
 
