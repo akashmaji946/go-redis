@@ -163,6 +163,7 @@ var Handlers = map[string]Handler{
 	"HLEN":    Hlen,
 	"HKEYS":   Hkeys,
 	"HVALS":   Hvals,
+	"HEXPIRE": Hexpire,
 
 	// authorize
 	"AUTH": Auth,
@@ -640,16 +641,16 @@ func Get(c *Client, v *Value, state *AppState) *Value {
 	// get the item from the database
 	DB.mu.RLock()
 	item, ok := DB.Poll(key)
+	// delete if expired
+	deleted := DB.RemIfExpired(key, item, state)
+	if deleted {
+		fmt.Println("Expired Key: ", key)
+		return NewNullValue()
+	}
 	DB.mu.RUnlock()
 
 	if !ok {
 		fmt.Println("Not Found: ", key)
-		return NewNullValue()
-	}
-
-	// delete if expired
-	deleted := DB.RemIfExpired(key, item, state)
-	if deleted {
 		return NewNullValue()
 	}
 
@@ -686,6 +687,41 @@ func Set(c *Client, v *Value, state *AppState) *Value {
 	key := args[0].blk // grab the key
 	val := args[1].blk // grab the value
 
+	DB.mu.Lock()
+	// First check if key exists to get old memory usage
+	var oldItem *Item
+	if existing, ok := DB.store[key]; ok {
+		oldItem = existing
+	}
+	DB.mu.Unlock()
+
+	// Create new item and calculate memory (without lock)
+	newItem := NewStringItem(val)
+	newMemory := newItem.approxMemoryUsage(key)
+
+	// Check if we need to evict (without holding lock)
+	DB.mu.RLock()
+	currentMem := DB.mem
+	maxMem := state.config.maxmemory
+	DB.mu.RUnlock()
+
+	oldMemory := int64(0)
+	if oldItem != nil {
+		oldMemory = int64(oldItem.approxMemoryUsage(key))
+	}
+
+	// Calculate new total memory
+	netNewMemory := newMemory - oldMemory
+
+	if maxMem > 0 && currentMem+netNewMemory >= maxMem {
+		// Need to evict - this acquires its own locks
+		_, err := DB.EvictKeys(state, netNewMemory)
+		if err != nil {
+			return NewErrorValue("ERR maxmemory reached: " + err.Error())
+		}
+	}
+
+	// Now acquire lock and actually put the item
 	DB.mu.Lock()
 	err := DB.Put(key, val, state)
 	if err != nil {
@@ -1060,6 +1096,8 @@ func Ttl(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.RLock()
 	item, ok := DB.store[k]
 	if !ok {
+		fmt.Println("TTL: key not found ", k)
+		DB.mu.RUnlock()
 		return NewIntegerValue(-2)
 	}
 	exp := item.Exp
@@ -1128,7 +1166,7 @@ func Hset(c *Client, v *Value, state *AppState) *Value {
 		if _, exists := item.Hash[field]; !exists {
 			count++
 		}
-		item.Hash[field] = value
+		item.Hash[field] = NewHashFieldItem(value)
 	}
 
 	if state.config.aofEnabled {
@@ -1165,23 +1203,42 @@ func Hget(c *Client, v *Value, state *AppState) *Value {
 	key := args[0].blk
 	field := args[1].blk
 
-	DB.mu.RLock()
-	defer DB.mu.RUnlock()
+	DB.mu.Lock()
+	defer DB.mu.Unlock()
 
-	item, ok := DB.store[key]
-	if !ok {
+	item, ok := DB.Poll(key)
+	if ok {
+		if !item.IsHash() {
+			return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
+		fieldItem, exists := item.Hash[field]
+		if exists {
+			// Check if field is expired
+			if fieldItem.IsExpired() {
+				// Delete here
+				fmt.Printf("Expired Key: %s:%s\n", key, field)
+				delete(item.Hash, field)
+				return NewNullValue()
+			}
+			// delete if expired
+			deleted := DB.RemIfExpired(key, item, state)
+			if deleted {
+				fmt.Println("Expired Key: ", key)
+				return NewNullValue()
+			}
+			return NewBulkValue(fieldItem.Str)
+		}
+
 		return NewNullValue()
 	}
 
-	if !item.IsHash() {
-		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	if !ok {
+		fmt.Println("Not Found: ", key)
+		return NewNullValue()
 	}
 
-	if val, exists := item.Hash[field]; exists {
-		return NewBulkValue(val)
-	}
+	return NewBulkValue(item.Str)
 
-	return NewNullValue()
 }
 
 // Hdel handles the HDEL command.
@@ -1268,9 +1325,13 @@ func Hgetall(c *Client, v *Value, state *AppState) *Value {
 	}
 
 	result := make([]Value, 0, len(item.Hash)*2)
-	for field, value := range item.Hash {
+	for field, fieldItem := range item.Hash {
+		// Skip expired fields
+		if fieldItem.IsExpired() {
+			continue
+		}
 		result = append(result, Value{typ: BULK, blk: field})
-		result = append(result, Value{typ: BULK, blk: value})
+		result = append(result, Value{typ: BULK, blk: fieldItem.Str})
 	}
 
 	return NewArrayValue(result)
@@ -1319,17 +1380,30 @@ func Hincrby(c *Client, v *Value, state *AppState) *Value {
 		DB.store[key] = item
 	}
 
-	currentVal := item.Hash[field]
+	var fieldItem *Item
+	if existing, ok := item.Hash[field]; ok {
+		fieldItem = existing
+	} else {
+		fieldItem = NewHashFieldItem("0")
+		item.Hash[field] = fieldItem
+	}
+
+	// Check if field is expired
+	if fieldItem.IsExpired() {
+		fieldItem = NewHashFieldItem("0")
+		item.Hash[field] = fieldItem
+	}
+
 	current := int64(0)
-	if currentVal != "" {
-		current, err = ParseInt(currentVal)
+	if fieldItem.Str != "" {
+		current, err = ParseInt(fieldItem.Str)
 		if err != nil {
 			return NewErrorValue("ERR hash value is not an integer")
 		}
 	}
 
 	newVal := current + incr
-	item.Hash[field] = fmt.Sprintf("%d", newVal)
+	fieldItem.Str = fmt.Sprintf("%d", newVal)
 
 	if state.config.aofEnabled {
 		state.aof.w.Write(v)
@@ -1377,7 +1451,7 @@ func Hmset(c *Client, v *Value, state *AppState) *Value {
 	for i := 1; i < len(args); i += 2 {
 		field := args[i].blk
 		value := args[i+1].blk
-		item.Hash[field] = value
+		item.Hash[field] = NewHashFieldItem(value)
 	}
 
 	if state.config.aofEnabled {
@@ -1493,8 +1567,11 @@ func Hkeys(c *Client, v *Value, state *AppState) *Value {
 	}
 
 	result := make([]Value, 0, len(item.Hash))
-	for field := range item.Hash {
-		result = append(result, Value{typ: BULK, blk: field})
+	for field, fieldItem := range item.Hash {
+		// Skip expired fields
+		if !fieldItem.IsExpired() {
+			result = append(result, Value{typ: BULK, blk: field})
+		}
 	}
 
 	return NewArrayValue(result)
@@ -1531,8 +1608,11 @@ func Hvals(c *Client, v *Value, state *AppState) *Value {
 	}
 
 	result := make([]Value, 0, len(item.Hash))
-	for _, value := range item.Hash {
-		result = append(result, Value{typ: BULK, blk: value})
+	for _, fieldItem := range item.Hash {
+		// Skip expired fields
+		if !fieldItem.IsExpired() {
+			result = append(result, Value{typ: BULK, blk: fieldItem.Str})
+		}
 	}
 
 	return NewArrayValue(result)
@@ -1575,7 +1655,7 @@ func Hdelall(c *Client, v *Value, state *AppState) *Value {
 	}
 
 	count := int64(len(item.Hash))
-	item.Hash = make(map[string]string) // Clear the hash
+	item.Hash = make(map[string]*Item) // Clear the hash
 
 	if state.config.aofEnabled {
 		state.aof.w.Write(v)
@@ -1585,4 +1665,62 @@ func Hdelall(c *Client, v *Value, state *AppState) *Value {
 	}
 
 	return NewIntegerValue(count)
+}
+
+// Hexpire handles the HEXPIRE command.
+// Sets expiration time on a specific hash field.
+//
+// Syntax:
+//
+//	HEXPIRE <key> <field> <seconds>
+//
+// Returns:
+//
+//	Integer: 1 if expiration set, 0 if field doesn't exist
+//
+// Behavior:
+//   - Sets the expiration time for a specific field in the hash
+//   - The field must exist in the hash
+//   - After the expiration time, the field will be treated as expired
+//   - Expired fields are lazily deleted on access
+//
+// Example:
+//
+//	HEXPIRE myhash field1 10   // field1 expires after 10 seconds
+func Hexpire(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 3 {
+		return NewErrorValue("ERR wrong number of arguments for 'hexpire' command")
+	}
+
+	key := args[0].blk
+	field := args[1].blk
+	secondsStr := args[2].blk
+
+	seconds, err := strconv.Atoi(secondsStr)
+	if err != nil {
+		return NewErrorValue("ERR invalid expiration time")
+	}
+
+	DB.mu.Lock()
+	defer DB.mu.Unlock()
+
+	item, ok := DB.store[key]
+	if !ok {
+		return NewIntegerValue(0)
+	}
+
+	if !item.IsHash() {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	fieldItem, exists := item.Hash[field]
+	if !exists {
+		return NewIntegerValue(0)
+	}
+
+	// Set expiration on the field
+	fieldItem.Exp = time.Now().Add(time.Second * time.Duration(seconds))
+
+	return NewIntegerValue(1)
 }

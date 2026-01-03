@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"sort"
 	"sync"
@@ -32,13 +33,14 @@ import (
 type Item struct {
 	Type string // Data type: "string", "int", "bool", "float", "hash", "list", "set", "zset"
 
-	Str     string            // String value
-	Int     int64             // Integer value
-	Bool    bool              // Boolean value
-	Float   float64           // Float value
-	Hash    map[string]*Item  // Hash type: field -> Item (each field can have expiration)
-	List    []string          // List type (future)
-	ItemSet map[string]bool   // Set type (future)
+	Str   string  // String value
+	Int   int64   // Integer value
+	Bool  bool    // Boolean value
+	Float float64 // Float value
+
+	Hash    map[string]*Item   // Hash type: field -> Item (each field can have expiration)
+	List    []string           // List type (future)
+	ItemSet map[string]bool    // Set type (future)
 	ZSet    map[string]float64 // Sorted set type (future)
 
 	Exp          time.Time
@@ -95,12 +97,13 @@ func NewDatabase() *Database {
 //   - The new item will have the access count set to 0
 //   - This method directly accesses DB.store without locking
 //     (caller must ensure proper locking is in place)
+//   - Memory eviction should be handled by the caller before calling Put
 //
 // Note: This is a low-level method. For thread-safe operations, ensure lock is held.
 func (DB *Database) Put(k string, v string, state *AppState) (err error) {
 
 	var item *Item
-	// if already exists, decrease meory
+	// if already exists, decrease memory
 	if oldItem, ok := DB.store[k]; ok {
 		item = oldItem
 		item.Str = v
@@ -115,16 +118,6 @@ func (DB *Database) Put(k string, v string, state *AppState) (err error) {
 	// get memory
 	memory := item.approxMemoryUsage(k)
 
-	oom := state.config.maxmemory > 0 && DB.mem+memory >= state.config.maxmemory
-	if oom {
-		count, err := DB.EvictKeys(state, memory)
-		if err != nil {
-			return err
-		}
-		state.genStats.total_evicted_keys += count
-		log.Printf("%d keys evicted\n", count)
-	}
-
 	// increase memory
 	DB.mem += int64(memory)
 	// track peak memory
@@ -136,6 +129,10 @@ func (DB *Database) Put(k string, v string, state *AppState) (err error) {
 	DB.store[k] = item
 
 	log.Printf("memory = %d\n", DB.mem)
+	if DB.mem < 0 {
+		panic("DB memory went negative!")
+	}
+
 	return nil
 }
 
@@ -176,13 +173,11 @@ func (DB *Database) Poll(k string) (item *Item, ok bool) {
 
 	// Check if expired, but don't delete here (would need write lock)
 	// Return expired status and let caller handle deletion if needed
-	if item.IsExpired() {
-		return nil, false // Treat expired as not found
+	if !item.IsExpired() {
+		// update last accessed time and access count
+		item.LastAccessed = time.Now()
+		item.AccessCount++
 	}
-
-	// update last accessed time and access count
-	item.LastAccessed = time.Now()
-	item.AccessCount++
 
 	// all good, return the item
 	return item, true
@@ -206,14 +201,20 @@ func (DB *Database) Poll(k string) (item *Item, ok bool) {
 //
 // Example:
 //
-//	db.Del("mykey")  // Removes "mykey" from the database
+//	db.Rem("mykey")  // Removes "mykey" from the database
 func (DB *Database) Rem(k string) {
 	if item, ok := DB.store[k]; ok {
-		mem := item.approxMemoryUsage(k)
+		mem := item.approxMemoryUsage(k) // also takes into account hashes
 		DB.mem -= int64(mem)
+		if item.Type == HASH_TYPE && item.Hash != nil {
+			item.Hash = nil // help GC
+		}
 		delete(DB.store, k)
 	}
 	log.Printf("memory = %d\n", DB.mem)
+	if DB.mem < 0 {
+		panic("DB memory went negative!")
+	}
 }
 
 // RemIfExpired removes a key-value pair from the database if it is expired.
@@ -243,7 +244,11 @@ func (DB *Database) Rem(k string) {
 //	    // item is deleted
 //	}
 func (DB *Database) RemIfExpired(k string, item *Item, state *AppState) (deleted bool) {
+	if item == nil {
+		return false
+	}
 	if item.IsExpired() { // check if expired
+		fmt.Println("Deleting expired key: ", k)
 		DB.Rem(k)
 		state.genStats.total_expired_keys += 1
 		return true
@@ -369,17 +374,43 @@ func (item *Item) approxMemoryUsage(key string) int64 {
 	size += int64(len(item.Str))
 	size += int64(len(item.Type))
 
-	// Hash map inside Item
+	// Hash map inside Item - now contains *Item pointers instead of strings
 	if item.Type == HASH_TYPE && item.Hash != nil {
 		// hmap header (pointer counted in struct, data here)
 		size += int64(unsafe.Sizeof(item.Hash))
 
-		for k, v := range item.Hash {
-			size += stringHeader + int64(len(k))
-			size += stringHeader + int64(len(v))
-			size += avgMapEntryOverhead
+		for k, fieldItem := range item.Hash {
+			if fieldItem == nil {
+				continue
+			}
+			size += stringHeader + int64(len(k)) // field name
+			size += pointerSize                  // pointer to field Item
+			size += avgMapEntryOverhead          // map entry overhead
+
+			// Recursively add size of the nested Item (field value)
+			size += fieldItem.approxMemoryUsageNested()
 		}
 	}
+
+	return size
+}
+
+// approxMemoryUsageNested calculates memory usage for nested Items (hash fields)
+// without double-counting the map entry overhead
+func (item *Item) approxMemoryUsageNested() int64 {
+	const pointerSize = 8
+
+	var size int64
+
+	// Item struct itself
+	size += int64(unsafe.Sizeof(*item))
+
+	// String values
+	size += int64(len(item.Str))
+	size += int64(len(item.Type))
+
+	// Note: We don't recursively calculate nested hash fields to avoid deep nesting
+	// If hash fields contain hashes, we only count the top level
 
 	return size
 }

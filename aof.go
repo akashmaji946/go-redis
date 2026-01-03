@@ -255,12 +255,18 @@ func (aof *Aof) Rewrite(cp map[string]*Item) {
 			if len(item.Hash) > 0 {
 				cmd := Value{typ: BULK, blk: "HSET"}
 				arr := []Value{cmd, key}
-				for field, value := range item.Hash {
-					arr = append(arr, Value{typ: BULK, blk: field})
-					arr = append(arr, Value{typ: BULK, blk: value})
+				for field, fieldItem := range item.Hash {
+					// Skip expired fields
+					if !fieldItem.IsExpired() {
+						arr = append(arr, Value{typ: BULK, blk: field})
+						arr = append(arr, Value{typ: BULK, blk: fieldItem.Str})
+					}
 				}
-				hsetCmd := Value{typ: ARRAY, arr: arr}
-				fwriter.Write(&hsetCmd)
+				// Only write if there are non-expired fields
+				if len(arr) > 2 {
+					hsetCmd := Value{typ: ARRAY, arr: arr}
+					fwriter.Write(&hsetCmd)
+				}
 			}
 
 		case LIST_TYPE:

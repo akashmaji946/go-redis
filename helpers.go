@@ -102,7 +102,7 @@ func (item *Item) EnsureHash() error {
 		return NewError("WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
 	if item.Hash == nil {
-		item.Hash = make(map[string]string)
+		item.Hash = make(map[string]*Item)
 	}
 	item.Type = HASH_TYPE
 	return nil
@@ -127,6 +127,14 @@ func NewStringItem(value string) *Item {
 func NewHashItem() *Item {
 	return &Item{
 		Type: HASH_TYPE,
-		Hash: make(map[string]string),
+		Hash: make(map[string]*Item),
+	}
+}
+
+// NewHashFieldItem creates a new Item for a hash field with a string value
+func NewHashFieldItem(value string) *Item {
+	return &Item{
+		Str:  value,
+		Type: STRING_TYPE,
 	}
 }
