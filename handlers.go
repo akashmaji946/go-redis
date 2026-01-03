@@ -151,6 +151,18 @@ var Handlers = map[string]Handler{
 	"EXPIRE": Expire,
 	"TTL":    Ttl,
 
+	// Hash commands
+	"HSET":    Hset,
+	"HGET":    Hget,
+	"HDEL":    Hdel,
+	"HGETALL": Hgetall,
+	"HINCRBY": Hincrby,
+	"HMSET":   Hmset,
+	"HEXISTS": Hexists,
+	"HLEN":    Hlen,
+	"HKEYS":   Hkeys,
+	"HVALS":   Hvals,
+
 	// authorize
 	"AUTH": Auth,
 
@@ -1066,4 +1078,453 @@ func Ttl(c *Client, v *Value, state *AppState) *Value {
 	// fmt.Println(secondsToExpire)
 	return NewIntegerValue(int64(secondsToExpire))
 
+}
+
+// ============================================================================
+// HASH COMMAND HANDLERS
+// ============================================================================
+
+// Hset handles the HSET command.
+// Sets one or more field-value pairs in a hash.
+//
+// Syntax:
+//
+//	HSET <key> <field> <value> [<field> <value> ...]
+//
+// Returns:
+//
+//	Integer: Number of fields added (not updated)
+//
+// Behavior:
+//   - Creates hash if it doesn't exist
+//   - Updates existing fields
+//   - Returns count of new fields added
+func Hset(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) < 3 || len(args)%2 == 0 {
+		return NewErrorValue("ERR wrong number of arguments for 'hset' command")
+	}
+
+	key := args[0].blk
+	DB.mu.Lock()
+	defer DB.mu.Unlock()
+
+	var item *Item
+	if existing, ok := DB.store[key]; ok {
+		item = existing
+		if err := item.EnsureHash(); err != nil {
+			return NewErrorValue(err.Error())
+		}
+	} else {
+		item = NewHashItem()
+		DB.store[key] = item
+	}
+
+	count := int64(0)
+	for i := 1; i < len(args); i += 2 {
+		field := args[i].blk
+		value := args[i+1].blk
+		if _, exists := item.Hash[field]; !exists {
+			count++
+		}
+		item.Hash[field] = value
+	}
+
+	if state.config.aofEnabled {
+		state.aof.w.Write(v)
+	}
+	if len(state.config.rdb) > 0 {
+		IncrRDBTrackers()
+	}
+
+	return NewIntegerValue(count)
+}
+
+// Hget handles the HGET command.
+// Gets the value of a hash field.
+//
+// Syntax:
+//
+//	HGET <key> <field>
+//
+// Returns:
+//
+//	Bulk string: Field value
+//	NULL: If field or key does not exist
+func Hget(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 2 {
+		return NewErrorValue("ERR wrong number of arguments for 'hget' command")
+	}
+
+	key := args[0].blk
+	field := args[1].blk
+
+	DB.mu.RLock()
+	defer DB.mu.RUnlock()
+
+	item, ok := DB.store[key]
+	if !ok {
+		return NewNullValue()
+	}
+
+	if !item.IsHash() {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	if val, exists := item.Hash[field]; exists {
+		return NewBulkValue(val)
+	}
+
+	return NewNullValue()
+}
+
+// Hdel handles the HDEL command.
+// Deletes one or more hash fields.
+//
+// Syntax:
+//
+//	HDEL <key> <field> [<field> ...]
+//
+// Returns:
+//
+//	Integer: Number of fields deleted
+func Hdel(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) < 2 {
+		return NewErrorValue("ERR wrong number of arguments for 'hdel' command")
+	}
+
+	key := args[0].blk
+
+	DB.mu.Lock()
+	defer DB.mu.Unlock()
+
+	item, ok := DB.store[key]
+	if !ok {
+		return NewIntegerValue(0)
+	}
+
+	if !item.IsHash() {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	count := int64(0)
+	for i := 1; i < len(args); i++ {
+		field := args[i].blk
+		if _, exists := item.Hash[field]; exists {
+			delete(item.Hash, field)
+			count++
+		}
+	}
+
+	if state.config.aofEnabled {
+		state.aof.w.Write(v)
+	}
+	if len(state.config.rdb) > 0 {
+		IncrRDBTrackers()
+	}
+
+	return NewIntegerValue(count)
+}
+
+// Hgetall handles the HGETALL command.
+// Returns all field-value pairs in a hash.
+//
+// Syntax:
+//
+//	HGETALL <key>
+//
+// Returns:
+//
+//	Array: [field1, value1, field2, value2, ...]
+func Hgetall(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 1 {
+		return NewErrorValue("ERR wrong number of arguments for 'hgetall' command")
+	}
+
+	key := args[0].blk
+
+	DB.mu.RLock()
+	defer DB.mu.RUnlock()
+
+	item, ok := DB.store[key]
+	if !ok {
+		return NewArrayValue([]Value{})
+	}
+
+	if !item.IsHash() {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	result := make([]Value, 0, len(item.Hash)*2)
+	for field, value := range item.Hash {
+		result = append(result, Value{typ: BULK, blk: field})
+		result = append(result, Value{typ: BULK, blk: value})
+	}
+
+	return NewArrayValue(result)
+}
+
+// Hincrby handles the HINCRBY command.
+// Increments the integer value of a hash field by the given amount.
+//
+// Syntax:
+//
+//	HINCRBY <key> <field> <increment>
+//
+// Returns:
+//
+//	Integer: The new value after increment
+//
+// Behavior:
+//   - Creates hash and field if they don't exist (initialized to 0)
+//   - Returns error if field value is not a valid integer
+func Hincrby(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 3 {
+		return NewErrorValue("ERR wrong number of arguments for 'hincrby' command")
+	}
+
+	key := args[0].blk
+	field := args[1].blk
+	incrStr := args[2].blk
+
+	incr, err := ParseInt(incrStr)
+	if err != nil {
+		return NewErrorValue("ERR value is not an integer or out of range")
+	}
+
+	DB.mu.Lock()
+	defer DB.mu.Unlock()
+
+	var item *Item
+	if existing, ok := DB.store[key]; ok {
+		item = existing
+		if err := item.EnsureHash(); err != nil {
+			return NewErrorValue(err.Error())
+		}
+	} else {
+		item = NewHashItem()
+		DB.store[key] = item
+	}
+
+	currentVal := item.Hash[field]
+	current := int64(0)
+	if currentVal != "" {
+		current, err = ParseInt(currentVal)
+		if err != nil {
+			return NewErrorValue("ERR hash value is not an integer")
+		}
+	}
+
+	newVal := current + incr
+	item.Hash[field] = fmt.Sprintf("%d", newVal)
+
+	if state.config.aofEnabled {
+		state.aof.w.Write(v)
+	}
+	if len(state.config.rdb) > 0 {
+		IncrRDBTrackers()
+	}
+
+	return NewIntegerValue(newVal)
+}
+
+// Hmset handles the HMSET command.
+// Sets multiple field-value pairs in a hash.
+// (Deprecated in favor of HSET, but kept for compatibility)
+//
+// Syntax:
+//
+//	HMSET <key> <field> <value> [<field> <value> ...]
+//
+// Returns:
+//
+//	String: OK
+func Hmset(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) < 3 || len(args)%2 == 0 {
+		return NewErrorValue("ERR wrong number of arguments for 'hmset' command")
+	}
+
+	key := args[0].blk
+
+	DB.mu.Lock()
+	defer DB.mu.Unlock()
+
+	var item *Item
+	if existing, ok := DB.store[key]; ok {
+		item = existing
+		if err := item.EnsureHash(); err != nil {
+			return NewErrorValue(err.Error())
+		}
+	} else {
+		item = NewHashItem()
+		DB.store[key] = item
+	}
+
+	for i := 1; i < len(args); i += 2 {
+		field := args[i].blk
+		value := args[i+1].blk
+		item.Hash[field] = value
+	}
+
+	if state.config.aofEnabled {
+		state.aof.w.Write(v)
+	}
+	if len(state.config.rdb) > 0 {
+		IncrRDBTrackers()
+	}
+
+	return NewStringValue("OK")
+}
+
+// Hexists handles the HEXISTS command.
+// Checks if a hash field exists.
+//
+// Syntax:
+//
+//	HEXISTS <key> <field>
+//
+// Returns:
+//
+//	Integer: 1 if field exists, 0 otherwise
+func Hexists(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 2 {
+		return NewErrorValue("ERR wrong number of arguments for 'hexists' command")
+	}
+
+	key := args[0].blk
+	field := args[1].blk
+
+	DB.mu.RLock()
+	defer DB.mu.RUnlock()
+
+	item, ok := DB.store[key]
+	if !ok {
+		return NewIntegerValue(0)
+	}
+
+	if !item.IsHash() {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	_, exists := item.Hash[field]
+	if exists {
+		return NewIntegerValue(1)
+	}
+
+	return NewIntegerValue(0)
+}
+
+// Hlen handles the HLEN command.
+// Returns the number of fields in a hash.
+//
+// Syntax:
+//
+//	HLEN <key>
+//
+// Returns:
+//
+//	Integer: Number of fields in the hash
+func Hlen(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 1 {
+		return NewErrorValue("ERR wrong number of arguments for 'hlen' command")
+	}
+
+	key := args[0].blk
+
+	DB.mu.RLock()
+	defer DB.mu.RUnlock()
+
+	item, ok := DB.store[key]
+	if !ok {
+		return NewIntegerValue(0)
+	}
+
+	if !item.IsHash() {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	return NewIntegerValue(int64(len(item.Hash)))
+}
+
+// Hkeys handles the HKEYS command.
+// Returns all field names in a hash.
+//
+// Syntax:
+//
+//	HKEYS <key>
+//
+// Returns:
+//
+//	Array: List of field names
+func Hkeys(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 1 {
+		return NewErrorValue("ERR wrong number of arguments for 'hkeys' command")
+	}
+
+	key := args[0].blk
+
+	DB.mu.RLock()
+	defer DB.mu.RUnlock()
+
+	item, ok := DB.store[key]
+	if !ok {
+		return NewArrayValue([]Value{})
+	}
+
+	if !item.IsHash() {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	result := make([]Value, 0, len(item.Hash))
+	for field := range item.Hash {
+		result = append(result, Value{typ: BULK, blk: field})
+	}
+
+	return NewArrayValue(result)
+}
+
+// Hvals handles the HVALS command.
+// Returns all values in a hash.
+//
+// Syntax:
+//
+//	HVALS <key>
+//
+// Returns:
+//
+//	Array: List of values
+func Hvals(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 1 {
+		return NewErrorValue("ERR wrong number of arguments for 'hvals' command")
+	}
+
+	key := args[0].blk
+
+	DB.mu.RLock()
+	defer DB.mu.RUnlock()
+
+	item, ok := DB.store[key]
+	if !ok {
+		return NewArrayValue([]Value{})
+	}
+
+	if !item.IsHash() {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	result := make([]Value, 0, len(item.Hash))
+	for _, value := range item.Hash {
+		result = append(result, Value{typ: BULK, blk: value})
+	}
+
+	return NewArrayValue(result)
 }

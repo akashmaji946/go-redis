@@ -6,19 +6,35 @@ import (
 	"sort"
 	"sync"
 	"time"
+	"unsafe"
 )
 
 // Item represents a value stored in the database along with its expiration time.
 // This structure allows the database to support key expiration functionality.
 //
 // Fields:
-//   - V: The actual string value stored in the database
+//
+//	-Type: The data type of the value (e.g., "string", "hash", "list", "set", "zset")
+//
+// -Str: The actual string value stored in the database
+// -Hash: A map representing a hash data type (for future hash support)
+// -List: A slice representing a list data type (for future list support)
+// -ItemSet: A map representing a set data type (for future set support)
+// -ZSet: A map representing a sorted set data type (for future sorted set support)
+//
 //   - Exp: The expiration time for this key-value pair
 //     If exp is the zero time (time.Time{}), the key has no expiration
 //   - LastAccessed: The time when the key was last accessed
 //   - AccessCount: The number of times the key was accessed
 type Item struct {
-	Str          string
+	Type string // NEW: Data type: "string", "hash", "list", "set", "zset"
+
+	Str     string             // Current: string value
+	Hash    map[string]string  // NEW: For hash type
+	List    []string           // NEW: For list type (future)
+	ItemSet map[string]bool    // NEW: For set type (future)
+	ZSet    map[string]float64 // NEW: For sorted set type (future)
+
 	Exp          time.Time
 	LastAccessed time.Time
 	AccessCount  int
@@ -77,14 +93,18 @@ func NewDatabase() *Database {
 // Note: This is a low-level method. For thread-safe operations, ensure lock is held.
 func (DB *Database) Put(k string, v string, state *AppState) (err error) {
 
+	var item *Item
 	// if already exists, decrease meory
 	if oldItem, ok := DB.store[k]; ok {
+		item = oldItem
+		item.Str = v
+		item.Type = STRING_TYPE
+
 		oldmemory := oldItem.approxMemoryUsage(k)
 		DB.mem -= int64(oldmemory)
+	} else {
+		item = NewStringItem(v)
 	}
-
-	// value to put
-	item := &Item{Str: v}
 
 	// get memory
 	memory := item.approxMemoryUsage(k)
@@ -321,15 +341,41 @@ type TxCommand struct {
 //   - expHeader: The size of the expiration time header (24 bytes)
 //   - mapEntrySize: The size of the map entry (32 bytes)
 //   - k: The key of the Item
-func (Val *Item) approxMemoryUsage(key string) (size int64) {
-	stringHeader := 16
-	expHeader := 24
-	mapEntrySize := 32
-	lastAccessedSize := 16
-	accessCountSize := 4
-	// stringHeader + key + stringHeader + value + expHeader + lastAccessed + accessCount + mapEntrySize
-	return int64(stringHeader + len(key) + stringHeader + len(Val.Str) + expHeader + mapEntrySize + lastAccessedSize + accessCountSize)
 
+func (item *Item) approxMemoryUsage(key string) int64 {
+	const (
+		stringHeader        = 16 // Go string header: pointer + length
+		pointerSize         = 8  // *Item pointer on 64-bit arch
+		avgMapEntryOverhead = 18 // amortized per-entry overhead in Go maps
+	)
+
+	var size int64
+
+	// map[string]*Item entry
+	size += stringHeader + int64(len(key)) // key string
+	size += pointerSize                    // pointer to Item
+	size += avgMapEntryOverhead            // map bucket overhead
+
+	// Item struct itself (headers + padding)
+	size += int64(unsafe.Sizeof(*item))
+
+	// String values inside Item (data only; headers counted in struct)
+	size += int64(len(item.Str))
+	size += int64(len(item.Type))
+
+	// Hash map inside Item
+	if item.Type == HASH_TYPE && item.Hash != nil {
+		// hmap header (pointer counted in struct, data here)
+		size += int64(unsafe.Sizeof(item.Hash))
+
+		for k, v := range item.Hash {
+			size += stringHeader + int64(len(k))
+			size += stringHeader + int64(len(v))
+			size += avgMapEntryOverhead
+		}
+	}
+
+	return size
 }
 
 // UNIX_TS_EPOCH is the Unix timestamp of the epoch time.
