@@ -1148,9 +1148,12 @@ func Hset(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.Lock()
 	defer DB.mu.Unlock()
 
+	// Calculate old memory before modification
+	var oldMemory int64 = 0
 	var item *Item
 	if existing, ok := DB.store[key]; ok {
 		item = existing
+		oldMemory = existing.approxMemoryUsage(key)
 		if err := item.EnsureHash(); err != nil {
 			return NewErrorValue(err.Error())
 		}
@@ -1168,6 +1171,15 @@ func Hset(c *Client, v *Value, state *AppState) *Value {
 		}
 		item.Hash[field] = NewHashFieldItem(value)
 	}
+
+	// Calculate new memory and update DB.mem
+	newMemory := item.approxMemoryUsage(key)
+	DB.mem -= oldMemory
+	DB.mem += newMemory
+	if DB.mem > DB.mempeak {
+		DB.mempeak = DB.mem
+	}
+	log.Printf("memory = %d\n", DB.mem)
 
 	if state.config.aofEnabled {
 		state.aof.w.Write(v)
@@ -1271,6 +1283,9 @@ func Hdel(c *Client, v *Value, state *AppState) *Value {
 		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
 
+	// Calculate old memory before modification
+	oldMemory := item.approxMemoryUsage(key)
+
 	count := int64(0)
 	for i := 1; i < len(args); i++ {
 		field := args[i].blk
@@ -1279,6 +1294,12 @@ func Hdel(c *Client, v *Value, state *AppState) *Value {
 			count++
 		}
 	}
+
+	// Calculate new memory and update DB.mem
+	newMemory := item.approxMemoryUsage(key)
+	DB.mem -= oldMemory
+	DB.mem += newMemory
+	log.Printf("memory = %d\n", DB.mem)
 
 	if state.config.aofEnabled {
 		state.aof.w.Write(v)
@@ -1370,8 +1391,10 @@ func Hincrby(c *Client, v *Value, state *AppState) *Value {
 	defer DB.mu.Unlock()
 
 	var item *Item
+	var oldMemory int64 = 0
 	if existing, ok := DB.store[key]; ok {
 		item = existing
+		oldMemory = existing.approxMemoryUsage(key)
 		if err := item.EnsureHash(); err != nil {
 			return NewErrorValue(err.Error())
 		}
@@ -1405,6 +1428,15 @@ func Hincrby(c *Client, v *Value, state *AppState) *Value {
 	newVal := current + incr
 	fieldItem.Str = fmt.Sprintf("%d", newVal)
 
+	// Calculate new memory and update DB.mem
+	newMemory := item.approxMemoryUsage(key)
+	DB.mem -= oldMemory
+	DB.mem += newMemory
+	if DB.mem > DB.mempeak {
+		DB.mempeak = DB.mem
+	}
+	log.Printf("memory = %d\n", DB.mem)
+
 	if state.config.aofEnabled {
 		state.aof.w.Write(v)
 	}
@@ -1437,9 +1469,12 @@ func Hmset(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.Lock()
 	defer DB.mu.Unlock()
 
+	// Calculate old memory before modification
+	var oldMemory int64 = 0
 	var item *Item
 	if existing, ok := DB.store[key]; ok {
 		item = existing
+		oldMemory = existing.approxMemoryUsage(key)
 		if err := item.EnsureHash(); err != nil {
 			return NewErrorValue(err.Error())
 		}
@@ -1453,6 +1488,15 @@ func Hmset(c *Client, v *Value, state *AppState) *Value {
 		value := args[i+1].blk
 		item.Hash[field] = NewHashFieldItem(value)
 	}
+
+	// Calculate new memory and update DB.mem
+	newMemory := item.approxMemoryUsage(key)
+	DB.mem -= oldMemory
+	DB.mem += newMemory
+	if DB.mem > DB.mempeak {
+		DB.mempeak = DB.mem
+	}
+	log.Printf("memory = %d\n", DB.mem)
 
 	if state.config.aofEnabled {
 		state.aof.w.Write(v)
@@ -1654,8 +1698,17 @@ func Hdelall(c *Client, v *Value, state *AppState) *Value {
 		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
 
+	// Calculate old memory before clearing
+	oldMemory := item.approxMemoryUsage(key)
+
 	count := int64(len(item.Hash))
 	item.Hash = make(map[string]*Item) // Clear the hash
+
+	// Calculate new memory and update DB.mem
+	newMemory := item.approxMemoryUsage(key)
+	DB.mem -= oldMemory
+	DB.mem += newMemory
+	log.Printf("memory = %d\n", DB.mem)
 
 	if state.config.aofEnabled {
 		state.aof.w.Write(v)

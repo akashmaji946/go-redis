@@ -141,6 +141,25 @@ func SyncRDB(conf *Config, state *AppState) {
 		log.Println("error restoring rdb file using gob: ", err)
 		return
 	}
+
+	// Recompute in-memory accounting after restoring DB.store from RDB.
+	// Decode populates DB.store but does not update DB.mem, so sum up
+	// approximate memory usage for each entry to initialize DB.mem and
+	// DB.mempeak properly.
+	var total int64 = 0
+	for k, item := range DB.store {
+		if item == nil {
+			continue
+		}
+		total += item.approxMemoryUsage(k)
+	}
+	DB.mu.Lock()
+	DB.mem = total
+	if DB.mem > DB.mempeak {
+		DB.mempeak = DB.mem
+	}
+	DB.mu.Unlock()
+
 	log.Println("restored rdb file")
 }
 

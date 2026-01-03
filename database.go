@@ -105,12 +105,12 @@ func (DB *Database) Put(k string, v string, state *AppState) (err error) {
 	var item *Item
 	// if already exists, decrease memory
 	if oldItem, ok := DB.store[k]; ok {
+		oldmemory := oldItem.approxMemoryUsage(k)
+		DB.mem -= int64(oldmemory)
+		// track peak memory
 		item = oldItem
 		item.Str = v
 		item.Type = STRING_TYPE
-
-		oldmemory := oldItem.approxMemoryUsage(k)
-		DB.mem -= int64(oldmemory)
 	} else {
 		item = NewStringItem(v)
 	}
@@ -248,10 +248,12 @@ func (DB *Database) RemIfExpired(k string, item *Item, state *AppState) (deleted
 		return false
 	}
 	if item.IsExpired() { // check if expired
-		fmt.Println("Deleting expired key: ", k)
-		DB.Rem(k)
-		state.genStats.total_expired_keys += 1
-		return true
+		if _, exists := DB.store[k]; exists {
+			fmt.Println("Deleting expired key: ", k)
+			DB.Rem(k)
+			state.genStats.total_expired_keys += 1
+			return true
+		}
 	}
 	return false
 }
