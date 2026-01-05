@@ -189,6 +189,17 @@ This enables:
 - Returns number of keys in database
 - O(1) operation
 
+#### `RENAME <key> <newkey>`
+
+- Renames a key to newkey
+- Overwrites newkey if it exists
+- Returns 1 on success, 0 if key doesn't exist
+
+#### `TYPE <key>`
+
+- Returns the type of value stored at key (string, list, set, hash)
+- Returns "none" if key does not exist
+
 #### `FLUSHDB`
 
 - Removes all keys
@@ -211,6 +222,44 @@ Return values:
 - `> 0` → seconds remaining
 - `-1` → key exists without expiration
 - `-2` → key does not exist
+
+---
+
+### 6.5 List Commands
+
+#### `LPUSH`, `RPUSH`
+
+- Prepend/Append values to a list
+- Creates list if not exists
+
+#### `LPOP`, `RPOP`
+
+- Remove and return first/last element
+
+#### `LRANGE <key> <start> <stop>`
+
+- Returns elements in range (inclusive)
+- Supports negative indices
+
+#### `LGET <key>`
+
+- Custom command: Returns all elements (alias for `LRANGE 0 -1`)
+
+#### `LLEN`, `LINDEX`
+
+- Get length or element at index
+
+---
+
+### 6.6 Set Commands
+
+#### `SADD`, `SREM`
+
+- Add/Remove members from a set
+
+#### `SMEMBERS`, `SISMEMBER`, `SCARD`
+
+- Get all members, check membership, or get set size
 
 ---
 
@@ -249,6 +298,15 @@ Supported commands:
 - `HKEYS`
 - `HVALS`
 - `HEXPIRE`
+- `HDELALL`
+
+#### `HDELALL <key>`
+
+- Custom command: Deletes the entire hash
+
+#### `HEXPIRE <key> <field> <seconds>`
+
+- Sets TTL on a specific hash field
 
 All hash commands:
 - Perform lazy expiration
@@ -409,6 +467,3 @@ Semantic versioning not yet enforced.
 - Email: `akashmaji@iisc.ac.in`
 
 ---
-
-
-

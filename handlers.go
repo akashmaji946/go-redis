@@ -809,10 +809,9 @@ func Set(c *Client, v *Value, state *AppState) *Value {
 	val := args[1].blk // grab the value
 
 	DB.mu.Lock()
-
 	// First check if key exists to get old memory usage
 	var oldItem *Item
-	if existing, ok := DB.Poll(key); ok {
+	if existing, ok := DB.store[key]; ok {
 		oldItem = existing
 	}
 	DB.mu.Unlock()
@@ -1406,8 +1405,7 @@ func Hset(c *Client, v *Value, state *AppState) *Value {
 	// Calculate old memory before modification
 	var oldMemory int64 = 0
 	var item *Item
-
-	if existing, ok := DB.Poll(key); ok {
+	if existing, ok := DB.store[key]; ok {
 		item = existing
 		oldMemory = existing.approxMemoryUsage(key)
 		if err := item.EnsureHash(); err != nil {
@@ -1530,7 +1528,7 @@ func Hdel(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.Lock()
 	defer DB.mu.Unlock()
 
-	item, ok := DB.Poll(key)
+	item, ok := DB.store[key]
 	if !ok {
 		return NewIntegerValue(0)
 	}
@@ -1592,7 +1590,7 @@ func Hgetall(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.RLock()
 	defer DB.mu.RUnlock()
 
-	item, ok := DB.Poll(key)
+	item, ok := DB.store[key]
 	if !ok {
 		return NewArrayValue([]Value{})
 	}
@@ -1642,7 +1640,7 @@ func Sadd(c *Client, v *Value, state *AppState) *Value {
 	var item *Item
 	var oldMemory int64 = 0
 
-	if existing, ok := DB.Poll(key); ok {
+	if existing, ok := DB.store[key]; ok {
 		item = existing
 		if item.Type != "set" {
 			return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
@@ -1705,7 +1703,7 @@ func Srem(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.Lock()
 	defer DB.mu.Unlock()
 
-	item, ok := DB.Poll(key)
+	item, ok := DB.store[key]
 	if !ok {
 		return NewIntegerValue(0)
 	}
@@ -1767,7 +1765,7 @@ func Smembers(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.RLock()
 	defer DB.mu.RUnlock()
 
-	item, ok := DB.Poll(key)
+	item, ok := DB.store[key]
 	if !ok {
 		return NewArrayValue([]Value{})
 	}
@@ -1806,7 +1804,7 @@ func Sismember(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.RLock()
 	defer DB.mu.RUnlock()
 
-	item, ok := DB.Poll(key)
+	item, ok := DB.store[key]
 	if !ok {
 		return NewIntegerValue(0)
 	}
@@ -1843,7 +1841,7 @@ func Scard(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.RLock()
 	defer DB.mu.RUnlock()
 
-	item, ok := DB.Poll(key)
+	item, ok := DB.store[key]
 	if !ok {
 		return NewIntegerValue(0)
 	}
@@ -1962,8 +1960,7 @@ func Hincrby(c *Client, v *Value, state *AppState) *Value {
 
 	var item *Item
 	var oldMemory int64 = 0
-
-	if existing, ok := DB.Poll(key); ok {
+	if existing, ok := DB.store[key]; ok {
 		item = existing
 		oldMemory = existing.approxMemoryUsage(key)
 		if err := item.EnsureHash(); err != nil {
@@ -2043,8 +2040,7 @@ func Hmset(c *Client, v *Value, state *AppState) *Value {
 	// Calculate old memory before modification
 	var oldMemory int64 = 0
 	var item *Item
-
-	if existing, ok := DB.Poll(key); ok {
+	if existing, ok := DB.store[key]; ok {
 		item = existing
 		oldMemory = existing.approxMemoryUsage(key)
 		if err := item.EnsureHash(); err != nil {
@@ -2102,7 +2098,7 @@ func Hexists(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.RLock()
 	defer DB.mu.RUnlock()
 
-	item, ok := DB.Poll(key)
+	item, ok := DB.store[key]
 	if !ok {
 		return NewIntegerValue(0)
 	}
@@ -2140,7 +2136,7 @@ func Hlen(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.RLock()
 	defer DB.mu.RUnlock()
 
-	item, ok := DB.Poll(key)
+	item, ok := DB.store[key]
 	if !ok {
 		return NewIntegerValue(0)
 	}
@@ -2173,7 +2169,7 @@ func Hkeys(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.RLock()
 	defer DB.mu.RUnlock()
 
-	item, ok := DB.Poll(key)
+	item, ok := DB.store[key]
 	if !ok {
 		return NewArrayValue([]Value{})
 	}
@@ -2214,7 +2210,7 @@ func Hvals(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.RLock()
 	defer DB.mu.RUnlock()
 
-	item, ok := DB.Poll(key)
+	item, ok := DB.store[key]
 	if !ok {
 		return NewArrayValue([]Value{})
 	}
@@ -2261,7 +2257,7 @@ func Hdelall(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.Lock()
 	defer DB.mu.Unlock()
 
-	item, ok := DB.Poll(key)
+	item, ok := DB.store[key]
 	if !ok {
 		return NewIntegerValue(0)
 	}
@@ -2330,7 +2326,7 @@ func Hexpire(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.Lock()
 	defer DB.mu.Unlock()
 
-	item, ok := DB.Poll(key)
+	item, ok := DB.store[key]
 	if !ok {
 		return NewIntegerValue(0)
 	}

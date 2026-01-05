@@ -1,6 +1,7 @@
 # Go-Redis
 
 ![go-redis logo](go-redis.png)
+A lightweight, multi-threaded Redis server implementation in Go.
 
 A Redis-compatible in-memory key-value store server written in Go. This implementation supports core Redis commands, persistence mechanisms (AOF and RDB), authentication, expiration, transactions, monitoring, and memory management with eviction policies.
 
@@ -9,7 +10,8 @@ Access it here: [Docs](https://akashmaji946.github.io/go-redis/)
 
 ## Features
 
-- **Core Commands**: GET, SET, DEL, EXISTS, KEYS, DBSIZE, FLUSHDB
+- **Core Commands**: GET, SET, DEL, EXISTS, KEYS, DBSIZE, FLUSHDB, ...
+- **In-Memory Storage**: Fast key-value store supporting Strings, Lists, Sets, and Hashes.
 - **Persistence**:
   - **AOF (Append-Only File)**: Logs every write operation with configurable fsync modes
   - **RDB (Redis Database)**: Point-in-time snapshots with automatic triggers
@@ -23,8 +25,15 @@ Access it here: [Docs](https://akashmaji946.github.io/go-redis/)
 - **Thread-Safe**: Concurrent access with read-write locks (RWMutex)
 - **Redis Protocol**: Full RESP (Redis Serialization Protocol) compatibility
 - **Checksum Verification**: SHA-256 checksums for RDB data integrity
+  - **RDB**: Snapshotting with configurable intervals.
+  - **AOF**: Append-Only File with rewrite support.
+- **Concurrency**: Handles multiple client connections concurrently.
+- **Protocol**: Compatible with RESP (Redis Serialization Protocol).
+- **Transactions**: Basic `MULTI`, `EXEC`, `DISCARD` support.
+- **Eviction**: LRU/Random eviction policies when maxmemory is reached.
 
 ## Prerequisites
+## Supported Commands
 
 - **Go 1.24.4** or later
 - **redis-cli** (for testing and connecting to the server)
@@ -135,17 +144,29 @@ listening on port 6379
 ## Available Commands
 
 ### String Operations
+- GET `SET key value`
+- SET `GET key`
+- INCR | DECR `INCR key`, `DECR key`
+- INCRBY | DECRBY`INCRBY key increment`, `DECRBY key decrement`
 
-* GET
-* SET
 
-### Key Management
+### List Operations
+- `LPUSH key value [value ...]`
+- `RPUSH key value [value ...]`
+- `LPOP key`
+- `RPOP key`
+- `LRANGE key start stop`
+- `LLEN key`
+- `LINDEX key index`
+- `LGET key` (Custom: Get all elements)
 
-* DEL
-* EXISTS
-* KEYS
-* DBSIZE
-* FLUSHDB
+### Set Operations
+- `SADD key member [member ...]`
+- `SREM key member [member ...]`
+- `SMEMBERS key`
+- `SISMEMBER key member`
+- `SCARD key`
+
 
 ### Expiration
 
@@ -176,8 +197,13 @@ listening on port 6379
 ### Utility
 
 * COMMAND
+* COMMANDS
 
 ### Hash Operations
+- `HSET`, `HGET`, `HDEL`, `HGETALL`
+- `HINCRBY`, `HEXISTS`, `HLEN`
+- `HKEYS`, `HVALS`, `HEXPIRE`
+- `HDELALL` (Custom: Clear hash)
 
 * **HSET**: Set field in a hash
 * **HGET**: Get field from a hash
@@ -192,21 +218,46 @@ listening on port 6379
 * **HVALS**: Get all values in a hash
 * **HEXPIRE**: Set TTL on a hash key
 
+### Key Management
+- `DEL`, `EXISTS`, `KEYS`, `RENAME`, `TYPE`
+- `EXPIRE`, `TTL`
+
 ## Persistence
+### Server & Connection
+- `PING`, `AUTH`, `INFO`, `MONITOR`
+- `SAVE`, `BGSAVE`, `BGREWRITEAOF`
+- `FLUSHDB`, `DBSIZE`, `COMMANDS`
 
 ### AOF
+## Getting Started
 
 * Logs every write
 * Replayed on startup
 * Supports `always`, `everysec`, `no` fsync modes
 * Rewritten using BGREWRITEAOF
+1. **Build the server:**
+   ```bash
+   go build -o go-redis .
+   ```
 
 ### RDB
+2. **Run the server:**
+   ```bash
+   ./go-redis
+   ```
+   *Optionally specify config file and data directory:*
+   ```bash
+   ./go-redis ./config/redis.conf ./data/
+   ```
 
 * Snapshot-based persistence
 * Triggered via `save` rules
 * Uses Go `gob` encoding
 * SHA-256 checksum verification
+3. **Connect using `redis-cli`:**
+   ```bash
+   redis-cli -p 6379
+   ```
 
 ## Memory Management
 
@@ -324,3 +375,6 @@ Educational project implementing Redis-like functionality in Go.
 
 ## Author
 **Akash Maji (akashmaji@iisc.ac.in) - Contact for bugs and support**
+## Configuration
+Configuration is handled via `redis.conf`. See `config/redis.conf` for available options like port, persistence settings, and memory limits.
+
