@@ -177,6 +177,21 @@ listening on port 6379
 
 * COMMAND
 
+### Hash Operations
+
+* **HSET**: Set field in a hash
+* **HGET**: Get field from a hash
+* **HDEL**: Delete one or more fields from a hash
+* **HGETALL**: Get all fields and values in a hash
+* **HDELALL**: Delete the entire hash key and all its fields
+* **HINCRBY**: Increment a hash field by a given integer
+* **HMSET**: Set multiple fields in a hash
+* **HEXISTS**: Check if a field exists in a hash
+* **HLEN**: Get number of fields in a hash
+* **HKEYS**: Get all field names in a hash
+* **HVALS**: Get all values in a hash
+* **HEXPIRE**: Set TTL on a hash key
+
 ## Persistence
 
 ### AOF
