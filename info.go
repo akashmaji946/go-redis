@@ -63,10 +63,11 @@ func (info *RedisInfo) Build(state *AppState) {
 		memoryTotal = virtual_memory.Total
 	}
 	info.memory = map[string]string{
-		"used_memory":      fmt.Sprintf("%d B", DB.mem),
-		"used_memory_peak": fmt.Sprintf("%d B", DB.mempeak),
-		"total_memory":     fmt.Sprintf("%d B", memoryTotal),
-		"eviction_policy":  string(state.config.eviction),
+		"used_memory":         fmt.Sprintf("%d B", DB.mem),
+		"used_memory_peak":    fmt.Sprintf("%d B", DB.mempeak),
+		"total_memory_peak":   fmt.Sprintf("%d B", memoryTotal),
+		"total_memory_usable": fmt.Sprintf("%d B", state.config.maxmemory),
+		"eviction_policy":     string(state.config.eviction),
 	}
 
 	info.persistence = map[string]string{

@@ -6,6 +6,7 @@ import (
 	"maps"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -15,6 +16,9 @@ import (
 // can run these even if authenticated=0
 var safeCommands = []string{
 	"COMMAND",
+	"PING",
+	"COMMANDS",
+	"HELP",
 	"AUTH",
 }
 
@@ -129,13 +133,44 @@ func handle(client *Client, v *Value, state *AppState) {
 
 type Handler func(*Client, *Value, *AppState) *Value
 
+func init() {
+	Handlers["COMMANDS"] = Commands
+}
+
 var Handlers = map[string]Handler{
+
+	// health check
 	"COMMAND": Command,
+	"PING":    Ping,
 
-	"GET": Get,
-	"SET": Set,
+	"GET":    Get,
+	"SET":    Set,
+	"INCR":   Incr,
+	"DECR":   Decr,
+	"INCRBY": IncrBy,
+	"DECRBY": DecrBy,
 
-	"DEL": Del,
+	// List commands
+	"LPUSH":  Lpush,
+	"RPUSH":  Rpush,
+	"LPOP":   Lpop,
+	"RPOP":   Rpop,
+	"LRANGE": Lrange,
+	"LLEN":   Llen,
+	"LINDEX": Lindex,
+	"LGET":   Lget,
+
+	// Set commands
+	"SADD":      Sadd,
+	"SREM":      Srem,
+	"SMEMBERS":  Smembers,
+	"SISMEMBER": Sismember,
+	"SCARD":     Scard,
+
+	"TYPE": Type,
+
+	"DEL":    Del,
+	"RENAME": Rename,
 
 	"EXISTS": Exists,
 
@@ -194,6 +229,39 @@ var Handlers = map[string]Handler{
 func Command(c *Client, v *Value, state *AppState) *Value {
 	// cmd := v.arr[0].blk
 	return NewStringValue("OK")
+}
+
+// Commands handles the COMMANDS command.
+// Lists all available commands in an array.
+//
+// Syntax:
+//
+//	COMMANDS
+//
+// Returns:
+//
+//	Array: List of all supported command names
+func Commands(c *Client, v *Value, state *AppState) *Value {
+	var cmds []string
+	for k := range Handlers {
+		cmds = append(cmds, k)
+	}
+	// sort.Strings(cmds)
+
+	var arr []Value
+	for _, cmd := range cmds {
+		arr = append(arr, Value{typ: BULK, blk: cmd})
+	}
+	return NewArrayValue(arr)
+}
+
+func Ping(c *Client, v *Value, state *AppState) *Value {
+	// cmd
+	args := v.arr[1:]
+	if len(args) != 0 {
+		return NewStringValue("PONG " + args[0].blk)
+	}
+	return NewStringValue("PONG")
 }
 
 // Info handles the INFO command.
@@ -291,14 +359,67 @@ func Command(c *Client, v *Value, state *AppState) *Value {
 //   - Information is generated dynamically on each call
 //   - Statistics are cumulative since server startup
 //   - Memory information uses gopsutil library to get system memory
+//
+// Info handles the INFO command.
+//
+// Modes:
+//   - INFO
+//     Returns global server info (server, clients, memory, persistence, general)
+//   - INFO <key>
+//     Returns metadata for a specific key: type, length, ttl, and memory usage
 func Info(c *Client, v *Value, state *AppState) *Value {
 	args := v.arr[1:]
-	if len(args) != 0 {
-		log.Println("invalid use of INFO")
-		return NewErrorValue("ERR inavlid argument to INFO")
+
+	// INFO (no args) -> global server info
+	if len(args) == 0 {
+		msg := state.redisInfo.Print(state)
+		return &Value{typ: BULK, blk: msg}
 	}
-	msg := state.redisInfo.Print(state)
-	return &Value{typ: BULK, blk: msg}
+
+	// INFO <key> -> per-key info
+	if len(args) == 1 {
+		key := args[0].blk
+
+		DB.mu.RLock()
+		item, ok := DB.store[key]
+		DB.mu.RUnlock()
+		if !ok {
+			return NewErrorValue("ERR key not found")
+		}
+
+		typ := item.Type
+		if typ == "" {
+			typ = STRING_TYPE
+		}
+
+		length := 0
+		switch typ {
+		case STRING_TYPE:
+			length = 1
+		case LIST_TYPE:
+			length = len(item.List)
+		case HASH_TYPE:
+			length = len(item.Hash)
+		case "set":
+			length = len(item.ItemSet)
+		}
+
+		ttl := int64(-1)
+		if item.Exp.Unix() != UNIX_TS_EPOCH {
+			ttl = int64(time.Until(item.Exp).Seconds())
+		}
+
+		mem := item.approxMemoryUsage(key)
+
+		msg := fmt.Sprintf(
+			"type: %s\nlen: %d\nttl: %d\nmem: %d B\naccesses: %d\n",
+			strings.ToUpper(typ), length, ttl, mem, item.AccessCount,
+		)
+		return NewBulkValue(msg)
+	}
+
+	// Anything else is invalid
+	return NewErrorValue("ERR wrong number of arguments for 'info' command")
 }
 
 // Monitor handles the MONITOR command.
@@ -688,9 +809,10 @@ func Set(c *Client, v *Value, state *AppState) *Value {
 	val := args[1].blk // grab the value
 
 	DB.mu.Lock()
+
 	// First check if key exists to get old memory usage
 	var oldItem *Item
-	if existing, ok := DB.store[key]; ok {
+	if existing, ok := DB.Poll(key); ok {
 		oldItem = existing
 	}
 	DB.mu.Unlock()
@@ -746,6 +868,137 @@ func Set(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.Unlock()
 
 	return NewStringValue("OK")
+}
+
+// Incr handles the INCR command.
+// Increments the integer value of a key by one.
+//
+// Syntax:
+//
+//	INCR <key>
+//
+// Returns:
+//
+//	Integer: The value of key after the increment
+func Incr(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 1 {
+		return NewErrorValue("ERR wrong number of arguments for 'incr' command")
+	}
+	return incrDecrBy(c, args[0].blk, 1, state, v)
+}
+
+// Decr handles the DECR command.
+// Decrements the integer value of a key by one.
+//
+// Syntax:
+//
+//	DECR <key>
+//
+// Returns:
+//
+//	Integer: The value of key after the decrement
+func Decr(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 1 {
+		return NewErrorValue("ERR wrong number of arguments for 'decr' command")
+	}
+	return incrDecrBy(c, args[0].blk, -1, state, v)
+}
+
+// IncrBy handles the INCRBY command.
+// Increments the integer value of a key by the given amount.
+//
+// Syntax:
+//
+//	INCRBY <key> <increment>
+//
+// Returns:
+//
+//	Integer: The value of key after the increment
+func IncrBy(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 2 {
+		return NewErrorValue("ERR wrong number of arguments for 'incrby' command")
+	}
+	incr, err := ParseInt(args[1].blk)
+	if err != nil {
+		return NewErrorValue("ERR value is not an integer or out of range")
+	}
+	return incrDecrBy(c, args[0].blk, incr, state, v)
+}
+
+// DecrBy handles the DECRBY command.
+// Decrements the integer value of a key by the given amount.
+//
+// Syntax:
+//
+//	DECRBY <key> <decrement>
+//
+// Returns:
+//
+//	Integer: The value of key after the decrement
+func DecrBy(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 2 {
+		return NewErrorValue("ERR wrong number of arguments for 'decrby' command")
+	}
+	decr, err := ParseInt(args[1].blk)
+	if err != nil {
+		return NewErrorValue("ERR value is not an integer or out of range")
+	}
+	return incrDecrBy(c, args[0].blk, -decr, state, v)
+}
+
+func incrDecrBy(c *Client, key string, delta int64, state *AppState, v *Value) *Value {
+	DB.mu.Lock()
+	defer DB.mu.Unlock()
+
+	var item *Item
+	var oldMemory int64 = 0
+
+	if existing, ok := DB.store[key]; ok {
+		item = existing
+		if item.IsExpired() {
+			oldMemory = item.approxMemoryUsage(key)
+			item = NewStringItem("0")
+			DB.store[key] = item
+		} else {
+			if !item.IsString() {
+				return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+			}
+			oldMemory = item.approxMemoryUsage(key)
+		}
+	} else {
+		item = NewStringItem("0")
+		DB.store[key] = item
+	}
+
+	val, err := ParseInt(item.Str)
+	if err != nil {
+		return NewErrorValue("ERR value is not an integer or out of range")
+	}
+
+	newVal := val + delta
+	item.Str = strconv.FormatInt(newVal, 10)
+
+	newMemory := item.approxMemoryUsage(key)
+	DB.mem += (newMemory - oldMemory)
+	if DB.mem > DB.mempeak {
+		DB.mempeak = DB.mem
+	}
+
+	if state.config.aofEnabled {
+		state.aof.w.Write(v)
+		if state.config.aofFsync == Always {
+			state.aof.w.Flush()
+		}
+	}
+	if len(state.config.rdb) > 0 {
+		IncrRDBTrackers()
+	}
+
+	return NewIntegerValue(newVal)
 }
 
 // Del handles the DEL command.
@@ -885,7 +1138,9 @@ func Keys(c *Client, v *Value, state *AppState) *Value {
 //
 //	Use BGSAVE for non-blocking persistence
 func Save(c *Client, v *Value, state *AppState) *Value {
+	// DB.mu.Lock()
 	SaveRDB(state)
+	// DB.mu.Unlock()
 	return NewStringValue("OK")
 }
 
@@ -1151,7 +1406,8 @@ func Hset(c *Client, v *Value, state *AppState) *Value {
 	// Calculate old memory before modification
 	var oldMemory int64 = 0
 	var item *Item
-	if existing, ok := DB.store[key]; ok {
+
+	if existing, ok := DB.Poll(key); ok {
 		item = existing
 		oldMemory = existing.approxMemoryUsage(key)
 		if err := item.EnsureHash(); err != nil {
@@ -1274,7 +1530,7 @@ func Hdel(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.Lock()
 	defer DB.mu.Unlock()
 
-	item, ok := DB.store[key]
+	item, ok := DB.Poll(key)
 	if !ok {
 		return NewIntegerValue(0)
 	}
@@ -1336,7 +1592,7 @@ func Hgetall(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.RLock()
 	defer DB.mu.RUnlock()
 
-	item, ok := DB.store[key]
+	item, ok := DB.Poll(key)
 	if !ok {
 		return NewArrayValue([]Value{})
 	}
@@ -1356,6 +1612,320 @@ func Hgetall(c *Client, v *Value, state *AppState) *Value {
 	}
 
 	return NewArrayValue(result)
+}
+
+// ============================================================================
+// SET COMMAND HANDLERS
+// ============================================================================
+
+// Sadd handles the SADD command.
+// Adds one or more members to a set.
+//
+// Syntax:
+//
+//	SADD <key> <member> [<member> ...]
+//
+// Returns:
+//
+//	Integer: The number of elements that were added to the set, not including all the elements already present into the set.
+func Sadd(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) < 2 {
+		return NewErrorValue("ERR wrong number of arguments for 'sadd' command")
+	}
+
+	key := args[0].blk
+
+	DB.mu.Lock()
+	defer DB.mu.Unlock()
+
+	var item *Item
+	var oldMemory int64 = 0
+
+	if existing, ok := DB.Poll(key); ok {
+		item = existing
+		if item.Type != "set" {
+			return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
+		oldMemory = item.approxMemoryUsage(key)
+	} else {
+		item = &Item{
+			Type:    "set",
+			ItemSet: make(map[string]bool),
+		}
+		DB.store[key] = item
+	}
+
+	count := int64(0)
+	for _, arg := range args[1:] {
+		member := arg.blk
+		if !item.ItemSet[member] {
+			item.ItemSet[member] = true
+			count++
+		}
+	}
+
+	newMemory := item.approxMemoryUsage(key)
+	DB.mem += (newMemory - oldMemory)
+	if DB.mem > DB.mempeak {
+		DB.mempeak = DB.mem
+	}
+
+	if state.config.aofEnabled {
+		state.aof.w.Write(v)
+		if state.config.aofFsync == Always {
+			state.aof.w.Flush()
+		}
+	}
+	if len(state.config.rdb) > 0 {
+		IncrRDBTrackers()
+	}
+
+	return NewIntegerValue(count)
+}
+
+// Srem handles the SREM command.
+// Removes one or more members from a set.
+//
+// Syntax:
+//
+//	SREM <key> <member> [<member> ...]
+//
+// Returns:
+//
+//	Integer: The number of members that were removed from the set, not including non existing members.
+func Srem(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) < 2 {
+		return NewErrorValue("ERR wrong number of arguments for 'srem' command")
+	}
+
+	key := args[0].blk
+
+	DB.mu.Lock()
+	defer DB.mu.Unlock()
+
+	item, ok := DB.Poll(key)
+	if !ok {
+		return NewIntegerValue(0)
+	}
+
+	if item.Type != "set" {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	oldMemory := item.approxMemoryUsage(key)
+	count := int64(0)
+
+	for _, arg := range args[1:] {
+		member := arg.blk
+		if item.ItemSet[member] {
+			delete(item.ItemSet, member)
+			count++
+		}
+	}
+
+	if len(item.ItemSet) == 0 {
+		delete(DB.store, key)
+		DB.mem -= oldMemory
+	} else {
+		newMemory := item.approxMemoryUsage(key)
+		DB.mem += (newMemory - oldMemory)
+	}
+
+	if state.config.aofEnabled {
+		state.aof.w.Write(v)
+		if state.config.aofFsync == Always {
+			state.aof.w.Flush()
+		}
+	}
+	if len(state.config.rdb) > 0 {
+		IncrRDBTrackers()
+	}
+
+	return NewIntegerValue(count)
+}
+
+// Smembers handles the SMEMBERS command.
+// Returns all the members of the set value stored at key.
+//
+// Syntax:
+//
+//	SMEMBERS <key>
+//
+// Returns:
+//
+//	Array: All elements of the set.
+func Smembers(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 1 {
+		return NewErrorValue("ERR wrong number of arguments for 'smembers' command")
+	}
+
+	key := args[0].blk
+
+	DB.mu.RLock()
+	defer DB.mu.RUnlock()
+
+	item, ok := DB.Poll(key)
+	if !ok {
+		return NewArrayValue([]Value{})
+	}
+
+	if item.Type != "set" {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	result := make([]Value, 0, len(item.ItemSet))
+	for member := range item.ItemSet {
+		result = append(result, Value{typ: BULK, blk: member})
+	}
+
+	return NewArrayValue(result)
+}
+
+// Sismember handles the SISMEMBER command.
+// Returns if member is a member of the set stored at key.
+//
+// Syntax:
+//
+//	SISMEMBER <key> <member>
+//
+// Returns:
+//
+//	Integer: 1 if the element is a member of the set. 0 if the element is not a member of the set, or if key does not exist.
+func Sismember(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 2 {
+		return NewErrorValue("ERR wrong number of arguments for 'sismember' command")
+	}
+
+	key := args[0].blk
+	member := args[1].blk
+
+	DB.mu.RLock()
+	defer DB.mu.RUnlock()
+
+	item, ok := DB.Poll(key)
+	if !ok {
+		return NewIntegerValue(0)
+	}
+
+	if item.Type != "set" {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	if item.ItemSet[member] {
+		return NewIntegerValue(1)
+	}
+
+	return NewIntegerValue(0)
+}
+
+// Scard handles the SCARD command.
+// Returns the set cardinality (number of elements) of the set stored at key.
+//
+// Syntax:
+//
+//	SCARD <key>
+//
+// Returns:
+//
+//	Integer: The cardinality (number of elements) of the set, or 0 if key does not exist.
+func Scard(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 1 {
+		return NewErrorValue("ERR wrong number of arguments for 'scard' command")
+	}
+
+	key := args[0].blk
+
+	DB.mu.RLock()
+	defer DB.mu.RUnlock()
+
+	item, ok := DB.Poll(key)
+	if !ok {
+		return NewIntegerValue(0)
+	}
+
+	if item.Type != "set" {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	return NewIntegerValue(int64(len(item.ItemSet)))
+}
+
+// Rename handles the RENAME command.
+// Renames a key.
+//
+// Syntax:
+//
+//	RENAME <key> <newkey>
+//
+// Returns:
+//
+//	1 if key was renamed
+//	0 if key does not exist
+func Rename(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 2 {
+		return NewErrorValue("ERR wrong number of arguments for 'rename' command")
+	}
+
+	oldKey := args[0].blk
+	newKey := args[1].blk
+
+	if oldKey == newKey {
+		return NewIntegerValue(1)
+	}
+
+	DB.mu.Lock()
+	defer DB.mu.Unlock()
+
+	// Check if source exists
+	item, ok := DB.store[oldKey]
+	if !ok {
+		return NewIntegerValue(0)
+	}
+
+	if item.IsExpired() {
+		DB.Rem(oldKey)
+		return NewIntegerValue(0)
+	}
+
+	// If target exists, don't remove it
+	if _, ok := DB.store[newKey]; ok {
+		return NewIntegerValue(0)
+	}
+
+	// Move logic: manually handle memory to avoid DB.Rem clearing hash data
+	// 1. Calculate old memory usage
+	oldMem := item.approxMemoryUsage(oldKey)
+
+	// 2. Remove from old key (delete directly to preserve item content)
+	delete(DB.store, oldKey)
+	DB.mem -= oldMem
+
+	// 3. Add to new key
+	DB.store[newKey] = item
+	newMem := item.approxMemoryUsage(newKey)
+	DB.mem += newMem
+
+	if DB.mem > DB.mempeak {
+		DB.mempeak = DB.mem
+	}
+
+	if state.config.aofEnabled {
+		state.aof.w.Write(v)
+		if state.config.aofFsync == Always {
+			state.aof.w.Flush()
+		}
+	}
+	if len(state.config.rdb) > 0 {
+		IncrRDBTrackers()
+	}
+
+	return NewIntegerValue(1)
 }
 
 // Hincrby handles the HINCRBY command.
@@ -1392,7 +1962,8 @@ func Hincrby(c *Client, v *Value, state *AppState) *Value {
 
 	var item *Item
 	var oldMemory int64 = 0
-	if existing, ok := DB.store[key]; ok {
+
+	if existing, ok := DB.Poll(key); ok {
 		item = existing
 		oldMemory = existing.approxMemoryUsage(key)
 		if err := item.EnsureHash(); err != nil {
@@ -1472,7 +2043,8 @@ func Hmset(c *Client, v *Value, state *AppState) *Value {
 	// Calculate old memory before modification
 	var oldMemory int64 = 0
 	var item *Item
-	if existing, ok := DB.store[key]; ok {
+
+	if existing, ok := DB.Poll(key); ok {
 		item = existing
 		oldMemory = existing.approxMemoryUsage(key)
 		if err := item.EnsureHash(); err != nil {
@@ -1530,7 +2102,7 @@ func Hexists(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.RLock()
 	defer DB.mu.RUnlock()
 
-	item, ok := DB.store[key]
+	item, ok := DB.Poll(key)
 	if !ok {
 		return NewIntegerValue(0)
 	}
@@ -1568,7 +2140,7 @@ func Hlen(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.RLock()
 	defer DB.mu.RUnlock()
 
-	item, ok := DB.store[key]
+	item, ok := DB.Poll(key)
 	if !ok {
 		return NewIntegerValue(0)
 	}
@@ -1601,7 +2173,7 @@ func Hkeys(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.RLock()
 	defer DB.mu.RUnlock()
 
-	item, ok := DB.store[key]
+	item, ok := DB.Poll(key)
 	if !ok {
 		return NewArrayValue([]Value{})
 	}
@@ -1642,7 +2214,7 @@ func Hvals(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.RLock()
 	defer DB.mu.RUnlock()
 
-	item, ok := DB.store[key]
+	item, ok := DB.Poll(key)
 	if !ok {
 		return NewArrayValue([]Value{})
 	}
@@ -1689,7 +2261,7 @@ func Hdelall(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.Lock()
 	defer DB.mu.Unlock()
 
-	item, ok := DB.store[key]
+	item, ok := DB.Poll(key)
 	if !ok {
 		return NewIntegerValue(0)
 	}
@@ -1758,7 +2330,7 @@ func Hexpire(c *Client, v *Value, state *AppState) *Value {
 	DB.mu.Lock()
 	defer DB.mu.Unlock()
 
-	item, ok := DB.store[key]
+	item, ok := DB.Poll(key)
 	if !ok {
 		return NewIntegerValue(0)
 	}
@@ -1776,4 +2348,479 @@ func Hexpire(c *Client, v *Value, state *AppState) *Value {
 	fieldItem.Exp = time.Now().Add(time.Second * time.Duration(seconds))
 
 	return NewIntegerValue(1)
+}
+
+// ============================================================================
+// LIST COMMAND HANDLERS
+// ============================================================================
+
+// Lpush handles the LPUSH command.
+// Prepends one or more values to a list.
+//
+// Syntax:
+//
+//	LPUSH <key> <value> [<value> ...]
+//
+// Returns:
+//
+//	Integer: The length of the list after the push operations.
+func Lpush(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) < 2 {
+		return NewErrorValue("ERR wrong number of arguments for 'lpush' command")
+	}
+
+	key := args[0].blk
+
+	DB.mu.Lock()
+	defer DB.mu.Unlock()
+
+	var item *Item
+	var oldMemory int64 = 0
+
+	if existing, ok := DB.store[key]; ok {
+		item = existing
+		if item.Type != LIST_TYPE {
+			return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
+		oldMemory = item.approxMemoryUsage(key)
+	} else {
+		item = &Item{
+			Type: LIST_TYPE,
+			List: []string{},
+		}
+		DB.store[key] = item
+	}
+
+	// Push values (prepend)
+	// LPUSH k v1 v2 => v2, v1, ...
+	for _, arg := range args[1:] {
+		item.List = append([]string{arg.blk}, item.List...)
+	}
+
+	newMemory := item.approxMemoryUsage(key)
+	DB.mem += (newMemory - oldMemory)
+	if DB.mem > DB.mempeak {
+		DB.mempeak = DB.mem
+	}
+
+	if state.config.aofEnabled {
+		state.aof.w.Write(v)
+		if state.config.aofFsync == Always {
+			state.aof.w.Flush()
+		}
+	}
+	if len(state.config.rdb) > 0 {
+		IncrRDBTrackers()
+	}
+
+	return NewIntegerValue(int64(len(item.List)))
+}
+
+// Rpush handles the RPUSH command.
+// Appends one or more values to a list.
+//
+// Syntax:
+//
+//	RPUSH <key> <value> [<value> ...]
+//
+// Returns:
+//
+//	Integer: The length of the list after the push operations.
+func Rpush(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) < 2 {
+		return NewErrorValue("ERR wrong number of arguments for 'rpush' command")
+	}
+
+	key := args[0].blk
+
+	DB.mu.Lock()
+	defer DB.mu.Unlock()
+
+	var item *Item
+	var oldMemory int64 = 0
+
+	if existing, ok := DB.store[key]; ok {
+		item = existing
+		if item.Type != LIST_TYPE {
+			return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
+		oldMemory = item.approxMemoryUsage(key)
+	} else {
+		item = &Item{
+			Type: LIST_TYPE,
+			List: []string{},
+		}
+		DB.store[key] = item
+	}
+
+	// Push values (append)
+	for _, arg := range args[1:] {
+		item.List = append(item.List, arg.blk)
+	}
+
+	newMemory := item.approxMemoryUsage(key)
+	DB.mem += (newMemory - oldMemory)
+	if DB.mem > DB.mempeak {
+		DB.mempeak = DB.mem
+	}
+
+	if state.config.aofEnabled {
+		state.aof.w.Write(v)
+		if state.config.aofFsync == Always {
+			state.aof.w.Flush()
+		}
+	}
+	if len(state.config.rdb) > 0 {
+		IncrRDBTrackers()
+	}
+
+	return NewIntegerValue(int64(len(item.List)))
+}
+
+// Lpop handles the LPOP command.
+// Removes and returns the first element of the list.
+//
+// Syntax:
+//
+//	LPOP <key>
+//
+// Returns:
+//
+//	Bulk String: The value of the first element, or NULL if key does not exist.
+func Lpop(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 1 {
+		return NewErrorValue("ERR wrong number of arguments for 'lpop' command")
+	}
+
+	key := args[0].blk
+
+	DB.mu.Lock()
+	defer DB.mu.Unlock()
+
+	item, ok := DB.store[key]
+	if !ok {
+		return NewNullValue()
+	}
+
+	if item.Type != LIST_TYPE {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	if len(item.List) == 0 {
+		return NewNullValue()
+	}
+
+	oldMemory := item.approxMemoryUsage(key)
+
+	// Pop first
+	val := item.List[0]
+	item.List = item.List[1:]
+
+	// If empty, remove key
+	if len(item.List) == 0 {
+		delete(DB.store, key)
+		DB.mem -= oldMemory
+	} else {
+		newMemory := item.approxMemoryUsage(key)
+		DB.mem += (newMemory - oldMemory)
+	}
+
+	if state.config.aofEnabled {
+		state.aof.w.Write(v)
+		if state.config.aofFsync == Always {
+			state.aof.w.Flush()
+		}
+	}
+	if len(state.config.rdb) > 0 {
+		IncrRDBTrackers()
+	}
+
+	return NewBulkValue(val)
+}
+
+// Rpop handles the RPOP command.
+// Removes and returns the last element of the list.
+//
+// Syntax:
+//
+//	RPOP <key>
+//
+// Returns:
+//
+//	Bulk String: The value of the last element, or NULL if key does not exist.
+func Rpop(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 1 {
+		return NewErrorValue("ERR wrong number of arguments for 'rpop' command")
+	}
+
+	key := args[0].blk
+
+	DB.mu.Lock()
+	defer DB.mu.Unlock()
+
+	item, ok := DB.store[key]
+	if !ok {
+		return NewNullValue()
+	}
+
+	if item.Type != LIST_TYPE {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	if len(item.List) == 0 {
+		return NewNullValue()
+	}
+
+	oldMemory := item.approxMemoryUsage(key)
+
+	// Pop last
+	lastIdx := len(item.List) - 1
+	val := item.List[lastIdx]
+	item.List = item.List[:lastIdx]
+
+	// If empty, remove key
+	if len(item.List) == 0 {
+		delete(DB.store, key)
+		DB.mem -= oldMemory
+	} else {
+		newMemory := item.approxMemoryUsage(key)
+		DB.mem += (newMemory - oldMemory)
+	}
+
+	if state.config.aofEnabled {
+		state.aof.w.Write(v)
+		if state.config.aofFsync == Always {
+			state.aof.w.Flush()
+		}
+	}
+	if len(state.config.rdb) > 0 {
+		IncrRDBTrackers()
+	}
+
+	return NewBulkValue(val)
+}
+
+// Lrange handles the LRANGE command.
+// Returns the specified elements of the list stored at key.
+//
+// Syntax:
+//
+//	LRANGE <key> <start> <stop>
+//
+// Returns:
+//
+//	Array: List of elements in the specified range.
+func Lrange(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 3 {
+		return NewErrorValue("ERR wrong number of arguments for 'lrange' command")
+	}
+
+	key := args[0].blk
+	startStr := args[1].blk
+	stopStr := args[2].blk
+
+	start, err := strconv.Atoi(startStr)
+	if err != nil {
+		return NewErrorValue("ERR value is not an integer or out of range")
+	}
+	stop, err := strconv.Atoi(stopStr)
+	if err != nil {
+		return NewErrorValue("ERR value is not an integer or out of range")
+	}
+
+	DB.mu.RLock()
+	defer DB.mu.RUnlock()
+
+	item, ok := DB.store[key]
+	if !ok {
+		return NewArrayValue([]Value{})
+	}
+
+	if item.Type != LIST_TYPE {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	listLen := len(item.List)
+
+	// Handle negative indices
+	if start < 0 {
+		start = listLen + start
+	}
+	if stop < 0 {
+		stop = listLen + stop
+	}
+
+	// Clamp indices
+	if start < 0 {
+		start = 0
+	}
+	if stop >= listLen {
+		stop = listLen - 1
+	}
+
+	if start > stop {
+		return NewArrayValue([]Value{})
+	}
+
+	// Extract range
+	result := make([]Value, 0, stop-start+1)
+	for i := start; i <= stop; i++ {
+		result = append(result, Value{typ: BULK, blk: item.List[i]})
+	}
+
+	return NewArrayValue(result)
+}
+
+// Llen handles the LLEN command.
+// Returns the length of the list stored at key.
+//
+// Syntax:
+//
+//	LLEN <key>
+//
+// Returns:
+//
+//	Integer: The length of the list, or 0 if key does not exist.
+func Llen(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 1 {
+		return NewErrorValue("ERR wrong number of arguments for 'llen' command")
+	}
+
+	key := args[0].blk
+
+	DB.mu.RLock()
+	defer DB.mu.RUnlock()
+
+	item, ok := DB.store[key]
+	if !ok {
+		return NewIntegerValue(0)
+	}
+
+	if item.Type != LIST_TYPE {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	return NewIntegerValue(int64(len(item.List)))
+}
+
+// Lindex handles the LINDEX command.
+// Returns the element at index index in the list stored at key.
+//
+// Syntax:
+//
+//	LINDEX <key> <index>
+//
+// Returns:
+//
+//	Bulk String: The requested element, or NULL if index is out of range.
+func Lindex(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 2 {
+		return NewErrorValue("ERR wrong number of arguments for 'lindex' command")
+	}
+
+	key := args[0].blk
+	indexStr := args[1].blk
+
+	index, err := strconv.Atoi(indexStr)
+	if err != nil {
+		return NewErrorValue("ERR value is not an integer or out of range")
+	}
+
+	DB.mu.RLock()
+	defer DB.mu.RUnlock()
+
+	item, ok := DB.store[key]
+	if !ok {
+		return NewNullValue()
+	}
+
+	if item.Type != LIST_TYPE {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	// Handle negative index
+	if index < 0 {
+		index = len(item.List) + index
+	}
+
+	if index < 0 || index >= len(item.List) {
+		return NewNullValue()
+	}
+
+	return NewBulkValue(item.List[index])
+}
+
+// Type handles the TYPE command.
+// Returns the string representation of the type of the value stored at key.
+//
+// Syntax:
+//
+//	TYPE <key>
+//
+// Returns:
+//
+//	Simple String: type of key (e.g., STRING, LIST, HASH), or "none" if key does not exist.
+func Type(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 1 {
+		return NewErrorValue("ERR wrong number of arguments for 'type' command")
+	}
+
+	key := args[0].blk
+
+	DB.mu.RLock()
+	defer DB.mu.RUnlock()
+
+	item, ok := DB.store[key]
+	if !ok {
+		return NewStringValue("none")
+	}
+
+	return NewStringValue(strings.ToUpper(item.Type))
+}
+
+// Lget handles the LGET command.
+// Returns all elements of the list stored at key.
+// This is a custom command equivalent to LRANGE <key> 0 -1.
+//
+// Syntax:
+//
+//	LGET <key>
+//
+// Returns:
+//
+//	Array: List of all elements in the list.
+func Lget(c *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) != 1 {
+		return NewErrorValue("ERR wrong number of arguments for 'lget' command")
+	}
+
+	key := args[0].blk
+
+	DB.mu.RLock()
+	defer DB.mu.RUnlock()
+
+	item, ok := DB.store[key]
+	if !ok {
+		return NewArrayValue([]Value{})
+	}
+
+	if item.Type != LIST_TYPE {
+		return NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	result := make([]Value, 0, len(item.List))
+	for _, val := range item.List {
+		result = append(result, Value{typ: BULK, blk: val})
+	}
+
+	return NewArrayValue(result)
 }

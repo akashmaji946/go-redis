@@ -394,6 +394,16 @@ func (item *Item) approxMemoryUsage(key string) int64 {
 		}
 	}
 
+	// Set type
+	if item.Type == SET_TYPE {
+		size += int64(unsafe.Sizeof(item.ItemSet))
+		for k := range item.ItemSet {
+			size += stringHeader + int64(len(k))
+			size += 1 // bool value
+			size += avgMapEntryOverhead
+		}
+	}
+
 	return size
 }
 
