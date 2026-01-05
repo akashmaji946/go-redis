@@ -1,13 +1,12 @@
 # Go-Redis
+![go-redis logo](go-redis-logo.png)
 
-![go-redis logo](go-redis.png)
 A lightweight, multi-threaded Redis server implementation in Go.
 
 A Redis-compatible in-memory key-value store server written in Go. This implementation supports core Redis commands, persistence mechanisms (AOF and RDB), authentication, expiration, transactions, monitoring, and memory management with eviction policies.
 
 ## Docs
 Access it here: [Docs](https://akashmaji946.github.io/go-redis/)
-
 ## Features
 
 - **Core Commands**: GET, SET, DEL, EXISTS, KEYS, DBSIZE, FLUSHDB, ...
@@ -32,8 +31,8 @@ Access it here: [Docs](https://akashmaji946.github.io/go-redis/)
 - **Transactions**: Basic `MULTI`, `EXEC`, `DISCARD` support.
 - **Eviction**: LRU/Random eviction policies when maxmemory is reached.
 
+
 ## Prerequisites
-## Supported Commands
 
 - **Go 1.24.4** or later
 - **redis-cli** (for testing and connecting to the server)
@@ -75,7 +74,7 @@ dbfilename backup.rdb
 requirepass dsl
 
 # Memory Management
-maxmemory 256
+maxmemory 1024
 maxmemory-policy allkeys-random
 maxmemory-samples 5
 ```
@@ -134,7 +133,7 @@ The server accepts command-line arguments for configuration file and data direct
 
 When you run the server, you'll see output like:
 
-```
+```bash
 >>> Go-Redis Server v0.1 <<<
 reading the config file...
 Data directory: /app/data
