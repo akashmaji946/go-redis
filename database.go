@@ -1,3 +1,8 @@
+/*
+author: akashmaji
+email: akashmaji@iisc.ac.in
+file: go-redis/database.go
+*/
 package main
 
 import (

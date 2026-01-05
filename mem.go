@@ -1,3 +1,8 @@
+/*
+author: akashmaji
+email: akashmaji@iisc.ac.in
+file: go-redis/mem.go
+*/
 package main
 
 // Sample represents a key-value pair sampled from the database for eviction purposes.

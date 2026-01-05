@@ -90,6 +90,8 @@ Command Dispatcher
 | `rdb.go` | Snapshot persistence |
 | `mem.go` | Memory accounting & eviction |
 | `info.go` | INFO command |
+| `conf.go` | Configuration management |
+| `appstate.go` | Global application state |
 
 ---
 
@@ -168,6 +170,14 @@ This enables:
 - Performs lazy expiration
 - Updates access metadata
 - Returns NULL if key is missing or expired
+
+#### `INCR <key>`, `DECR <key>`
+
+- Increment or decrement integer value by 1
+
+#### `INCRBY <key> <amount>`, `DECRBY <key> <amount>`
+
+- Increment or decrement integer value by amount
 
 ---
 
@@ -263,6 +273,19 @@ Return values:
 
 ---
 
+### 6.7 Utility Commands
+
+#### `PING [message]`
+
+- Returns PONG or echo message
+
+#### `COMMAND`, `COMMANDS`
+
+- `COMMAND`: Returns OK (connection test)
+- `COMMANDS`: Lists all available commands
+
+---
+
 ## 7. Transactions
 
 ### MULTI / EXEC
@@ -298,7 +321,6 @@ Supported commands:
 - `HKEYS`
 - `HVALS`
 - `HEXPIRE`
-- `HDELALL`
 
 #### `HDELALL <key>`
 
