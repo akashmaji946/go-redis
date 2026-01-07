@@ -1,666 +1,362 @@
-# Go-Redis User Guide
+# Go-Redis: User Guide
 
-This guide provides documentation for all available commands in Go-Redis. Each command includes syntax, examples, and behavior description.
+This guide provides comprehensive documentation for installing, configuring, and using Go-Redis. It covers everything from building the server to detailed explanations of all available commands.
+
+![go-redis logo](go-redis-logo.png)
+
+---
 
 ## Table of Contents
 
-- [String Operations](#string-operations)
-- [Key Management](#key-management)
-- [Expiration](#expiration)
-- [Transactions](#transactions)
-- [Persistence](#persistence)
-- [Authentication](#authentication)
-- [Monitoring & Information](#monitoring--information)
-- [Utility](#utility)
+1.  [Features](#features)
+2.  [Getting Started](#getting-started)
+    -   [Prerequisites](#prerequisites)
+    -   [Building the Server](#building-the-server)
+    -   [Configuration](#configuration)
+    -   [Running the Server](#running-the-server)
+    -   [Connecting with `redis-cli`](#connecting-with-redis-cli)
+3.  [Docker Deployment](#docker-deployment)
+4.  [Command Reference](#command-reference)
+    -   [String Operations](#string-operations)
+    -   [Key Management](#key-management)
+    -   [List Operations](#list-operations)
+    -   [Set Operations](#set-operations)
+    -   [Hash Operations](#hash-operations)
+    -   [Sorted Set Operations](#sorted-set-operations)
+    -   [Expiration](#expiration)
+    -   [Transactions](#transactions)
+    -   [Persistence](#persistence)
+    -   [Server & Connection](#server--connection)
+    -   [Monitoring & Information](#monitoring--information)
+5.  [Persistence Explained](#persistence-explained)
+    -   [AOF (Append-Only File)](#aof-append-only-file)
+    -   [RDB (Snapshot)](#rdb-snapshot)
+6.  [Memory Management](#memory-management)
+7.  [Limitations](#limitations)
 
 ---
 
-## String Operations
+## 1. Features
 
-### GET
-
-**Description:** Retrieves the value associated with a key.
-
-**Syntax:**
-```
-GET <key>
-```
-
-**Example:**
-```
-127.0.0.1:6379> GET name
-"John"
-127.0.0.1:6379> GET nonexistent
-(nil)
-```
-
-**Returns:**
-- Bulk string: The value if key exists and is not expired
-- NULL: If key doesn't exist or has expired
-
-**Behavior:**
-- Automatically deletes expired keys when accessed (lazy expiration)
-- Thread-safe read operation
-- Updates last accessed time and access count for the key
+-   **Core Redis Commands**: Supports a wide subset of commands for strings, lists, sets, hashes, and sorted sets.
+-   **In-Memory Storage**: Fast, thread-safe key-value store.
+-   **Dual Persistence**:
+    -   **AOF (Append-Only File)**: Logs every write operation with configurable `fsync` modes for durability.
+    -   **RDB (Redis Database)**: Creates point-in-time snapshots of your dataset.
+-   **Key Expiration**: `EXPIRE` and `TTL` support with lazy cleanup.
+-   **Authentication**: Secure your server with password protection.
+-   **Atomic Transactions**: Group commands using `MULTI`/`EXEC`.
+-   **Real-time Monitoring**: Use the `MONITOR` command to inspect live traffic.
+-   **Server Introspection**: The `INFO` command provides detailed server statistics.
+-   **Memory Management**: Set memory limits (`maxmemory`) and eviction policies.
+-   **RESP Compatibility**: Fully compatible with `redis-cli` and the Redis Serialization Protocol.
 
 ---
 
-### SET
+## 2. Getting Started
 
-**Description:** Sets a key to hold a string value.
+### Prerequisites
+
+-   **Go**: Version 1.24.4 or later.
+-   **redis-cli**: The standard Redis command-line interface, used to connect to the server.
+-   **Operating System**: Tested primarily on Linux/Unix environments.
+
+Before you start, ensure no other Redis instance is running on the default port `6379`. You can stop the default Redis service with:
+```bash
+sudo systemctl stop redis-server.service
+```
+
+### Building the Server
+
+1.  Clone the repository or navigate to the project directory.
+2.  Build the executable:
+    ```bash
+    go build
+    ```
+This command compiles the source code and creates a binary file named `go-redis` in the current directory.
+
+### Configuration
+
+Go-Redis is configured via a `redis.conf` file. The server looks for this file at `./config/redis.conf` by default.
+
+Here is an example `redis.conf`:
+```conf
+# Set the data directory for persistence files
+dir ./data
+
+# Enable AOF persistence
+appendonly yes
+appendfilename backup.aof
+# fsync policy: always, everysec, or no
+appendfsync always
+
+# RDB snapshot configuration (save if 3 changes happen in 5 seconds)
+save 5 3
+dbfilename backup.rdb
+
+# Set a password for authentication
+requirepass your-secret-password
+
+# Set a memory limit (e.g., 1GB) and eviction policy
+maxmemory 1073741824
+maxmemory-policy allkeys-random
+```
+
+### Running the Server
+
+You can run the server with default settings or provide custom paths for the configuration and data directory.
 
 **Syntax:**
-```
-SET <key> <value>
-```
-
-**Example:**
-```
-127.0.0.1:6379> SET name "John"
-OK
-127.0.0.1:6379> SET counter "100"
-OK
+```bash
+./go-redis [config_file_path] [data_directory_path]
 ```
 
-**Returns:** `OK` on success
+**Examples:**
 
-**Behavior:**
-- If key already exists, overwrites the previous value
-- Automatically triggers eviction if maxmemory limit is reached
-- Appends command to AOF file if AOF persistence is enabled
-- Flushes AOF immediately if `appendfsync=always`
-- Updates RDB change tracker if RDB persistence is configured
-- Thread-safe write operation
+-   **Run with defaults:** (Uses `./config/redis.conf` and `./data/`)
+    ```bash
+    ./go-redis
+    ```
 
----
+-   **Run with a custom config file:**
+    ```bash
+    ./go-redis /etc/go-redis/redis.conf
+    ```
 
-## Key Management
+-   **Run with custom config and data directories:**
+    ```bash
+    ./go-redis ./my.conf ./my-data
+    ```
 
-### DEL
+The server will start and listen on port **6379**.
 
-**Description:** Deletes one or more keys from the database.
+### Connecting with `redis-cli`
 
-**Syntax:**
-```
-DEL <key1> [key2 ...]
-```
-
-**Example:**
-```
-127.0.0.1:6379> DEL name
-(integer) 1
-127.0.0.1:6379> DEL key1 key2 key3
-(integer) 2
+Open a new terminal and connect to the server:
+```bash
+redis-cli -p 6379
 ```
 
-**Returns:** Integer representing the number of keys actually deleted
-
-**Behavior:**
-- Non-existent keys are ignored (not counted)
-- Returns 0 if none of the specified keys exist
-- Thread-safe operation
-- Frees memory associated with deleted keys
-
----
-
-### EXISTS
-
-**Description:** Checks if one or more keys exist in the database.
-
-**Syntax:**
+If you have authentication enabled in your `redis.conf`, you must authenticate first:
 ```
-EXISTS <key1> [key2 ...]
-```
-
-**Example:**
-```
-127.0.0.1:6379> EXISTS name
-(integer) 1
-127.0.0.1:6379> EXISTS name age
-(integer) 1
-127.0.0.1:6379> EXISTS nonexistent
-(integer) 0
-```
-
-**Returns:** Integer count of keys that exist
-
-**Behavior:**
-- Returns 0 if none of the keys exist
-- Returns count of existing keys (may be less than number of keys checked)
-- Thread-safe read operation
-
----
-
-### KEYS
-
-**Description:** Finds all keys matching a given pattern using glob-style matching.
-
-**Syntax:**
-```
-KEYS <pattern>
-```
-
-**Example:**
-```
-127.0.0.1:6379> KEYS *
-1) "name"
-2) "age"
-3) "user:1"
-127.0.0.1:6379> KEYS user:*
-1) "user:1"
-2) "user:2"
-127.0.0.1:6379> KEYS *name*
-1) "firstname"
-2) "lastname"
-```
-
-**Pattern Rules:**
-- `*` - Matches any sequence of characters
-- `?` - Matches a single character
-- `[abc]` - Matches any character in brackets
-
-**Returns:** Array of matching keys (empty array if no matches)
-
-**Behavior:**
-- Uses filepath.Match for pattern matching
-- Thread-safe read operation
-- May be slow on large databases (scans all keys)
-
----
-
-### DBSIZE
-
-**Description:** Returns the total number of keys in the current database.
-
-**Syntax:**
-```
-DBSIZE
-```
-
-**Example:**
-```
-127.0.0.1:6379> DBSIZE
-(integer) 42
-```
-
-**Returns:** Integer count of keys
-
-**Behavior:**
-- Counts all keys including expired ones (until accessed)
-- Thread-safe read operation
-- Fast operation (O(1) - map length)
-
----
-
-### FLUSHDB
-
-**Description:** Removes all keys from the current database.
-
-**Syntax:**
-```
-FLUSHDB
-```
-
-**Example:**
-```
-127.0.0.1:6379> FLUSHDB
+127.0.0.1:6379> AUTH your-secret-password
 OK
 ```
 
-**Returns:** `OK`
-
-**Behavior:**
-- Efficiently clears database by replacing the store map
-- Irreversible operation - all data is permanently deleted
-- Thread-safe write operation
-- Resets memory usage counter
-
-**Warning:** This operation cannot be undone!
+You are now ready to execute commands!
 
 ---
 
-## Expiration
+## 3. Docker Deployment
 
-### EXPIRE
+For ease of use, you can run Go-Redis in a Docker container.
 
-**Description:** Sets a timeout on a key. After the timeout expires, the key will be automatically deleted.
+### Pull and Run the Pre-built Image
 
-**Syntax:**
+This is the fastest way to get started.
+
+```bash
+# 1. Pull the latest image from Docker Hub
+docker pull akashmaji/go-redis:latest
+
+# 2. Run the container, mapping the data directory to your host
+docker run -d -p 6379:6379 \
+  -v $(pwd)/data:/app/data \
+  akashmaji/go-redis:latest
+
+# 3. Connect from your host machine
+redis-cli
 ```
-EXPIRE <key> <seconds>
+
+### Build and Run Your Own Image
+
+If you've made changes to the code, you can build the image yourself.
+
+```bash
+# 1. Build the Docker image
+docker build -t go-redis:latest .
+
+# 2. Run the container
+# This example mounts a custom config file and data directory
+docker run -d -p 6379:6379 \
+  -v $(pwd)/config/redis.conf:/app/config/redis.conf:ro \
+  -v $(pwd)/data:/app/data \
+  go-redis:latest
 ```
 
-**Example:**
-```
-127.0.0.1:6379> EXPIRE session:123 3600
-(integer) 1
-127.0.0.1:6379> EXPIRE nonexistent 60
-(integer) 0
-```
-
-**Returns:**
-- `1`: Timeout was set successfully
-- `0`: Key doesn't exist
-
-**Behavior:**
-- Sets expiration as absolute timestamp (current time + seconds)
-- Overwrites any existing expiration time
-- Expired keys are deleted when accessed (lazy expiration)
-- Thread-safe operation
+For more advanced Docker usage, see `DOCKER.md`.
 
 ---
 
-### TTL
+## 4. Command Reference
 
-**Description:** Returns the remaining time to live (TTL) of a key in seconds.
+### String Operations
 
-**Syntax:**
-```
-TTL <key>
-```
+| Command | Description | Syntax | 
+|---|---|---|
+| `GET` | Get the value of a key. | `GET <key>` |
+| `SET` | Set the string value of a key. | `SET <key> <value>` |
+| `INCR` | Increment the integer value of a key by one. | `INCR <key>` |
+| `DECR` | Decrement the integer value of a key by one. | `DECR <key>` |
+| `INCRBY`| Increment the integer value of a key by a given amount. | `INCRBY <key> <amount>` |
+| `DECRBY`| Decrement the integer value of a key by a given amount. | `DECRBY <key> <amount>` |
+| `MGET` | Get the values of all the given keys. | `MGET <key> [key ...]` |
+| `MSET` | Set multiple keys to multiple values. | `MSET <key> <value> [key value ...]` |
 
-**Example:**
-```
-127.0.0.1:6379> TTL session:123
-(integer) 3598
-127.0.0.1:6379> TTL noexpiration
-(integer) -1
-127.0.0.1:6379> TTL nonexistent
-(integer) -2
-```
+### Key Management
 
-**Returns:**
-- Positive integer: Remaining TTL in seconds
-- `-1`: Key exists but has no expiration set
-- `-2`: Key doesn't exist or has expired
+| Command | Description | Syntax | 
+|---|---|---|
+| `DEL` | Delete one or more keys. | `DEL <key> [key ...]` |
+| `EXISTS`| Check if a key exists. | `EXISTS <key>` |
+| `KEYS` | Find all keys matching a given pattern. **Warning: O(N) complexity.** | `KEYS <pattern>` |
+| `RENAME`| Rename a key. | `RENAME <key> <newkey>` |
+| `TYPE` | Get the type of value stored at a key. | `TYPE <key>` |
+| `FLUSHDB`| Remove all keys from the database. **Warning: Irreversible.** | `FLUSHDB` |
+| `DBSIZE`| Return the number of keys in the database. | `DBSIZE` |
 
-**Behavior:**
-- Automatically deletes key if expired when checked
-- Returns seconds remaining until expiration
-- Thread-safe read operation
+### List Operations
 
----
+| Command | Description | Syntax | 
+|---|---|---|
+| `LPUSH` | Prepend one or more values to a list. | `LPUSH <key> <value> [value ...]` |
+| `RPUSH` | Append one or more values to a list. | `RPUSH <key> <value> [value ...]` |
+| `LPOP` | Remove and get the first element in a list. | `LPOP <key>` |
+| `RPOP` | Remove and get the last element in a list. | `RPOP <key>` |
+| `LRANGE`| Get a range of elements from a list. | `LRANGE <key> <start> <stop>` |
+| `LLEN` | Get the length of a list. | `LLEN <key>` |
+| `LINDEX`| Get an element from a list by its index. | `LINDEX <key> <index>` |
+| `LGET` | **(Custom)** Get all elements in a list. | `LGET <key>` |
 
-## Transactions
+### Set Operations
 
-### MULTI
+| Command | Description | Syntax | 
+|---|---|---|
+| `SADD` | Add one or more members to a set. | `SADD <key> <member> [member ...]` |
+| `SREM` | Remove one or more members from a set. | `SREM <key> <member> [member ...]` |
+| `SMEMBERS`| Get all the members in a set. | `SMEMBERS <key>` |
+| `SISMEMBER`| Determine if a given value is a member of a set. | `SISMEMBER <key> <member>` |
+| `SCARD` | Get the number of members in a set. | `SCARD <key>` |
 
-**Description:** Begins a transaction. All subsequent commands will be queued until EXEC or DISCARD is called.
+### Hash Operations
 
-**Syntax:**
-```
-MULTI
-```
+Hashes are maps between string fields and string values.
 
-**Example:**
-```
-127.0.0.1:6379> MULTI
-OK
-127.0.0.1:6379> SET key1 "value1"
-QUEUED
-127.0.0.1:6379> SET key2 "value2"
-QUEUED
-```
+| Command | Description | Syntax | 
+|---|---|---|
+| `HSET` | Set the string value of a hash field. | `HSET <key> <field> <value>` |
+| `HGET` | Get the value of a hash field. | `HGET <key> <field>` |
+| `HDEL` | Delete one or more hash fields. | `HDEL <key> <field> [field ...]` |
+| `HGETALL`| Get all the fields and values in a hash. | `HGETALL <key>` |
+| `HINCRBY`| Increment the integer value of a hash field by a given number. | `HINCRBY <key> <field> <increment>` |
+| `HEXISTS`| Determine if a hash field exists. | `HEXISTS <key> <field>` |
+| `HLEN` | Get the number of fields in a hash. | `HLEN <key>` |
+| `HKEYS` | Get all the fields in a hash. | `HKEYS <key>` |
+| `HVALS` | Get all the values in a hash. | `HVALS <key>` |
+| `HMSET` | Set multiple hash fields to multiple values. | `HMSET <key> <field> <value> [field value ...]` |
+| `HDELALL`| **(Custom)** Delete the entire hash. | `HDELALL <key>` |
+| `HEXPIRE`| **(Custom)** Set a TTL on a hash key. | `HEXPIRE <key> <seconds>` |
 
-**Returns:** `OK` (or error if transaction already running)
+### Sorted Set Operations
 
-**Behavior:**
-- Creates a new transaction context
-- Commands return "QUEUED" instead of executing immediately
-- Only one transaction can be active per client
-- Transaction control commands (MULTI, EXEC, DISCARD) execute immediately
+| Command | Description | Syntax | 
+|---|---|---|
+| `ZADD` | Add one or more members to a sorted set, or update its score. | `ZADD <key> <score> <member> [score member ...]` |
+| `ZREM` | Remove one or more members from a sorted set. | `ZREM <key> <member> [member ...]` |
+| `ZSCORE`| Get the score associated with the given member in a sorted set. | `ZSCORE <key> <member>` |
+| `ZCARD` | Get the number of members in a sorted set. | `ZCARD <key>` |
+| `ZRANGE`| Return a range of members in a sorted set, by index. | `ZRANGE <key> <start> <stop> [WITHSCORES]` |
+| `ZREVRANGE`| Return a range of members in a sorted set, by index, ordered from high to low scores. | `ZREVRANGE <key> <start> <stop> [WITHSCORES]` |
+| `ZGET` | **(Custom)** Get the score of a member or all members with scores. | `ZGET <key> [member]` |
 
----
+### Expiration
 
-### EXEC
+| Command | Description | Syntax | 
+|---|---|---|
+| `EXPIRE`| Set a timeout on a key. | `EXPIRE <key> <seconds>` |
+| `TTL` | Get the remaining time to live of a key. | `TTL <key>` |
+| `PERSIST`| Remove the expiration from a key. | `PERSIST <key>` |
 
-**Description:** Executes all commands queued in the current transaction atomically.
+### Transactions
 
-**Syntax:**
-```
-EXEC
-```
+| Command | Description | Syntax | 
+|---|---|---|
+| `MULTI` | Mark the start of a transaction block. | `MULTI` |
+| `EXEC` | Execute all commands queued in a transaction. | `EXEC` |
+| `DISCARD`| Discard all commands issued after `MULTI`. | `DISCARD` |
 
-**Example:**
-```
-127.0.0.1:6379> MULTI
-OK
-127.0.0.1:6379> SET a "1"
-QUEUED
-127.0.0.1:6379> SET b "2"
-QUEUED
-127.0.0.1:6379> EXEC
-1) OK
-2) OK
-```
+### Persistence
 
-**Returns:**
-- Array of replies: One reply per queued command, in order
-- Error if no transaction is running
+| Command | Description | Syntax | 
+|---|---|---|
+| `SAVE` | **Synchronously** save the dataset to disk. **Blocks the server.** | `SAVE` |
+| `BGSAVE`| **Asynchronously** save the dataset to disk in the background. | `BGSAVE` |
+| `BGREWRITEAOF`| Asynchronously rewrite the append-only file. | `BGREWRITEAOF` |
 
-**Behavior:**
-- Executes all queued commands sequentially
-- Commands succeed or fail individually (no rollback)
-- Clears transaction context after execution
-- Updates transaction statistics
+### Server & Connection
 
----
+| Command | Description | Syntax | 
+|---|---|---|
+| `PING` | Check the connection. Returns `PONG` or an optional message. | `PING [message]` |
+| `AUTH` | Authenticate to the server. | `AUTH <password>` |
+| `COMMAND`| A simple command that returns `OK`. | `COMMAND` |
+| `COMMANDS`| **(Custom)** List all available commands. | `COMMANDS` |
 
-### DISCARD
+### Monitoring & Information
 
-**Description:** Aborts the current transaction by discarding all queued commands without executing them.
-
-**Syntax:**
-```
-DISCARD
-```
-
-**Example:**
-```
-127.0.0.1:6379> MULTI
-OK
-127.0.0.1:6379> SET key1 "value1"
-QUEUED
-127.0.0.1:6379> SET key2 "value2"
-QUEUED
-127.0.0.1:6379> DISCARD
-OK
-```
-
-**Returns:** `OK` (or error if no transaction is running)
-
-**Behavior:**
-- Clears transaction context
-- All queued commands are discarded
-- No changes are made to the database
-- Client can start a new transaction with MULTI
+| Command | Description | Syntax | 
+|---|---|---|
+| `INFO` | Get information and statistics about the server. | `INFO` |
+| `MONITOR`| Listen for all requests received by the server in real-time. | `MONITOR` |
 
 ---
 
-## Persistence
+## 5. Persistence Explained
 
-### SAVE
+Go-Redis offers two mechanisms to persist your data on disk.
 
-**Description:** Synchronously saves the database snapshot to disk.
+### AOF (Append-Only File)
 
-**Syntax:**
-```
-SAVE
-```
+The AOF logs every write operation received by the server. This data is replayed on startup to reconstruct the original dataset.
 
-**Example:**
-```
-127.0.0.1:6379> SAVE
-OK
-```
+-   **Durability**: Offers better durability than RDB. You can configure how often data is synced to disk (`appendfsync`).
+-   **`fsync` Modes**:
+    -   `always`: Sync after every write. Slowest but safest.
+    -   `everysec`: Sync once per second in the background. A good balance.
+    -   `no`: Let the operating system handle syncing. Fastest but least safe.
+-   **Compaction**: The `BGREWRITEAOF` command rebuilds the AOF to be as small as possible.
 
-**Returns:** `OK`
+### RDB (Snapshot)
 
-**Behavior:**
-- Blocks the server until save completes
-- Uses read lock, preventing write operations during save
-- Computes SHA-256 checksum for data integrity
-- Saves to RDB file configured in redis.conf
+The RDB persistence performs point-in-time snapshots of your dataset at specified intervals.
 
-**Note:** Use BGSAVE for non-blocking saves.
+-   **Performance**: Forking a background process for `BGSAVE` has minimal impact on the main server.
+-   **Configuration**: You can configure `save` rules in `redis.conf` (e.g., `save 60 1000` saves if there are 1000 key changes in 60 seconds).
+-   **Integrity**: RDB files are saved with a SHA-256 checksum to prevent corruption.
 
 ---
 
-### BGSAVE
+## 6. Memory Management
 
-**Description:** Performs an asynchronous background save of the database snapshot.
+You can control memory usage with the `maxmemory` directive in `redis.conf`.
 
-**Syntax:**
-```
-BGSAVE
-```
-
-**Example:**
-```
-127.0.0.1:6379> BGSAVE
-OK
-127.0.0.1:6379> BGSAVE
-(error) already in progress
-```
-
-**Returns:**
-- `OK`: Background save started successfully
-- Error: If a background save is already in progress
-
-**Behavior:**
-- Creates a copy of database state before saving
-- Runs in a separate goroutine (non-blocking)
-- Server continues to handle commands during save
-- Prevents concurrent background saves
+-   **`maxmemory <bytes>`**: Sets the maximum memory limit.
+-   **`maxmemory-policy <policy>`**: Defines what happens when the limit is reached.
+    -   `no-eviction`: (Default) Return an error on write commands.
+    -   `allkeys-random`: Evict random keys to make space.
 
 ---
 
-### BGREWRITEAOF
+## 7. Limitations
 
-**Description:** Rewrites the AOF file in the background to remove duplicates and optimize size.
+Go-Redis is an educational project and intentionally omits certain advanced Redis features:
 
-**Syntax:**
-```
-BGREWRITEAOF
-```
-
-**Example:**
-```
-127.0.0.1:6379> BGREWRITEAOF
-Started.
-```
-
-**Returns:** `Started.`
-
-**Behavior:**
-- Creates compact AOF with only SET commands for current keys
-- Buffers new commands during rewrite and appends them after
-- Significantly reduces AOF file size
-- Runs in a separate goroutine
-- Updates AOF rewrite statistics
+-   Single database only (no `SELECT` command).
+-   No replication or clustering.
+-   No Pub/Sub messaging.
+-   No Lua scripting.
+-   No `WATCH` command for optimistic locking in transactions.
 
 ---
 
-## Authentication
-
-### AUTH
-
-**Description:** Authenticates the client with the server using a password.
-
-**Syntax:**
-```
-AUTH <password>
-```
-
-**Example:**
-```
-127.0.0.1:6379> AUTH dsl
-OK
-127.0.0.1:6379> AUTH wrongpassword
-(error) ERR invalid password, given=wrongpassword
-```
-
-**Returns:**
-- `OK`: Authentication successful
-- Error: If password is incorrect
-
-**Behavior:**
-- Sets client's authenticated flag to true on success
-- Sets authenticated flag to false on failure
-- Required before executing other commands if `requirepass` is set
-- Safe command (can be executed without prior authentication)
-
-**Note:** Authentication state persists for the connection lifetime.
-
----
-
-## Monitoring & Information
-
-### MONITOR
-
-**Description:** Enables real-time monitoring mode. All commands executed by other clients are streamed to this connection.
-
-**Syntax:**
-```
-MONITOR
-```
-
-**Example:**
-```
-# Terminal 1: Enable monitoring
-127.0.0.1:6379> MONITOR
-OK
-
-# Terminal 2: Execute commands
-127.0.0.1:6379> SET test "value"
-OK
-
-# Terminal 1: Receives
-1704067200 [127.0.0.1:54321] "SET" "test" "value"
-```
-
-**Returns:** `OK`
-
-**Behavior:**
-- Adds client to monitoring list
-- Client remains in monitoring mode until connection closes
-- All commands from other clients are streamed
-- Monitoring client does not receive its own commands
-- Multiple clients can monitor simultaneously
-- Logs sent asynchronously (doesn't block command execution)
-
-**Format:** `<timestamp> [<client_ip>] "<command>" "<arg1>" ... "<argN>"`
-
----
-
-### INFO
-
-**Description:** Returns server information and statistics in a human-readable format.
-
-**Syntax:**
-```
-INFO
-```
-
-**Example:**
-```
-127.0.0.1:6379> INFO
-# Server
-redis_version  : 0.1
-process_id     : 12345
-server_uptime  : 3600
-...
-
-# Memory
-used_memory: 1024 B
-eviction_policy: allkeys-random
-...
-```
-
-**Returns:** Bulk string containing formatted server information
-
-**Information Categories:**
-- **Server**: Version, PID, port, uptime, paths
-- **Clients**: Number of connected clients
-- **Memory**: Used/peak/total memory, eviction policy
-- **Persistence**: RDB/AOF status, save times, counts
-- **General**: Connections, commands, transactions, expired/evicted keys
-
-**Behavior:**
-- Information generated dynamically on each call
-- Statistics are cumulative since server startup
-- Thread-safe read operation
-
----
-
-## Utility
-
-### COMMAND
-
-**Description:** Utility command for connection testing and protocol compliance.
-
-**Syntax:**
-```
-COMMAND
-```
-
-**Example:**
-```
-127.0.0.1:6379> COMMAND
-OK
-```
-
-**Returns:** `OK`
-
-**Behavior:**
-- Simple connection test
-- Can be executed without authentication
-- Used for protocol compliance
-
----
-
-## Command Response Types
-
-Go-Redis uses the RESP (Redis Serialization Protocol) format for responses:
-
-- **Simple String**: `+OK\r\n`
-- **Bulk String**: `$5\r\nhello\r\n`
-- **Integer**: `:42\r\n`
-- **Array**: `*2\r\n$3\r\nGET\r\n$4\r\nname\r\n`
-- **Error**: `-ERR message\r\n`
-- **Null**: `$-1\r\n`
-
----
-
-## Error Messages
-
-Common error messages you may encounter:
-
-- `ERR no such command` - Command doesn't exist
-- `NOAUTH client not authenticated` - Authentication required
-- `ERR invalid command usage` - Wrong number of arguments
-- `ERR tx already running` - Transaction already active
-- `ERR tx already NOT running` - No transaction to execute/discard
-- `already in progress` - Background save already running
-- `ERR maxmemory reached` - Memory limit reached, eviction failed
-
----
-
-## Best Practices
-
-1. **Use BGSAVE instead of SAVE** - Non-blocking saves don't freeze the server
-2. **Monitor memory usage** - Use INFO command to check memory statistics
-3. **Set appropriate expiration** - Use EXPIRE for temporary data to prevent memory buildup
-4. **Use transactions for atomicity** - MULTI/EXEC for operations that must succeed together
-5. **Enable AOF for durability** - Better data safety than RDB alone
-6. **Use KEYS sparingly** - Can be slow on large databases
-
----
-
-## Quick Reference
-
-| Command | Category | Purpose |
-|---------|----------|---------|
-| GET | String | Retrieve value |
-| SET | String | Store value |
-| DEL | Key | Delete key(s) |
-| EXISTS | Key | Check existence |
-| KEYS | Key | Find by pattern |
-| DBSIZE | Key | Count keys |
-| FLUSHDB | Key | Delete all keys |
-| EXPIRE | Expiration | Set timeout |
-| TTL | Expiration | Check remaining time |
-| MULTI | Transaction | Start transaction |
-| EXEC | Transaction | Execute transaction |
-| DISCARD | Transaction | Abort transaction |
-| SAVE | Persistence | Sync save |
-| BGSAVE | Persistence | Async save |
-| BGREWRITEAOF | Persistence | Rewrite AOF |
-| AUTH | Auth | Authenticate |
-| MONITOR | Monitoring | Enable monitoring |
-| INFO | Information | Server stats |
-| COMMAND | Utility | Connection test |
-
----
-
-For more information, see the main README.md file.
+For bug reports or support, please contact **Akash Maji** at `akashmaji@iisc.ac.in`.
