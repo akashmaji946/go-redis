@@ -11,7 +11,9 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 )
 
 // main is the entry point of the Go-Redis server application.
@@ -85,10 +87,24 @@ func main() {
 	if err != nil {
 		log.Fatal("cannot listen on port 6379 due to:", err)
 	}
-	defer l.Close()
 
 	// listener setup success
 	log.Println("listening on port 6379")
+
+	// Signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		<-sigChan
+		log.Println("\n[SHUTDOWN] Signal received, starting graceful shutdown...")
+
+		// 1. Stop accepting new connections
+		l.Close()
+
+		// 2. Close all existing client connections
+		state.CloseAllConnections()
+	}()
 
 	var connectionCount int = 0
 
@@ -97,7 +113,8 @@ func main() {
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			log.Fatal("cannot accept connection due to:", err)
+			log.Println("[SHUTDOWN] Listener closed, stopping accept loop.")
+			break
 		}
 		// defer conn.Close()
 
@@ -113,6 +130,17 @@ func main() {
 	}
 	wg.Wait()
 
+	// 3. Final persistence save
+	log.Println("[SHUTDOWN] All connections closed. Saving final state...")
+	SaveRDB(state)
+
+	if state.config.aofEnabled && state.aof != nil {
+		log.Println("[SHUTDOWN] Flushing AOF to disk...")
+		state.aof.w.Flush()
+		state.aof.f.Sync()
+	}
+
+	log.Println("[SHUTDOWN] Graceful shutdown complete. Goodbye!")
 }
 
 // handleOneConnection manages a single client connection for its entire lifetime.
@@ -169,6 +197,9 @@ func handleOneConnection(conn net.Conn, state *AppState, connectionCount *int) {
 	state.clients = *connectionCount
 	state.genStats.total_connections_received += 1
 	log.Printf("[%2d] [ACCEPT] Accepted connection from: %s\n", *connectionCount, conn.LocalAddr().String())
+
+	state.AddConn(conn)
+	defer state.RemoveConn(conn)
 
 	client := NewClient(conn)
 	reader := bufio.NewReader(conn)
