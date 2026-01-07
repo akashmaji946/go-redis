@@ -35,6 +35,7 @@ func Publish(client *Client, v *Value, state *AppState) *Value {
 	w := &Writer{}
 	serialized := w.Deserialize(reply)
 
+	// Send the message to all subscribers
 	for _, subClient := range subsCopy {
 		subClient.conn.Write([]byte(serialized))
 	}

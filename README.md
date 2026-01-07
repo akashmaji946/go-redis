@@ -14,6 +14,7 @@ Access it here: [Docs](https://akashmaji946.github.io/go-redis/)
 - **Persistence**:
   - **AOF (Append-Only File)**: Logs every write operation with configurable fsync modes
   - **RDB (Redis Database)**: Point-in-time snapshots with automatic triggers
+- **Pub/Sub**: Real-time messaging with PUBLISH, SUBSCRIBE, and UNSUBSCRIBE support
 - **Expiration**: EXPIRE and TTL support for keys with automatic cleanup
 - **Authentication**: Password-based authentication with configurable requirements
 - **Transactions**: MULTI, EXEC, DISCARD for atomic command execution
@@ -134,7 +135,7 @@ The server accepts command-line arguments for configuration file and data direct
 When you run the server, you'll see output like:
 
 ```bash
->>> Go-Redis Server v0.1 <<<
+>>> Go-Redis Server v1.0 <<<
 reading the config file...
 Data directory: /app/data
 listening on port 6379
@@ -148,6 +149,11 @@ listening on port 6379
 - INCR | DECR `INCR key`, `DECR key`
 - INCRBY | DECRBY`INCRBY key increment`, `DECRBY key decrement`
 
+
+### Pub/Sub Operations
+- `PUBLISH channel message`
+- `SUBSCRIBE channel [channel ...]`
+- `UNSUBSCRIBE [channel ...]`
 
 ### List Operations
 - `LPUSH key value [value ...]`
@@ -263,9 +269,9 @@ listening on port 6379
 ### Eviction Policies
 
 * no-eviction
-* allkeys-random (implemented)
-* allkeys-lru (not implemented)
-* allkeys-lfu (not implemented)
+* allkeys-random
+* allkeys-lru
+* allkeys-lfu
 
 ## Architecture
 
@@ -359,10 +365,8 @@ See `DOCKER.md` for more detail
 
 * Single database only
 * No replication
-* No Pub/Sub
-* Only string data type
 * No WATCH
-* Partial eviction support
+* No Lua scripting
 
 ## License
 
@@ -370,10 +374,9 @@ Educational project implementing Redis-like functionality in Go.
 
 ## Version
 
-**v0.1**
+**v1.0**
 
 ## Author
 **Akash Maji (akashmaji@iisc.ac.in) - Contact for bugs and support**
 ## Configuration
 Configuration is handled via `redis.conf`. See `config/redis.conf` for available options like port, persistence settings, and memory limits.
-
