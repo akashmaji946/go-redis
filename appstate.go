@@ -5,7 +5,10 @@ file: go-redis/appstate.go
 */
 package main
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 type RDBStats struct {
 	rdb_last_saved_ts int64
@@ -63,6 +66,11 @@ type AppState struct {
 	rdbStats  *RDBStats
 	aofStats  *AOFStats
 	genStats  *GeneralStats
+
+	// we will have in-memory pub-sub system
+	channels map[string][]*Client
+	topics   map[string][]*Client
+	pubsubMu sync.RWMutex
 }
 
 // NewAppState creates and initializes a new AppState instance.
@@ -109,6 +117,10 @@ func NewAppState(config *Config) *AppState {
 		rdbStats:        &RDBStats{},
 		aofStats:        &AOFStats{},
 		genStats:        &GeneralStats{},
+		// initialize pubsub maps
+		channels: make(map[string][]*Client),
+		topics:   make(map[string][]*Client),
+		pubsubMu: sync.RWMutex{},
 	}
 
 	if config.aofEnabled {

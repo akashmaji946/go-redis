@@ -7,6 +7,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 )
 
 // can run these even if authenticated=0
@@ -40,6 +41,9 @@ func Commands(c *Client, v *Value, state *AppState) *Value {
 	for k := range Handlers {
 		cmds = append(cmds, k)
 	}
+
+	// sort cmds for consistent order
+	sort.Strings(cmds)
 
 	var arr []Value
 	for _, cmd := range cmds {

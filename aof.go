@@ -13,6 +13,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"strconv"
 )
 
 // Aof manages the Append-Only File (AOF) persistence mechanism.
@@ -240,7 +241,7 @@ func (aof *Aof) Rewrite(cp map[string]*Item) {
 	// write all items with appropriate commands based on type
 	fwriter := NewWriter(aof.f) // writer to file
 	for k, item := range cp {
-		if item == nil {
+		if item == nil || item.IsExpired() {
 			continue
 		}
 
@@ -275,16 +276,41 @@ func (aof *Aof) Rewrite(cp map[string]*Item) {
 			}
 
 		case LIST_TYPE:
-			// TODO: LPUSH key value [value ...] when list support is added
-			log.Printf("Warning: LIST type not yet supported in AOF Rewrite for key %s\n", k)
+			if len(item.List) > 0 {
+				cmd := Value{typ: BULK, blk: "RPUSH"}
+				arr := []Value{cmd, key}
+				for _, val := range item.List {
+					arr = append(arr, Value{typ: BULK, blk: val})
+				}
+				rpushCmd := Value{typ: ARRAY, arr: arr}
+				fwriter.Write(&rpushCmd)
+			}
 
 		case SET_TYPE:
-			// TODO: SADD key member [member ...] when set support is added
-			log.Printf("Warning: SET type not yet supported in AOF Rewrite for key %s\n", k)
+			if len(item.ItemSet) > 0 {
+				cmd := Value{typ: BULK, blk: "SADD"}
+				arr := []Value{cmd, key}
+				for member := range item.ItemSet {
+					arr = append(arr, Value{typ: BULK, blk: member})
+				}
+				saddCmd := Value{typ: ARRAY, arr: arr}
+				fwriter.Write(&saddCmd)
+			}
 
 		case ZSET_TYPE:
-			// TODO: ZADD key score member [score member ...] when zset support is added
-			log.Printf("Warning: ZSET type not yet supported in AOF Rewrite for key %s\n", k)
+			if len(item.ZSet) > 0 {
+				cmd := Value{typ: BULK, blk: "ZADD"}
+				arr := []Value{cmd, key}
+				for member, score := range item.ZSet {
+					arr = append(arr, Value{
+						typ: BULK,
+						blk: strconv.FormatFloat(score, 'f', -1, 64),
+					})
+					arr = append(arr, Value{typ: BULK, blk: member})
+				}
+				zaddCmd := Value{typ: ARRAY, arr: arr}
+				fwriter.Write(&zaddCmd)
+			}
 
 		default:
 			log.Printf("Warning: Unknown type %s for key %s in AOF Rewrite\n", item.Type, k)

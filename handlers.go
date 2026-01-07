@@ -105,6 +105,17 @@ var Handlers = map[string]Handler{
 
 	"MONITOR": Monitor,
 	"INFO":    Info,
+
+	// pubsub
+	"PUBLISH":     Publish,
+	"SUBSCRIBE":   Subscribe,
+	"UNSUBSCRIBE": Unsubscribe,
+
+	// "PSUBSCRIBE":   Psubscribe,
+	// "PUNSUBSCRIBE": Punsubscribe,
+	// "PUBSUB":       Pubsub,
+	// "ECHO":         Echo,
+	// "QUIT":         Quit,
 }
 
 // handle is the main command dispatcher.
