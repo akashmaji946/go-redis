@@ -47,7 +47,8 @@ import (
 //   - Individual connection errors are logged but don't stop the server
 func main() {
 
-	fmt.Println(ASCII_ART)
+	fmt.Println(">>> Go-Redis Server v0.1 <<<")
+	fmt.Printf(ASCII_ART)
 
 	configFilePath := "./config/redis.conf"
 	dataDirectoryPath := "./data/"

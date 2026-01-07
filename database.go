@@ -409,6 +409,16 @@ func (item *Item) approxMemoryUsage(key string) int64 {
 		}
 	}
 
+	// ZSet type
+	if item.Type == ZSET_TYPE {
+		size += int64(unsafe.Sizeof(item.ZSet))
+		for k := range item.ZSet {
+			size += stringHeader + int64(len(k))
+			size += 8 // float64 value
+			size += avgMapEntryOverhead
+		}
+	}
+
 	return size
 }
 

@@ -179,6 +179,14 @@ This enables:
 
 - Increment or decrement integer value by amount
 
+#### `MGET <key> [key ...]`
+
+- Returns the values of all specified keys
+
+#### `MSET <key> <value> [key value ...]`
+
+- Sets multiple keys to multiple values
+
 ---
 
 ### 6.3 Key Commands
@@ -233,6 +241,11 @@ Return values:
 - `-1` → key exists without expiration
 - `-2` → key does not exist
 
+#### `PERSIST <key>`
+
+- Remove the existing timeout on key
+- Returns 1 if timeout was removed, 0 otherwise
+
 ---
 
 ### 6.5 List Commands
@@ -253,7 +266,7 @@ Return values:
 
 #### `LGET <key>`
 
-- Custom command: Returns all elements (alias for `LRANGE 0 -1`)
+- Custom command: Returns all elements (alias for `LRANGE <key> 0 -1`)
 
 #### `LLEN`, `LINDEX`
 
@@ -273,7 +286,39 @@ Return values:
 
 ---
 
-### 6.7 Utility Commands
+### 6.7 Sorted Set Commands
+
+#### `ZADD <key> <score> <member> [score member ...]`
+
+- Adds members with scores to the sorted set
+
+#### `ZREM <key> <member> [member ...]`
+
+- Removes members from the sorted set
+
+#### `ZSCORE <key> <member>`
+
+- Returns the score of member
+
+#### `ZCARD <key>`
+
+- Returns the number of elements in the sorted set
+
+#### `ZRANGE <key> <start> <stop> [WITHSCORES]`
+
+- Returns elements in range (low to high)
+
+#### `ZREVRANGE <key> <start> <stop> [WITHSCORES]`
+
+- Returns elements in range (high to low)
+
+#### `ZGET <key> [member]`
+
+- Custom command: Get score of a member or all members with scores
+
+---
+
+### 6.8 Utility Commands
 
 #### `PING [message]`
 
