@@ -271,6 +271,8 @@ Below is a categorized list of all supported commands.
 | `PUBLISH <channel> <msg>` | Post a message to a channel. |
 | `SUBSCRIBE <chan> ...` | Listen for messages published to the given channels. |
 | `UNSUBSCRIBE [chan ...]` | Stop listening for messages on the given channels. |
+| `PSUBSCRIBE <pattern> ...` | Listen for messages matching glob patterns. |
+| `PUNSUBSCRIBE [pattern ...]` | Stop listening for messages on the given patterns. |
 
 ### Expiration Commands
 | Command | Description |

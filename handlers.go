@@ -111,8 +111,8 @@ var Handlers = map[string]Handler{
 	"SUBSCRIBE":   Subscribe,
 	"UNSUBSCRIBE": Unsubscribe,
 
-	// "PSUBSCRIBE":   Psubscribe,
-	// "PUNSUBSCRIBE": Punsubscribe,
+	"PSUBSCRIBE":   Psubscribe,
+	"PUNSUBSCRIBE": Punsubscribe,
 	// "PUBSUB":       Pubsub,
 	// "ECHO":         Echo,
 	// "QUIT":         Quit,

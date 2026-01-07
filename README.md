@@ -154,6 +154,8 @@ listening on port 6379
 - `PUBLISH channel message`
 - `SUBSCRIBE channel [channel ...]`
 - `UNSUBSCRIBE [channel ...]`
+- `PSUBSCRIBE pattern [pattern ...]`
+- `PUNSUBSCRIBE [pattern ...]`
 
 ### List Operations
 - `LPUSH key value [value ...]`

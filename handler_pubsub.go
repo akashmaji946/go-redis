@@ -1,5 +1,9 @@
 package main
 
+import (
+	"path"
+)
+
 // PubSub commands
 // Publish sends a message to all clients subscribed to the specified channel.
 // Syntax: PUBLISH channel message
@@ -12,35 +16,42 @@ func Publish(client *Client, v *Value, state *AppState) *Value {
 	message := args[1].blk
 
 	state.pubsubMu.Lock()
-	subscribers, exists := state.channels[channel]
-	if !exists {
-		state.pubsubMu.Unlock()
-		return NewIntegerValue(0)
+
+	// 1. Handle exact channel matches
+	var totalSent int64
+	if subscribers, exists := state.channels[channel]; exists {
+		reply := NewArrayValue([]Value{
+			*NewBulkValue("message"),
+			*NewBulkValue(channel),
+			*NewBulkValue(message),
+		})
+		serialized := (&Writer{}).Deserialize(reply)
+		for _, subClient := range subscribers {
+			subClient.conn.Write([]byte(serialized))
+			totalSent++
+		}
 	}
 
-	// Copy the subscriber list to avoid holding the lock during network I/O
-	subsCopy := make([]*Client, len(subscribers))
-	copy(subsCopy, subscribers)
+	// 2. Handle pattern (topic) matches
+	for pattern, subscribers := range state.topics {
+		matched, _ := path.Match(pattern, channel)
+		if matched {
+			reply := NewArrayValue([]Value{
+				*NewBulkValue("pmessage"),
+				*NewBulkValue(pattern),
+				*NewBulkValue(channel),
+				*NewBulkValue(message),
+			})
+			serialized := (&Writer{}).Deserialize(reply)
+			for _, subClient := range subscribers {
+				subClient.conn.Write([]byte(serialized))
+				totalSent++
+			}
+		}
+	}
 	state.pubsubMu.Unlock()
 
-	// Correct RESP format for a message: ["message", channel, payload]
-	// Using Bulk Strings ($) as required by the protocol
-	reply := NewArrayValue([]Value{
-		*NewBulkValue("message"),
-		*NewBulkValue(channel),
-		*NewBulkValue(message),
-	})
-
-	// Serialize once to be efficient
-	w := &Writer{}
-	serialized := w.Deserialize(reply)
-
-	// Send the message to all subscribers
-	for _, subClient := range subsCopy {
-		subClient.conn.Write([]byte(serialized))
-	}
-
-	return NewIntegerValue(int64(len(subsCopy)))
+	return NewIntegerValue(totalSent)
 }
 
 // Subscribe subscribes the client to the specified channels.
@@ -88,6 +99,94 @@ func Subscribe(client *Client, v *Value, state *AppState) *Value {
 			w.Flush()
 		} else {
 			lastReply = reply
+		}
+	}
+	return lastReply
+}
+
+// Psubscribe subscribes the client to the specified patterns (topics).
+// Syntax: PSUBSCRIBE pattern [pattern ...]
+func Psubscribe(client *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) < 1 {
+		return NewErrorValue("ERR wrong number of arguments for 'psubscribe' command")
+	}
+
+	state.pubsubMu.Lock()
+	defer state.pubsubMu.Unlock()
+	var lastReply *Value
+	for _, arg := range args {
+		pattern := arg.blk
+		subscribers := state.topics[pattern]
+
+		alreadySubscribed := false
+		for _, subClient := range subscribers {
+			if subClient == client {
+				alreadySubscribed = true
+				break
+			}
+		}
+		if !alreadySubscribed {
+			subscribers = append(subscribers, client)
+			state.topics[pattern] = subscribers
+		}
+
+		reply := NewArrayValue([]Value{
+			*NewBulkValue("psubscribe"),
+			*NewBulkValue(pattern),
+			*NewIntegerValue(int64(len(subscribers))),
+		})
+
+		if pattern != args[len(args)-1].blk {
+			w := NewWriter(client.conn)
+			w.Write(reply)
+			w.Flush()
+		} else {
+			lastReply = reply
+		}
+	}
+	return lastReply
+}
+
+// Punsubscribe unsubscribes the client from the specified patterns.
+func Punsubscribe(client *Client, v *Value, state *AppState) *Value {
+	args := v.arr[1:]
+	if len(args) < 1 {
+		return NewErrorValue("ERR wrong number of arguments for 'punsubscribe' command")
+	}
+
+	state.pubsubMu.Lock()
+	defer state.pubsubMu.Unlock()
+	var lastReply *Value
+	for _, arg := range args {
+		pattern := arg.blk
+		subscribers, exists := state.topics[pattern]
+		if exists {
+			newSubscribers := []*Client{}
+			for _, subClient := range subscribers {
+				if subClient != client {
+					newSubscribers = append(newSubscribers, subClient)
+				}
+			}
+			if len(newSubscribers) == 0 {
+				delete(state.topics, pattern)
+			} else {
+				state.topics[pattern] = newSubscribers
+			}
+
+			reply := NewArrayValue([]Value{
+				*NewBulkValue("punsubscribe"),
+				*NewBulkValue(pattern),
+				*NewIntegerValue(int64(len(newSubscribers))),
+			})
+
+			if pattern != args[len(args)-1].blk {
+				w := NewWriter(client.conn)
+				w.Write(reply)
+				w.Flush()
+			} else {
+				lastReply = reply
+			}
 		}
 	}
 	return lastReply
