@@ -9,40 +9,6 @@ import (
 	"log"
 )
 
-// Success Message:
-// +OK\r\n
-
-// can run these even if authenticated=0
-var safeCommands = []string{
-	"COMMAND",
-	"PING",
-	"COMMANDS",
-	"HELP",
-	"AUTH",
-}
-
-// IsSafeCmd checks whether a command can be executed without authentication.
-//
-// Parameters:
-//   - cmd: command name
-//   - commands: list of safe commands
-//
-// Returns:
-//
-//	true if cmd is in commands, false otherwise
-//
-// Safe commands include:
-//
-//	COMMAND, AUTH
-func IsSafeCmd(cmd string, commands []string) bool {
-	for _, command := range commands {
-		if cmd == command {
-			return true
-		}
-	}
-	return false
-}
-
 type Handler func(*Client, *Value, *AppState) *Value
 
 func init() {
@@ -55,9 +21,9 @@ var Handlers = map[string]Handler{
 	"COMMAND": Command,
 	"PING":    Ping,
 
-	"GET":    Get,
-	"SET":    Set,
-	"SETNX":  Setnx,
+	"GET": Get,
+	"SET": Set,
+	// "SETNX":  Setnx,
 	"INCR":   Incr,
 	"DECR":   Decr,
 	"INCRBY": IncrBy,

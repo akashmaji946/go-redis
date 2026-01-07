@@ -1,4 +1,4 @@
-1/*
+/*
 author: akashmaji
 email: akashmaji@iisc.ac.in
 file: go-redis/handler/connection.go

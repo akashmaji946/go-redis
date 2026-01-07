@@ -12,56 +12,6 @@ import (
 	"time"
 )
 
-// Command handles the COMMAND command.
-// Utility command used for connection testing and protocol compliance.
-//
-// Syntax:
-//   COMMAND
-//
-// Returns:
-//   +OK\r\n
-//
-// Notes:
-//   - Executable without authentication
-
-func Command(c *Client, v *Value, state *AppState) *Value {
-	// cmd := v.arr[0].blk
-	return NewStringValue("OK")
-}
-
-// Commands handles the COMMANDS command.
-// Lists all available commands in an array.
-//
-// Syntax:
-//
-//	COMMANDS
-//
-// Returns:
-//
-//	Array: List of all supported command names
-func Commands(c *Client, v *Value, state *AppState) *Value {
-	var cmds []string
-	for k := range Handlers {
-		cmds = append(cmds, k)
-	}
-	// sort.Strings(cmds)
-
-	var arr []Value
-	for _, cmd := range cmds {
-		arr = append(arr, Value{typ: BULK, blk: cmd})
-	}
-	return NewArrayValue(arr)
-}
-
-func Ping(c *Client, v *Value, state *AppState) *Value {
-	// cmd
-	args := v.arr[1:]
-	if len(args) != 0 {
-		return NewStringValue("PONG " + args[0].blk)
-	}
-	return NewStringValue("PONG")
-}
-
 // Info handles the INFO command.
 // Returns server information and statistics in a human-readable format.
 // This command provides comprehensive details about the server's current state,
@@ -370,34 +320,4 @@ func DBSize(c *Client, v *Value, state *AppState) *Value {
 
 	return NewIntegerValue(int64(size))
 
-}
-
-// Auth handles the AUTH command.
-// Authenticates the client with the server using a password.
-//
-// Syntax:
-//
-//	AUTH <password>
-//
-// Returns:
-//
-//	+OK\r\n on successful authentication
-//	Error if password is incorrect or arguments are invalid
-//
-// Behavior:
-//   - Sets client's authenticated flag to true on success
-//   - Requires correct password as per server configuration
-func Auth(c *Client, v *Value, state *AppState) *Value {
-	args := v.arr[1:]
-	if len(args) != 1 {
-		return NewErrorValue("ERR wrong number of arguments for 'auth' command")
-	}
-
-	pass := args[0].blk
-	if pass != state.config.password {
-		return NewErrorValue("ERR invalid password")
-	}
-
-	c.authenticated = true
-	return NewStringValue("OK")
 }
