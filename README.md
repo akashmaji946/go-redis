@@ -95,7 +95,7 @@ This creates a `go-redis` executable in your project directory.
 
 ### Configuration
 
-The server is configured using a `redis.conf` file. By default, it looks for `./config/redis.conf`.
+The go-redis server is configured using a `redis.conf` file. By default, it looks for `./config/redis.conf`.
 
 **Example `redis.conf`:**
 ```conf
