@@ -1,414 +1,440 @@
-# Go-Redis — Developer Documentation (DOCS.md)
+![Go-Redis Logo](go-redis-logo.png)
 
-This document describes the **internal architecture, command semantics, persistence model, concurrency behavior, and design decisions** of **Go-Redis**, a Redis-compatible in-memory key-value store written in Go.
+# Go-Redis: The Complete Guide (v1.0)
 
-> 📌 For build, configuration, and usage instructions, see `README.md` at [link](https://github.com/akashmaji946/go-redis/blob/main/README.md)
+Welcome to the complete developer and user documentation for **Go-Redis**, a lightweight, multi-threaded, Redis-compatible server implemented in Go.
+
+This document provides a deep dive into the project's features, architecture, and usage. Whether you are a developer looking to understand the internals, or a user wanting to get started, this guide is for you.
 
 ---
 
 ## Table of Contents
 
-1. Overview  
-2. Architecture  
-3. Data Model  
-4. Concurrency Model  
-5. Command Execution Pipeline  
-6. Command Reference  
-7. Transactions  
-8. Persistence  
-9. Memory Management  
-10. Monitoring & Observability  
-11. RESP Protocol Support  
-12. Startup & Shutdown Lifecycle  
-13. Limitations  
-14. Intended Use  
-15. Versioning  
+1.  [**Overview & Features**](#1-overview--features)
+    -   [Design Goals](#design-goals)
+2.  [**Getting Started**](#2-getting-started)
+    -   [Prerequisites](#prerequisites)
+    -   [Building from Source](#building-from-source)
+    -   [Configuration](#configuration)
+    -   [Running the Server](#running-the-server)
+    -   [Connecting with `redis-cli`](#connecting-with-redis-cli)
+3.  [**Docker Deployment**](#3-docker-deployment)
+    -   [Using the Pre-built Image](#using-the-pre-built-image)
+    -   [Building a Custom Image](#building-a-custom-image)
+4.  [**Command Reference**](#4-command-reference)
+    -   [String Operations](#string-operations)
+    -   [Key Management](#key-management)
+    -   [List Operations](#list-operations)
+    -   [Set Operations](#set-operations)
+    -   [Hash Operations](#hash-operations)
+    -   [Sorted Set Operations](#sorted-set-operations)
+    -   [Expiration Commands](#expiration-commands)
+    -   [Transactions](#transactions)
+    -   [Persistence Commands](#persistence-commands)
+    -   [Server & Connection](#server--connection)
+    -   [Monitoring & Information](#monitoring--information)
+5.  [**Internal Architecture**](#5-internal-architecture)
+    -   [High-Level Diagram](#high-level-diagram)
+    -   [Project Structure & Core Components](#project-structure--core-components)
+    -   [Concurrency Model](#concurrency-model)
+    -   [Command Execution Pipeline](#command-execution-pipeline)
+    -   [Data Model](#data-model)
+    -   [RESP Protocol Support](#resp-protocol-support)
+6.  [**Core Subsystems Explained**](#6-core-subsystems-explained)
+    -   [Persistence: AOF vs. RDB](#persistence-aof-vs-rdb)
+    -   [Memory Management & Eviction](#memory-management--eviction)
+7.  [**Limitations**](#7-limitations)
+8.  [**Contact & Support**](#8-contact--support)
 
 ---
 
-## 1. Overview
+## 1. Overview & Features
 
-**Go-Redis** is a Redis-compatible, single-node, in-memory database implemented in Go.  
-It supports the RESP protocol and a subset of Redis commands, with a focus on **clarity, correctness, and educational value**.
+Go-Redis is a Redis-compatible in-memory key-value store server written in Go. It is designed to be a learning tool for understanding how a database like Redis works under the hood, while also being a functional server for development and testing purposes.
+
+-   **Broad Command Support**: Implements a rich subset of commands for Strings, Lists, Sets, Hashes, and Sorted Sets.
+-   **Dual Persistence Model**: 
+    -   **AOF (Append-Only File)**: Logs every write operation with configurable `fsync` modes for high durability.
+    -   **RDB (Redis Database)**: Creates point-in-time snapshots for fast startups and backups. Supports full AOF rewriting for all data types.
+-   **Key Expiration**: Supports `EXPIRE`, `TTL`, and `PERSIST` with lazy (on-access) key removal.
+-   **Atomic Transactions**: Group commands in `MULTI`/`EXEC` blocks for atomic execution.
+-   **Server Security**: Built-in password authentication via the `AUTH` command.
+-   **Introspection & Monitoring**: 
+    -   `INFO` provides a detailed look into server statistics.
+    -   `MONITOR` streams live command processing for debugging.
+-   **Memory Management**: Allows setting a `maxmemory` limit and an eviction policy.
+-   **Pub/Sub Messaging**: Decoupled real-time communication between publishers and subscribers.
+-   **RESP Compatible**: Fully compatible with the Redis Serialization Protocol (RESP), allowing `redis-cli` and other standard clients to connect seamlessly.
+-   **Thread-Safe by Design**: Handles multiple concurrent clients safely using a single database protected by read-write locks.
 
 ### Design Goals
 
-- Compatible with `redis-cli`
-- Simple, readable Go implementation
-- Deterministic persistence behavior
-- Clear separation of concerns
-- Educational rather than production focus
-
-### Non-Goals
-
-- Replication or clustering
-- Redis modules
-- Full Redis command parity
-- Maximum performance tuning
+-   **Educational**: To provide a clear, readable, and well-documented codebase for those learning about database internals, concurrency in Go, and network programming.
+-   **Redis-Compatible**: To work out-of-the-box with `redis-cli`.
+-   **Correctness over Performance**: To prioritize a simple, correct, and deterministic implementation over complex performance optimizations.
 
 ---
 
-## 2. Architecture
+## 2. Getting Started
 
-### High-Level Flow
+### Prerequisites
 
+-   **Go**: Version 1.24.4 or later.
+-   **`redis-cli`**: The standard Redis command-line tool.
+-   **OS**: Tested on Linux/Unix environments.
+
+> **Note**: Before starting, ensure no other Redis instance is running on port `6379`. You can stop a default Redis service using `sudo systemctl stop redis-server`.
+
+### Building from Source
+
+Clone the repository and run the build command:
+```bash
+go build
+```
+This creates a `go-redis` executable in your project directory.
+
+### Configuration
+
+The server is configured using a `redis.conf` file. By default, it looks for `./config/redis.conf`.
+
+**Example `redis.conf`:**
+```conf
+# Set the data directory for AOF and RDB files
+dir ./data
+
+# Enable AOF persistence and set fsync policy (always, everysec, no)
+appendonly yes
+appendfsync everysec
+
+# Configure RDB snapshotting: save if 3 changes occur within 5 seconds
+save 5 3
+dbfilename backup.rdb
+
+# Secure the server with a password
+requirepass your-secret-password
+
+# Set a 1GB memory limit and define eviction policy
+maxmemory 1073741824
+maxmemory-policy allkeys-random
 ```
 
-Client (redis-cli)
-|
-TCP
-|
-RESP Parser
-|
-Command Dispatcher
-|
-+--------------------------+
-| In-Memory Database       |
-| map[string]*Value        |
-| RWMutex protected        |
-+--------------------------+
-|
-+--------------------------+
-| Persistence Layer        |
-|  - AOF                  |
-|  - RDB                  |
-+--------------------------+
+### Running the Server
 
+The server can be started with default paths or custom ones.
+
+**Syntax:**
+```bash
+./go-redis [config_file_path] [data_directory_path]
 ```
 
-### Core Components
+-   **With defaults:**
+    ```bash
+    ./go-redis
+    ```
+-   **With custom paths:**
+    ```bash
+    ./go-redis ./my.conf ./my-data
+    ```
 
-| File | Responsibility |
-|----|----------------|
-| `main.go` | Server startup, TCP listener |
-| `client.go` | Per-client lifecycle |
-| `handlers.go` | Command handlers |
-| `database.go` | Thread-safe datastore |
-| `value.go` | Value + TTL metadata |
-| `writer.go` | RESP encoding |
-| `aof.go` | Append-only file |
-| `rdb.go` | Snapshot persistence |
-| `mem.go` | Memory accounting & eviction |
-| `info.go` | INFO command |
+The server will log its startup process and listen on port `6379`.
 
----
+### Connecting with `redis-cli`
 
-## 3. Data Model
-
-Each key maps to a `Value` object containing:
-
-- Stored value (string or hash)
-- Optional expiration timestamp
-- Last access timestamp
-- Access frequency counter
-
-This enables:
-
-- Lazy expiration
-- TTL inspection
-- Future LRU/LFU eviction policies
+Open a new terminal and connect:
+```bash
+redis-cli -p 6379
+```
+If you've set `requirepass`, authenticate your session:
+```
+127.0.0.1:6379> AUTH your-secret-password
+OK
+```
+You're all set to run commands!
 
 ---
 
-## 4. Concurrency Model
+## 3. Docker Deployment
 
-### Threading Strategy
+### Using the Pre-built Image
 
-- One goroutine per client connection
-- Single shared database
-- Synchronization via `sync.RWMutex`
+The quickest way to run Go-Redis is with the official Docker image.
 
-### Locking Rules
+```bash
+# 1. Pull the image from Docker Hub
+docker pull akashmaji/go-redis:latest
 
-| Operation | Lock Type |
-|---------|----------|
-| Read-only (GET, TTL) | `RLock` |
-| Write (SET, DEL) | `Lock` |
-| RDB snapshot | Read lock + copy |
+# 2. Run the container, mounting a volume for persistent data
+docker run -d -p 6379:6379 \
+  -v $(pwd)/data:/app/data \
+  akashmaji/go-redis:latest
 
-> The system prioritizes **correctness and simplicity** over fine-grained parallelism.
+# 3. Connect from your host
+redis-cli
+```
 
----
+### Building a Custom Image
 
-## 5. Command Execution Pipeline
+If you've modified the code, you can build your own image from the `Dockerfile`.
 
-1. Client sends RESP request
-2. RESP parser decodes command and arguments
-3. Authentication check (if enabled)
-4. Transaction state check (MULTI mode)
-5. Command handler execution
-6. RESP-encoded response sent
-7. Optional AOF append
+```bash
+# 1. Build the image
+docker build -t go-redis:latest .
 
----
-
-## 6. Command Reference
-
-### 6.1 Authentication
-
-#### `AUTH <password>`
-
-- Validates against `requirepass` from config
-- Required for most commands if authentication is enabled
-- Marks client as authenticated on success
+# 2. Run the container
+# This example mounts a custom config file and data directory
+docker run -d -p 6379:6379 \
+  -v $(pwd)/config/redis.conf:/app/config/redis.conf:ro \
+  -v $(pwd)/data:/app/data \
+  go-redis:latest
+```
 
 ---
 
-### 6.2 String Commands
+## 4. Command Reference
 
-#### `SET <key> <value>`
+Below is a categorized list of all supported commands.
 
-- Overwrites existing key
-- Clears previous TTL
-- Updates memory counters
-- Appended to AOF (if enabled)
+### String Operations
+| Command | Description |
+|---|---|
+| `GET <key>` | Get the value of a key. |
+| `SET <key> <value>` | Set the string value of a key. |
+| `INCR <key>` | Increment the integer value of a key by one. |
+| `DECR <key>` | Decrement the integer value of a key by one. |
+| `INCRBY <key> <amount>`| Increment the integer value of a key by a given amount. |
+| `DECRBY <key> <amount>`| Decrement the integer value of a key by a given amount. |
+| `MGET <key> [key ...]` | Get the values of all the given keys. |
+| `MSET <key> <value> ...` | Set multiple keys to multiple values. |
 
-#### `GET <key>`
+### Key Management
+| Command | Description |
+|---|---|
+| `DEL <key> [key ...]` | Delete one or more keys. |
+| `EXISTS <key>`| Check if a key exists. |
+| `KEYS <pattern>` | Find all keys matching a pattern. **Warning: O(N) complexity.** |
+| `RENAME <key> <newkey>`| Rename a key. |
+| `TYPE <key>` | Get the type of value stored at a key. |
+| `FLUSHDB`| Remove all keys from the database. **Warning: Irreversible.** |
+| `DBSIZE`| Return the number of keys in the database. |
 
-- Performs lazy expiration
-- Updates access metadata
-- Returns NULL if key is missing or expired
+### List Operations
+| Command | Description |
+|---|---|
+| `LPUSH <key> <value> ...` | Prepend one or more values to a list. |
+| `RPUSH <key> <value> ...` | Append one or more values to a list. |
+| `LPOP <key>` | Remove and get the first element in a list. |
+| `RPOP <key>` | Remove and get the last element in a list. |
+| `LRANGE <key> <start> <stop>`| Get a range of elements from a list. |
+| `LLEN <key>` | Get the length of a list. |
+| `LINDEX <key> <index>`| Get an element from a list by its index. |
+| `LGET <key>` | **(Custom)** Get all elements in a list. |
 
----
+### Set Operations
+| Command | Description |
+|---|---|
+| `SADD <key> <member> ...` | Add one or more members to a set. |
+| `SREM <key> <member> ...` | Remove one or more members from a set. |
+| `SMEMBERS <key>`| Get all the members in a set. |
+| `SISMEMBER <key> <member>`| Determine if a given value is a member of a set. |
+| `SCARD <key>` | Get the number of members in a set. |
 
-### 6.3 Key Commands
+### Hash Operations
+| Command | Description |
+|---|---|
+| `HSET <key> <field> <value>` | Set the string value of a hash field. |
+| `HGET <key> <field>` | Get the value of a hash field. |
+| `HDEL <key> <field> ...` | Delete one or more hash fields. |
+| `HGETALL <key>`| Get all the fields and values in a hash. |
+| `HINCRBY <key> <field> <inc>`| Increment the integer value of a hash field. |
+| `HEXISTS <key> <field>`| Determine if a hash field exists. |
+| `HLEN <key>` | Get the number of fields in a hash. |
+| `HKEYS <key>` | Get all the fields in a hash. |
+| `HVALS <key>` | Get all the values in a hash. |
+| `HMSET <key> <field> <value> ...` | Set multiple hash fields to multiple values. |
+| `HDELALL <key>`| **(Custom)** Delete the entire hash. |
+| `HEXPIRE <key> <seconds>`| **(Custom)** Set a TTL on a hash key. |
 
-#### `DEL <key1> [key2 ...]`
+### Sorted Set Operations
+| Command | Description |
+|---|---|
+| `ZADD <key> <score> <member> ...` | Add members to a sorted set, or update scores. |
+| `ZREM <key> <member> ...` | Remove members from a sorted set. |
+| `ZSCORE <key> <member>`| Get the score of a member. |
+| `ZCARD <key>` | Get the number of members in a sorted set. |
+| `ZRANGE <key> <start> <stop> ...`| Return a range of members, by index. |
+| `ZREVRANGE <key> <start> <stop> ...`| Return a range of members, by index, ordered high to low. |
+| `ZGET <key> [member]` | **(Custom)** Get score of a member or all members. |
 
-- Deletes keys immediately
-- Frees memory and expiration metadata
+### Pub/Sub Operations
+| Command | Description |
+|---|---|
+| `PUBLISH <channel> <msg>` | Post a message to a channel. |
+| `SUBSCRIBE <chan> ...` | Listen for messages published to the given channels. |
+| `UNSUBSCRIBE [chan ...]` | Stop listening for messages on the given channels. |
 
-#### `KEYS <pattern>`
+### Expiration Commands
+| Command | Description |
+|---|---|
+| `EXPIRE <key> <seconds>`| Set a timeout on a key. |
+| `TTL <key>` | Get the remaining time to live of a key. |
+| `PERSIST <key>`| Remove the expiration from a key. |
 
-- Glob-style matching
-- Iterates entire keyspace (O(N))
-- Intended for debugging
+### Transactions
+| Command | Description |
+|---|---|
+| `MULTI` | Mark the start of a transaction block. |
+| `EXEC` | Execute all commands queued in a transaction. |
+| `DISCARD`| Discard all commands issued after `MULTI`. |
 
-#### `DBSIZE`
+### Persistence Commands
+| Command | Description |
+|---|---|
+| `SAVE` | **Synchronously** save the dataset to disk. **Blocks the server.** |
+| `BGSAVE`| **Asynchronously** save the dataset to disk in the background. |
+| `BGREWRITEAOF`| Asynchronously rewrite the append-only file. |
 
-- Returns number of keys in database
-- O(1) operation
+### Server & Connection
+| Command | Description |
+|---|---|
+| `PING [message]` | Check the connection. |
+| `AUTH <password>` | Authenticate to the server. |
+| `COMMAND`| A simple command that returns `OK`. |
+| `COMMANDS`| **(Custom)** List all available commands. |
 
-#### `FLUSHDB`
-
-- Removes all keys
-- Frees all memory
-- Irreversible
-
----
-
-### 6.4 Expiration Commands
-
-#### `EXPIRE <key> <seconds>`
-
-- Stores absolute expiration timestamp
-- No background timer
-- Key removed lazily on access
-
-#### `TTL <key>`
-
-Return values:
-- `> 0` → seconds remaining
-- `-1` → key exists without expiration
-- `-2` → key does not exist
-
----
-
-## 7. Transactions
-
-### MULTI / EXEC
-
-- Commands queued per client
-- No `WATCH` support
-- `EXEC` executes atomically under write lock
-- Errors inside transaction do **not** abort execution
-
-### DISCARD
-
-- Clears queued commands
-- Leaves database unchanged
-
----
-
-## 8. Hash Commands
-
-Each hash key stores a `map[field]value`.  
-TTL applies to the **entire hash**, not individual fields.
-
-Supported commands:
-
-- `HSET`
-- `HGET`
-- `HDEL`
-- `HDELALL`
-- `HGETALL`
-- `HMSET`
-- `HINCRBY`
-- `HEXISTS`
-- `HLEN`
-- `HKEYS`
-- `HVALS`
-- `HEXPIRE`
-
-All hash commands:
-- Perform lazy expiration
-- Update memory accounting
-- Remove hash key if empty
-
----
-
-## 9. Persistence
-
-### 9.1 AOF (Append-Only File)
-
-#### Write Path
-
-1. Command executes in memory
-2. Serialized in RESP
-3. Appended to AOF buffer
-4. Flushed based on fsync policy
-
-#### fsync Modes
-
-- `always` — fsync after every write
-- `everysec` — background fsync goroutine
-- `no` — OS-managed flushing
-
-#### AOF Replay
-
-- Replayed on startup
-- Rebuilds dataset deterministically
+### Monitoring & Information
+| Command | Description |
+|---|---|
+| `INFO` | Get information and statistics about the server. |
+| `MONITOR`| Listen for all requests received by the server in real-time. |
 
 ---
 
-### 9.2 RDB (Snapshot)
+## 5. Internal Architecture
 
-#### Snapshot Flow
+This section details the internal design of Go-Redis for developers and contributors.
 
-1. Copy database state
-2. Serialize using Go `gob`
-3. Compute SHA-256 checksum
-4. Write atomically to disk
+### High-Level Diagram
+```
+   Client (redis-cli)
+           |
+          TCP
+           |
+     RESP Parser  (client.go)
+           |
+   Command Dispatcher (handlers.go)
+           |
++--------------------------+
+|   In-Memory Database     | (database.go)
+|   map[string]*Value      |
+| (RWMutex Protection)     |
++--------------------------+
+           |
++--------------------------+
+|   Persistence Layer      |
+| - AOF (aof.go)           |
+| - RDB (rdb.go)           |
++--------------------------+
+```
 
-#### Save Commands
+### Project Structure & Core Components
+```
+go-redis/
+├── main.go         # Server entrypoint, TCP listener
+├── handlers.go     # Command handlers and dispatch logic
+├── database.go     # Thread-safe in-memory database store
+├── client.go       # Per-client connection handling and RESP parsing
+├── value.go        # Data structure for stored values and metadata (TTL)
+├── writer.go       # RESP protocol writer/encoder
+├── conf.go         # Configuration loading from redis.conf
+├── appstate.go     # Global server state management
+├── aof.go          # Append-Only File (AOF) persistence logic
+├── rdb.go          # Snapshot (RDB) persistence logic
+├── mem.go          # Memory accounting and eviction logic
+├── info.go         # Logic for the INFO command
+├── config/
+│   └── redis.conf  # Default configuration file
+└── data/           # Default directory for persistence files
+```
 
-- `SAVE` — synchronous, blocks writes
-- `BGSAVE` — background snapshot
-- `BGREWRITEAOF` — AOF compaction
+### Concurrency Model
 
-Snapshots with checksum mismatch are rejected.
+-   **One Goroutine Per Client**: The server spawns a new goroutine for each incoming connection, ensuring clients are handled in parallel.
+-   **Centralized Data Store**: A single, shared database instance is used for all clients.
+-   **Read/Write Locking**: Access to the database is synchronized using `sync.RWMutex`: 
+    -   **Read operations** (`GET`, `TTL`, etc.) use a read lock (`RLock`), allowing multiple readers to proceed concurrently.
+    -   **Write operations** (`SET`, `DEL`, etc.) use a write lock (`Lock`), ensuring exclusive access and data consistency.
 
----
+### Command Execution Pipeline
 
-## 10. Memory Management
+1.  A client connection is accepted, and a new goroutine starts handling it.
+2.  The client's request is read from the TCP socket and parsed as a RESP message.
+3.  The command and its arguments are dispatched to the appropriate handler function.
+4.  If authentication is enabled, the client's authenticated status is checked.
+5.  The handler acquires the necessary lock (read or write) on the database.
+6.  The command logic is executed (e.g., reading/writing a value).
+7.  A RESP-formatted response is written back to the client.
+8.  For write commands, the operation is appended to the AOF buffer if enabled.
 
-### Memory Accounting Includes
+### Data Model
 
-- Key size
-- Value size
-- Hash fields
-- Expiration metadata
-- Map overhead
+Each key in the database maps to a `Value` struct, which contains:
+- The stored data itself (e.g., a string, list, or hash).
+- An optional expiration timestamp (as a `time.Time`).
+- Metadata for future eviction policies (e.g., access frequency).
 
-### Eviction
+### RESP Protocol Support
 
-Triggered when `maxmemory` is exceeded.
-
-Supported policies:
-- `no-eviction`
-- `allkeys-random`
-
-(LRU/LFU scaffolding exists but is inactive.)
-
----
-
-## 11. Monitoring & Observability
-
-### `MONITOR`
-
-- Streams all executed commands
-- Includes timestamp and client address
-- Runs until connection closes
-
-### `INFO`
-
-Reports sections:
-- Server
-- Clients
-- Memory
-- Persistence
-- General stats
-
----
-
-## 12. RESP Protocol Support
-
-Supported RESP types:
-
-- `+` Simple String
-- `-` Error
-- `:` Integer
-- `$` Bulk String
-- `$-1` Null
-- `*` Array
-
-Fully compatible with `redis-cli`.
-
----
-
-## 13. Startup & Shutdown Lifecycle
-
-### Startup
-
-1. Parse `redis.conf`
-2. Load AOF (if enabled)
-3. Load RDB (if present)
-4. Start TCP listener
-5. Launch background workers
-
-### Shutdown
-
-- No signal handling yet
-- Intended for controlled educational use
+Go-Redis supports all primary RESP data types, making it fully compatible with `redis-cli`:
+- `+` Simple Strings
+- `-` Errors
+- `:` Integers
+- `$` Bulk Strings
+- `*` Arrays
+- `$-1` Nulls
 
 ---
 
-## 14. Limitations (Intentional)
+## 6. Core Subsystems Explained
 
-- Single database only
-- No replication or clustering
-- No Pub/Sub
-- No Lua scripting
-- No background expiration sweeps
-- No Redis modules
+### Persistence: AOF vs. RDB
 
----
+| Feature | AOF (Append-Only File) | RDB (Snapshot) |
+|---|---|---|
+| **Strategy** | Logs every write command to a file. | Saves a point-in-time snapshot of the entire dataset. |
+| **Pros** | - Higher durability. <br> - More granular (can lose at most 1s of data with `everysec`). | - Faster restarts (loads one big file). <br> - Compact file size. |
+| **Cons** | - Larger file size. <br> - Slower restarts on large datasets. | - Less durable (can lose data since last snapshot). |
+| **Use Case** | Maximum data safety. | Fast backups and disaster recovery. |
 
-## 15. Intended Use
+-   **AOF `fsync` Policies**: Controlled by `appendfsync` in `redis.conf`.
+    -   `always`: Safest but slowest. `fsync()` on every write.
+    -   `everysec`: Default. `fsync()` once per second. Good trade-off.
+    -   `no`: Fastest. Lets the OS decide when to `fsync()`.
+-   **RDB Triggers**: Controlled by `save` rules in `redis.conf` or manually via `SAVE`/`BGSAVE`.
 
-Go-Redis is ideal for:
+### Memory Management & Eviction
 
-- Learning Redis internals
-- Understanding RESP
-- Studying persistence tradeoffs
-- Exploring Go concurrency
-- Systems programming coursework
-
----
-
-## 16. Versioning
-
-Current version: **v0.1**
-
-Semantic versioning not yet enforced.
+-   **`maxmemory`**: This directive in `redis.conf` sets a hard limit on the memory Go-Redis can use.
+-   **`maxmemory-policy`**: When the `maxmemory` limit is reached, this policy determines the eviction behavior.
+    -   `no-eviction`: (Default) Blocks write commands that would exceed the limit, returning an error.
+    -   `allkeys-random`: Randomly evicts keys to make space for new data.
+    -   `allkeys-lru`: Evicts the least recently used keys.
+    -   `allkeys-lfu`: Evicts the least frequently used keys.
 
 ---
 
-## 17. Report and Bugs
-- Contact: `Akash Maji` 
-- Email: `akashmaji@iisc.ac.in`
+## 7. Limitations
+
+Go-Redis is an educational project and intentionally omits certain advanced Redis features:
+
+-   Single database only (no `SELECT` command).
+-   No replication or clustering.
+-   No Lua scripting.
+-   No `WATCH` command for optimistic locking in transactions.
 
 ---
 
+## 8. Contact & Support
 
-
+For bug reports, questions, or contributions, please contact:
+-   **Author**: Akash Maji
+-   **Email**: `akashmaji@iisc.ac.in`
