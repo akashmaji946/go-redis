@@ -57,6 +57,7 @@ var Handlers = map[string]Handler{
 
 	"GET":    Get,
 	"SET":    Set,
+	"SETNX":  Setnx,
 	"INCR":   Incr,
 	"DECR":   Decr,
 	"INCRBY": IncrBy,
@@ -75,11 +76,15 @@ var Handlers = map[string]Handler{
 	"LGET":   Lget,
 
 	// Set commands
-	"SADD":      Sadd,
-	"SREM":      Srem,
-	"SMEMBERS":  Smembers,
-	"SISMEMBER": Sismember,
-	"SCARD":     Scard,
+	"SADD":        Sadd,
+	"SREM":        Srem,
+	"SMEMBERS":    Smembers,
+	"SISMEMBER":   Sismember,
+	"SCARD":       Scard,
+	"SINTER":      Sinter,
+	"SUNION":      Sunion,
+	"SDIFF":       Sdiff,
+	"SRANDMEMBER": Srandmember,
 
 	// Sorted Set commands
 	"ZADD":      Zadd,
