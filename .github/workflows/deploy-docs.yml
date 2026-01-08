@@ -27,11 +27,34 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
+      - name: Install markdown converter
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+
       - name: Prepare Documentation
         run: |
           mkdir -p _site
-          cp DOCS.md _site/index.md
+          pandoc DOCS.md -t html -s -o _site/index.html \
+            --metadata title="Go-Redis Documentation" \
+            --css style.css \
+            -c https://cdn.jsdelivr.net/npm/github-markdown-css@5.2.0/github-markdown.min.css
           cp go-redis-logo.png _site/ || true
+
+      - name: Add CSS styling
+        run: |
+          cat > _site/style.css << 'EOF'
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+          }
+          .markdown-body {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          EOF
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
