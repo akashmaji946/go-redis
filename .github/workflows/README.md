@@ -1,6 +1,11 @@
+---
+layout: default
+title: Go-Redis Documentation
+---
+
 ![Go-Redis Logo](go-redis-logo.png)
 
-# Go-Redis: The Complete Guide (v1.0)
+# Go-Redis-Server: The Complete Guide (v1.0)
 
 Welcome to the complete developer and user documentation for **Go-Redis**, a lightweight, multi-threaded, Redis-compatible server implemented in Go.
 
@@ -195,6 +200,7 @@ docker run -d -p 6379:6379 \
 Below is a categorized list of all supported commands.
 
 ### String Operations
+
 | Command | Description |
 |---|---|
 | `GET <key>` | Get the value of a key |
@@ -206,7 +212,9 @@ Below is a categorized list of all supported commands.
 | `MGET <key> [key ...]` | Get the values of all the given keys |
 | `MSET <key> <value> [key <value> ...]` | Set multiple keys to multiple values |
 
+
 ### Key Management
+
 | Command | Description |
 |---|---|
 | `DEL <key> [key ...]` | Delete one or more keys |
@@ -218,7 +226,9 @@ Below is a categorized list of all supported commands.
 | `TTL <key>` | Get the time to live for a key in seconds |
 | `PERSIST <key>` | Remove the expiration from a key |
 
+
 ### List Operations
+
 | Command | Description |
 |---|---|
 | `LPUSH <key> <value> [value ...]` | Prepend one or multiple values to a list |
@@ -230,7 +240,9 @@ Below is a categorized list of all supported commands.
 | `LINDEX <key> <index>` | Get an element from a list by its index |
 | `LGET <key>` | Get all elements in a list |
 
+
 ### Set Operations
+
 | Command | Description |
 |---|---|
 | `SADD <key> <member> [member ...]` | Add one or more members to a set |
@@ -243,7 +255,9 @@ Below is a categorized list of all supported commands.
 | `SUNION <key> [key ...]` | Add multiple sets |
 | `SRANDMEMBER <key> [count]` | Get one or multiple random members from a set |
 
+
 ### Hash Operations
+
 | Command | Description |
 |---|---|
 | `HSET <key> <field> <value> [field <value> ...]` | Set the string value of a hash field |
@@ -259,7 +273,9 @@ Below is a categorized list of all supported commands.
 | `HDELALL <key>` | Delete all fields in a hash |
 | `HEXPIRE <key> <field> <seconds>` | Set expiration for a hash field |
 
+
 ### Sorted Set Operations
+
 | Command | Description |
 |---|---|
 | `ZADD <key> <score> <member> [score <member> ...]` | Add one or more members to a sorted set, or update its score if it already exists |
@@ -270,7 +286,9 @@ Below is a categorized list of all supported commands.
 | `ZREVRANGE <key> <start> <stop> [WITHSCORES]` | Return a range of members in a sorted set, by index, with scores ordered from high to low |
 | `ZGET <key> [<member>]` | Get score of a member or all members with scores |
 
+
 ### Pub/Sub Operations
+
 | Command | Description |
 |---|---|
 | `PUBLISH <channel> <message>` | Post a message to a channel |
@@ -279,7 +297,9 @@ Below is a categorized list of all supported commands.
 | `PSUBSCRIBE <pattern> [pattern ...]` | Listen for messages published to channels matching the given patterns |
 | `PUNSUBSCRIBE [pattern ...]` | Stop listening for messages posted to channels matching the given patterns |
 
+
 ### Transactions
+
 | Command | Description |
 |---|---|
 | `MULTI` | Mark the start of a transaction block. |
@@ -288,14 +308,18 @@ Below is a categorized list of all supported commands.
 | `WATCH <key> [key ...]` | Watch the given keys to determine execution of the MULTI/EXEC block |
 | `UNWATCH` | Forget about all watched keys |
 
+
 ### Persistence Commands
+
 | Command | Description |
 |---|---|
 | `SAVE` | Synchronously save the database to disk |
 | `BGSAVE` | Asynchronously save the database to disk |
 | `BGREWRITEAOF` | Asynchronously rewrite the Append-Only File |
 
+
 ### Server & Connection
+
 | Command | Description |
 |---|---|
 | `AUTH <password>` | Authenticate to the server |
@@ -303,7 +327,9 @@ Below is a categorized list of all supported commands.
 | `COMMAND` | Get help about Redis commands |
 | `COMMANDS [pattern]` | List available commands or get help for a specific command |
 
+
 ### Monitoring & Information
+
 | Command | Description |
 |---|---|
 | `INFO [key]` | Get server information and statistics or per-key metadata |
