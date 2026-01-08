@@ -51,7 +51,7 @@ func (info *RedisInfo) Build(state *AppState) {
 		"redis_version  ": "0.1",
 		"author         ": "akashmaji(@iisc.ac.in)",
 		"process_id     ": strconv.Itoa(os.Getpid()),
-		"tcp_port       ": "6379",
+		"tcp_port       ": strconv.Itoa(state.config.port),
 		"server_time    ": fmt.Sprint(time.Now().UnixMicro()),
 		"server_uptime  ": fmt.Sprint(int64(time.Since(state.serverStartTime).Seconds())),
 		"server_path    ": exePath,

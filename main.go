@@ -16,7 +16,7 @@ import (
 	"syscall"
 )
 
-// main is the entry point of the Go-Redis server application.
+// Entry point of the Go-Redis-Server application.
 // It initializes the server, loads configuration, restores data from persistence,
 // and starts accepting client connections on port 6379.
 //
@@ -50,17 +50,24 @@ import (
 func main() {
 
 	fmt.Println(">>> Go-Redis Server v1.0 <<<")
-	fmt.Printf(ASCII_ART)
+	fmt.Println(ASCII_ART)
 
+	// defaults for config file and data directory
 	configFilePath := "./config/redis.conf"
 	dataDirectoryPath := "./data/"
 
+	// override from command line args if provided
 	args := os.Args[1:]
 	if len(args) > 0 {
 		configFilePath = args[0]
 	}
 	if len(args) > 1 {
 		dataDirectoryPath = args[1]
+	}
+
+	if len(args) > 2 {
+		log.Fatalln("usage: ./go-redis [config-file] [data-directory]")
+		os.Exit(1)
 	}
 
 	// read the config file
@@ -82,14 +89,14 @@ func main() {
 		InitRDBTrackers(conf, state)
 	}
 
-	// setup a tcp listener at localhost:6379
-	l, err := net.Listen("tcp", ":6379")
+	// setup a tcp listener
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", conf.port))
 	if err != nil {
-		log.Fatal("cannot listen on port 6379 due to:", err)
+		log.Fatalf("cannot listen on port %d due to: %v", conf.port, err)
 	}
 
 	// listener setup success
-	log.Println("listening on port 6379")
+	log.Printf("listening on port %d\n", conf.port)
 
 	// Signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)

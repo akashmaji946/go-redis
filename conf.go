@@ -35,6 +35,7 @@ import (
 type Config struct {
 	rdb   []RDBSnapshot
 	rdbFn string
+	port  int
 
 	dir string
 
@@ -129,7 +130,9 @@ const (
 //	config := NewConfig()
 //	// Then populate via ReadConf() or manually
 func NewConfig() *Config {
-	return &Config{}
+	return &Config{
+		port: 6379, // Default Redis port
+	}
 
 }
 
@@ -287,6 +290,11 @@ func parseLine(l string, config *Config) {
 	cmd := args[0]
 
 	switch cmd {
+	case "port":
+		p, err := strconv.Atoi(args[1])
+		if err == nil {
+			config.port = p
+		}
 	case "dir":
 		config.dir = args[1]
 
