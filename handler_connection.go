@@ -67,7 +67,7 @@ func Ping(c *Client, v *Value, state *AppState) *Value {
 func Auth(c *Client, v *Value, state *AppState) *Value {
 	args := v.arr[1:]
 	if len(args) != 1 {
-		return NewErrorValue(fmt.Sprintf("ERR invalid argument to AUTH, given=%d, needed=1\n", len(args)))
+		return NewErrorValue(fmt.Sprintf("ERR invalid argument to AUTH, given=%d, needed=1", len(args)))
 	}
 
 	password := args[0].blk // AUTH <password>

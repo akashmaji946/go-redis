@@ -66,11 +66,13 @@ type Item struct {
 //   - The RWMutex allows multiple goroutines to read simultaneously while ensuring
 //     exclusive access for write operations
 type Database struct {
-	store   map[string]*Item
-	mu      sync.RWMutex
-	txMu    sync.RWMutex
-	mem     int64
-	mempeak int64
+	store      map[string]*Item
+	mu         sync.RWMutex
+	txMu       sync.RWMutex
+	watchers   map[string][]*Client // Key -> List of clients watching it
+	watchersMu sync.Mutex           // Protects the watchers map
+	mem        int64
+	mempeak    int64
 }
 
 // NewDatabase creates and returns a new empty Database instance.
@@ -84,9 +86,10 @@ type Database struct {
 //	// db is ready to use with empty store
 func NewDatabase() *Database {
 	return &Database{
-		store: map[string]*Item{},
-		mu:    sync.RWMutex{},
-		txMu:  sync.RWMutex{},
+		store:    map[string]*Item{},
+		mu:       sync.RWMutex{},
+		txMu:     sync.RWMutex{},
+		watchers: make(map[string][]*Client),
 	}
 }
 
@@ -263,6 +266,34 @@ func (DB *Database) RemIfExpired(k string, item *Item, state *AppState) (deleted
 		}
 	}
 	return false
+}
+
+// Touch marks all clients watching the given key as having a failed transaction.
+// This is used for optimistic locking (WATCH/MULTI/EXEC).
+func (DB *Database) Touch(key string) {
+	DB.watchersMu.Lock()
+	defer DB.watchersMu.Unlock()
+
+	if clients, ok := DB.watchers[key]; ok {
+		for _, client := range clients {
+			client.txFailed = true
+		}
+		// Once a key is touched, we clear its watchers
+		delete(DB.watchers, key)
+	}
+}
+
+// TouchAll marks all clients watching any key as having a failed transaction.
+func (DB *Database) TouchAll() {
+	DB.watchersMu.Lock()
+	defer DB.watchersMu.Unlock()
+
+	for _, clients := range DB.watchers {
+		for _, client := range clients {
+			client.txFailed = true
+		}
+	}
+	DB.watchers = make(map[string][]*Client)
 }
 
 // DB is the global database instance used throughout the application.

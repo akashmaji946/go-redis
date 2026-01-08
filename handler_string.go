@@ -28,7 +28,7 @@ func Get(c *Client, v *Value, state *AppState) *Value {
 	// cmd := v.arr[0].blk
 	args := v.arr[1:]
 	if len(args) != 1 {
-		return NewErrorValue("ERR invalid command uage with GET")
+		return NewErrorValue("ERR invalid command usage with GET")
 	}
 	key := args[0].blk // grab the key
 
@@ -122,6 +122,7 @@ func Set(c *Client, v *Value, state *AppState) *Value {
 		DB.mu.Unlock()
 		return NewErrorValue("ERR some error occured while PUT:" + err.Error())
 	}
+	DB.Touch(key)
 	// record it for AOF
 	if state.config.aofEnabled {
 		state.aof.w.Write(v)
@@ -333,6 +334,7 @@ func incrDecrBy(c *Client, key string, delta int64, state *AppState, v *Value) *
 	newVal := val + delta
 	item.Str = strconv.FormatInt(newVal, 10)
 
+	DB.Touch(key)
 	newMemory := item.approxMemoryUsage(key)
 	DB.mem += (newMemory - oldMemory)
 	if DB.mem > DB.mempeak {

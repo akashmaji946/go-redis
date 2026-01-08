@@ -6,7 +6,9 @@ file: go-redis/handlers.go
 package main
 
 import (
+	"fmt"
 	"log"
+	"strings"
 )
 
 type Handler func(*Client, *Value, *AppState) *Value
@@ -102,6 +104,8 @@ var Handlers = map[string]Handler{
 	"MULTI":   Multi,
 	"EXEC":    Exec,
 	"DISCARD": Discard,
+	"WATCH":   Watch,
+	"UNWATCH": Unwatch,
 
 	"MONITOR": Monitor,
 	"INFO":    Info,
@@ -155,11 +159,17 @@ func handle(client *Client, v *Value, state *AppState) {
 
 	// the command is in the first entry of v.arr
 	cmd := v.arr[0].blk
+
+	if !state.config.sensitive {
+		cmd = strings.ToUpper(cmd)
+	}
+
 	handler, ok := Handlers[cmd]
 
 	if !ok {
 		log.Println("ERROR: no such command:", cmd)
-		reply := NewErrorValue("ERR no such command")
+		msg := fmt.Sprintf("ERR no such command '%s', use COMMANDS for help", cmd)
+		reply := NewErrorValue(msg)
 		w := NewWriter(client.conn)
 		w.Write(reply)
 		w.Flush()
@@ -188,7 +198,7 @@ func handle(client *Client, v *Value, state *AppState) {
 	} else {
 		// Otherwise, execute the handler immediately (normal command or MULTI/EXEC/DISCARD).
 		// Transaction control commands are executed directly to avoid deadlocks with txMu.
-		if cmd == "MULTI" || cmd == "EXEC" || cmd == "DISCARD" {
+		if cmd == "MULTI" || cmd == "EXEC" || cmd == "DISCARD" || cmd == "WATCH" || cmd == "UNWATCH" {
 			reply = handler(client, v, state)
 		} else {
 			// Normal commands must wait if a transaction is currently executing.
@@ -205,7 +215,7 @@ func handle(client *Client, v *Value, state *AppState) {
 	// for MONITOR handle will send to all monitors
 	go func() {
 		for _, mon := range state.monitors {
-			if mon != *client {
+			if &mon != client {
 				mon.writerMonitorLog(v, client)
 			}
 		}

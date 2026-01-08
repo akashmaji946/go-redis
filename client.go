@@ -41,6 +41,10 @@ type Client struct {
 	// transaction
 	inTx bool         // in a txn?
 	tx   *Transaction // txn context
+
+	// optimistic locking
+	watchedKeys []string
+	txFailed    bool // set to true if a watched key is modified
 }
 
 // NewClient creates a new Client instance for a network connection.
@@ -60,6 +64,8 @@ func NewClient(conn net.Conn) *Client {
 		authenticated: false,
 		inTx:          false,
 		tx:            nil,
+		watchedKeys:   make([]string, 0),
+		txFailed:      false,
 	}
 }
 

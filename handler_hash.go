@@ -61,6 +61,7 @@ func Hset(c *Client, v *Value, state *AppState) *Value {
 		item.Hash[field] = NewHashFieldItem(value)
 	}
 
+	DB.Touch(key)
 	// Calculate new memory and update DB.mem
 	newMemory := item.approxMemoryUsage(key)
 	DB.mem -= oldMemory
@@ -184,6 +185,7 @@ func Hdel(c *Client, v *Value, state *AppState) *Value {
 		}
 	}
 
+	DB.Touch(key)
 	// Calculate new memory and update DB.mem
 	newMemory := item.approxMemoryUsage(key)
 	DB.mem -= oldMemory
@@ -286,6 +288,7 @@ func Hdelall(c *Client, v *Value, state *AppState) *Value {
 	// Calculate old memory before clearing
 	oldMemory := item.approxMemoryUsage(key)
 
+	DB.Touch(key)
 	count := int64(len(item.Hash))
 	item.Hash = make(map[string]*Item) // Clear the hash
 
@@ -375,6 +378,7 @@ func Hincrby(c *Client, v *Value, state *AppState) *Value {
 	newVal := current + incr
 	fieldItem.Str = fmt.Sprintf("%d", newVal)
 
+	DB.Touch(key)
 	// Calculate new memory and update DB.mem
 	newMemory := item.approxMemoryUsage(key)
 	DB.mem -= oldMemory
@@ -436,6 +440,7 @@ func Hmset(c *Client, v *Value, state *AppState) *Value {
 		item.Hash[field] = NewHashFieldItem(value)
 	}
 
+	DB.Touch(key)
 	// Calculate new memory and update DB.mem
 	newMemory := item.approxMemoryUsage(key)
 	DB.mem -= oldMemory
@@ -663,6 +668,7 @@ func Hexpire(c *Client, v *Value, state *AppState) *Value {
 
 	// Set expiration on the field
 	fieldItem.Exp = time.Now().Add(time.Second * time.Duration(seconds))
+	DB.Touch(key)
 
 	return NewIntegerValue(1)
 }

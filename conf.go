@@ -45,6 +45,7 @@ type Config struct {
 
 	requirepass bool
 	password    string
+	sensitive   bool
 
 	maxmemory        int64
 	eviction         Eviction
@@ -131,7 +132,8 @@ const (
 //	// Then populate via ReadConf() or manually
 func NewConfig() *Config {
 	return &Config{
-		port: 6379, // Default Redis port
+		port:      6379, // Default Redis port
+		sensitive: true, // Default command case sensitivity
 	}
 
 }
@@ -294,6 +296,12 @@ func parseLine(l string, config *Config) {
 		p, err := strconv.Atoi(args[1])
 		if err == nil {
 			config.port = p
+		}
+	case "sensitive":
+		if args[1] == "no" {
+			config.sensitive = false
+		} else {
+			config.sensitive = true
 		}
 	case "dir":
 		config.dir = args[1]

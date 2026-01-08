@@ -69,6 +69,7 @@ func Zadd(c *Client, v *Value, state *AppState) *Value {
 		item.ZSet[member] = score
 	}
 
+	DB.Touch(key)
 	newMemory := item.approxMemoryUsage(key)
 	DB.mem += (newMemory - oldMemory)
 	if DB.mem > DB.mempeak {
@@ -129,6 +130,7 @@ func Zrem(c *Client, v *Value, state *AppState) *Value {
 		}
 	}
 
+	DB.Touch(key)
 	if len(item.ZSet) == 0 {
 		delete(DB.store, key)
 		DB.mem -= oldMemory

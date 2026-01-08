@@ -57,6 +57,7 @@ func Sadd(c *Client, v *Value, state *AppState) *Value {
 		}
 	}
 
+	DB.Touch(key)
 	newMemory := item.approxMemoryUsage(key)
 	DB.mem += (newMemory - oldMemory)
 	if DB.mem > DB.mempeak {
@@ -117,6 +118,7 @@ func Srem(c *Client, v *Value, state *AppState) *Value {
 		}
 	}
 
+	DB.Touch(key)
 	if len(item.ItemSet) == 0 {
 		delete(DB.store, key)
 		DB.mem -= oldMemory

@@ -53,6 +53,7 @@ func Lpush(c *Client, v *Value, state *AppState) *Value {
 		item.List = append([]string{arg.blk}, item.List...)
 	}
 
+	DB.Touch(key)
 	newMemory := item.approxMemoryUsage(key)
 	DB.mem += (newMemory - oldMemory)
 	if DB.mem > DB.mempeak {
@@ -115,6 +116,7 @@ func Rpush(c *Client, v *Value, state *AppState) *Value {
 		item.List = append(item.List, arg.blk)
 	}
 
+	DB.Touch(key)
 	newMemory := item.approxMemoryUsage(key)
 	DB.mem += (newMemory - oldMemory)
 	if DB.mem > DB.mempeak {
@@ -174,6 +176,7 @@ func Lpop(c *Client, v *Value, state *AppState) *Value {
 	val := item.List[0]
 	item.List = item.List[1:]
 
+	DB.Touch(key)
 	// If empty, remove key
 	if len(item.List) == 0 {
 		delete(DB.store, key)
@@ -237,6 +240,7 @@ func Rpop(c *Client, v *Value, state *AppState) *Value {
 	val := item.List[lastIdx]
 	item.List = item.List[:lastIdx]
 
+	DB.Touch(key)
 	// If empty, remove key
 	if len(item.List) == 0 {
 		delete(DB.store, key)

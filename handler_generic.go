@@ -288,6 +288,7 @@ func FlushDB(c *Client, v *Value, state *AppState) *Value {
 	// fast
 	DB.mu.Lock()
 	DB.store = map[string]*Item{}
+	DB.TouchAll()
 	DB.mu.Unlock()
 
 	return NewStringValue("OK")

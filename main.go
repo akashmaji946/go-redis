@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"sync/atomic"
 	"syscall"
 )
 
@@ -113,7 +114,7 @@ func main() {
 		state.CloseAllConnections()
 	}()
 
-	var connectionCount int = 0
+	var connectionCount int32 = 0
 
 	// listener awaiting connection(s)
 	var wg sync.WaitGroup
@@ -198,12 +199,12 @@ func main() {
 //	-> handle() routes to Get() handler
 //	-> Response sent back to client
 //	-> Loop continues for next command
-func handleOneConnection(conn net.Conn, state *AppState, connectionCount *int) {
+func handleOneConnection(conn net.Conn, state *AppState, connectionCount *int32) {
 
-	*connectionCount += 1
-	state.clients = *connectionCount
+	newCount := atomic.AddInt32(connectionCount, 1)
+	state.clients = int(newCount)
 	state.genStats.total_connections_received += 1
-	log.Printf("[%2d] [ACCEPT] Accepted connection from: %s\n", *connectionCount, conn.LocalAddr().String())
+	log.Printf("[%2d] [ACCEPT] Accepted connection from: %s\n", newCount, conn.LocalAddr().String())
 
 	state.AddConn(conn)
 	defer state.RemoveConn(conn)
@@ -215,7 +216,7 @@ func handleOneConnection(conn net.Conn, state *AppState, connectionCount *int) {
 	defer func() {
 		newmonitors := state.monitors[:0] // same capacity but zero size
 		for _, mon := range state.monitors {
-			if mon != *client {
+			if &mon != client {
 				newmonitors = append(newmonitors, mon)
 			}
 		}
@@ -232,7 +233,6 @@ func handleOneConnection(conn net.Conn, state *AppState, connectionCount *int) {
 		err := v.ReadArray(reader)
 		if err != nil {
 			log.Println("[CLOSE] Closing connection due to: ", err)
-			*connectionCount -= 1
 			break
 		}
 
@@ -243,8 +243,8 @@ func handleOneConnection(conn net.Conn, state *AppState, connectionCount *int) {
 		handle(client, &v, state)
 	}
 
-	*connectionCount -= 1
-	state.clients = *connectionCount
-	log.Printf("[%2d] [CLOSED] Closed connection from: %s\n", *connectionCount, conn.LocalAddr().String())
+	newCount = atomic.AddInt32(connectionCount, -1)
+	state.clients = int(newCount)
+	log.Printf("[%2d] [CLOSED] Closed connection from: %s\n", newCount, conn.LocalAddr().String())
 
 }

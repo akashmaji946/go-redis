@@ -41,6 +41,7 @@ func Del(c *Client, v *Value, state *AppState) *Value {
 		}
 		// delete
 		DB.Rem(key)
+		DB.Touch(key)
 		m += 1
 	}
 	DB.mu.Unlock()
@@ -192,6 +193,7 @@ func Expire(c *Client, v *Value, state *AppState) *Value {
 		return NewIntegerValue(0)
 	}
 	Val.Exp = time.Now().Add(time.Second * time.Duration(expirySeconds))
+	DB.Touch(k)
 	DB.mu.RUnlock()
 
 	return NewIntegerValue(1)
@@ -284,6 +286,7 @@ func Persist(c *Client, v *Value, state *AppState) *Value {
 	}
 
 	item.Exp = time.Time{} // Clear expiration
+	DB.Touch(key)
 	return NewIntegerValue(1)
 }
 
@@ -337,6 +340,9 @@ func Rename(c *Client, v *Value, state *AppState) *Value {
 	// 2. Remove from old key (delete directly to preserve item content)
 	delete(DB.store, oldKey)
 	DB.mem -= oldMem
+
+	DB.Touch(oldKey)
+	DB.Touch(newKey)
 
 	// 3. Add to new key
 	DB.store[newKey] = item
