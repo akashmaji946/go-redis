@@ -1,4 +1,4 @@
-name: go-redis-server-docs
+name: go-redis-server-documentation
 on:
   push:
     branches: [main]
@@ -22,7 +22,7 @@ jobs:
       - name: Prepare Documentation
         run: |
           mkdir -p _site
-          cp DOCS.md _site/index.md
+          cp DOCUMENTATION.md _site/index.md
           cp go-redis-logo.png _site/ || true
           
       - name: Build with Jekyll
