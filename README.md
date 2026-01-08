@@ -6,7 +6,9 @@ A lightweight, multi-threaded Redis server implementation in Go.
 A Redis-compatible in-memory key-value store server written in Go. This implementation supports core Redis commands, persistence mechanisms (AOF and RDB), authentication, expiration, transactions, monitoring, and memory management with eviction policies.
 
 ## Docs
-Access it here: [Docs](https://akashmaji946.github.io/go-redis/)
+- Refer to our docs for full guide on usage and description of commands.
+- Access it here: [Docs](https://akashmaji946.github.io/go-redis/)
+
 ## Features
 
 - **Core Commands**: GET, SET, DEL, EXISTS, KEYS, DBSIZE, FLUSHDB, ...
@@ -14,6 +16,7 @@ Access it here: [Docs](https://akashmaji946.github.io/go-redis/)
 - **Persistence**:
   - **AOF (Append-Only File)**: Logs every write operation with configurable fsync modes
   - **RDB (Redis Database)**: Point-in-time snapshots with automatic triggers
+- **Pub/Sub**: Real-time messaging with PUBLISH, SUBSCRIBE, PSUBSCRIBE, and pattern support
 - **Expiration**: EXPIRE and TTL support for keys with automatic cleanup
 - **Authentication**: Password-based authentication with configurable requirements
 - **Transactions**: MULTI, EXEC, DISCARD for atomic command execution
@@ -21,13 +24,11 @@ Access it here: [Docs](https://akashmaji946.github.io/go-redis/)
 - **Server Info**: INFO command for server statistics and metrics
 - **Memory Management**: Configurable memory limits with eviction policies
 - **Background Operations**: BGSAVE and BGREWRITEAOF for non-blocking persistence
+- **Optimistic Locking**: WATCH and UNWATCH support for safe concurrent transactions
 - **Thread-Safe**: Concurrent access with read-write locks (RWMutex)
 - **Redis Protocol**: Full RESP (Redis Serialization Protocol) compatibility
 - **Checksum Verification**: SHA-256 checksums for RDB data integrity
-  - **RDB**: Snapshotting with configurable intervals.
-  - **AOF**: Append-Only File with rewrite support.
 - **Concurrency**: Handles multiple client connections concurrently.
-- **Protocol**: Compatible with RESP (Redis Serialization Protocol).
 - **Transactions**: Basic `MULTI`, `EXEC`, `DISCARD` support.
 - **Eviction**: LRU/Random eviction policies when maxmemory is reached.
 
@@ -60,6 +61,12 @@ The server reads configuration from a `redis.conf` file. Create a configuration 
 ```conf
 # Data directory (where persistence files are stored)
 dir ./data
+
+# Server Configuration
+port 7379
+
+# Command case sensitivity (yes|no)
+sensitive no
 
 # AOF Configuration
 appendonly yes
@@ -134,7 +141,7 @@ The server accepts command-line arguments for configuration file and data direct
 When you run the server, you'll see output like:
 
 ```bash
->>> Go-Redis Server v0.1 <<<
+>>> Go-Redis Server v1.0 <<<
 reading the config file...
 Data directory: /app/data
 listening on port 6379
@@ -142,90 +149,41 @@ listening on port 6379
 
 ## Available Commands
 
-### String Operations
-- GET `SET key value`
-- SET `GET key`
-- INCR | DECR `INCR key`, `DECR key`
-- INCRBY | DECRBY`INCRBY key increment`, `DECRBY key decrement`
+**Connection**
+`AUTH`, `PING`
 
+**Persistence**
+`BGREWRITEAOF`, `BGSAVE`, `SAVE`
 
-### List Operations
-- `LPUSH key value [value ...]`
-- `RPUSH key value [value ...]`
-- `LPOP key`
-- `RPOP key`
-- `LRANGE key start stop`
-- `LLEN key`
-- `LINDEX key index`
-- `LGET key` (Custom: Get all elements)
+**Server**
+`COMMAND`, `COMMANDS`, `DBSIZE`, `FLUSHDB`, `INFO`, `MONITOR`
 
-### Set Operations
-- `SADD key member [member ...]`
-- `SREM key member [member ...]`
-- `SMEMBERS key`
-- `SISMEMBER key member`
-- `SCARD key`
+**String**
+`DECR`, `DECRBY`, `GET`, `INCR`, `INCRBY`, `MGET`, `MSET`, `SET`
 
+**Key**
+`DEL`, `EXISTS`, `EXPIRE`, `KEYS`, `PERSIST`, `RENAME`, `TTL`, `TYPE`
 
-### Expiration
+**Transaction**
+`DISCARD`, `EXEC`, `MULTI`, `UNWATCH`, `WATCH`
 
-* EXPIRE
-* TTL
+**Hash**
+`HDEL`, `HDELALL`, `HEXISTS`, `HEXPIRE`, `HGET`, `HGETALL`, `HINCRBY`, `HKEYS`, `HLEN`, `HMSET`, `HSET`, `HVALS`
 
-### Transactions
+**List**
+`LGET`, `LINDEX`, `LLEN`, `LPOP`, `LPUSH`, `LRANGE`, `RPOP`, `RPUSH`
 
-* MULTI
-* EXEC
-* DISCARD
+**PubSub**
+`PSUBSCRIBE`, `PUBLISH`, `PUNSUBSCRIBE`, `SUBSCRIBE`, `UNSUBSCRIBE`
 
-### Persistence
+**Set**
+`SADD`, `SCARD`, `SDIFF`, `SINTER`, `SISMEMBER`, `SMEMBERS`, `SRANDMEMBER`, `SREM`, `SUNION`
 
-* SAVE
-* BGSAVE
-* BGREWRITEAOF
-
-### Monitoring and Information
-
-* MONITOR
-* INFO
-
-### Authentication
-
-* AUTH
-
-### Utility
-
-* COMMAND
-* COMMANDS
-
-### Hash Operations
-- `HSET`, `HGET`, `HDEL`, `HGETALL`
-- `HINCRBY`, `HEXISTS`, `HLEN`
-- `HKEYS`, `HVALS`, `HEXPIRE`
-- `HDELALL` (Custom: Clear hash)
-
-* **HSET**: Set field in a hash
-* **HGET**: Get field from a hash
-* **HDEL**: Delete one or more fields from a hash
-* **HGETALL**: Get all fields and values in a hash
-* **HDELALL**: Delete the entire hash key and all its fields
-* **HINCRBY**: Increment a hash field by a given integer
-* **HMSET**: Set multiple fields in a hash
-* **HEXISTS**: Check if a field exists in a hash
-* **HLEN**: Get number of fields in a hash
-* **HKEYS**: Get all field names in a hash
-* **HVALS**: Get all values in a hash
-* **HEXPIRE**: Set TTL on a hash key
-
-### Key Management
-- `DEL`, `EXISTS`, `KEYS`, `RENAME`, `TYPE`
-- `EXPIRE`, `TTL`
+**ZSet**
+`ZADD`, `ZCARD`, `ZGET`, `ZRANGE`, `ZREM`, `ZREVRANGE`, `ZSCORE`
 
 ## Persistence
-### Server & Connection
-- `PING`, `AUTH`, `INFO`, `MONITOR`
-- `SAVE`, `BGSAVE`, `BGREWRITEAOF`
-- `FLUSHDB`, `DBSIZE`, `COMMANDS`
+### AOF
 
 ### AOF
 ## Getting Started
@@ -263,9 +221,9 @@ listening on port 6379
 ### Eviction Policies
 
 * no-eviction
-* allkeys-random (implemented)
-* allkeys-lru (not implemented)
-* allkeys-lfu (not implemented)
+* allkeys-random
+* allkeys-lru
+* allkeys-lfu
 
 ## Architecture
 
@@ -277,26 +235,52 @@ listening on port 6379
 
 ## Project Structure
 
-```
-go-redis/
-├── main.go
-├── handlers.go
-├── database.go
-├── value.go
-├── writer.go
-├── conf.go
+```bash
+.
 ├── aof.go
-├── rdb.go
-├── client.go
 ├── appstate.go
-├── info.go
-├── mem.go
-├── config/
+├── client.go
+├── commands.json
+├── conf.go
+├── config
 │   └── redis.conf
-├── data/
-│   ├── backup.aof
-│   └── backup.rdb
-└── go.mod
+├── constants.go
+├── data
+│   ├── redisdb.aof
+│   └── redisdb.rdb
+├── database.go
+├── Dockerfile
+├── DOCKER.md
+├── DOCS.md
+├── go.mod
+├── go-redis
+├── go-redis.code-workspace
+├── go-redis-logo.png
+├── go-redis.png
+├── go.sum
+├── handler_connection.go
+├── handler_generic.go
+├── handler_hash.go
+├── handler_key.go
+├── handler_list.go
+├── handler_persistence.go
+├── handler_pubsub.go
+├── handler_set.go
+├── handlers.go
+├── handler_string.go
+├── handler_transaction.go
+├── handler_zset.go
+├── helpers.go
+├── info.go
+├── LICENSE
+├── main.go
+├── mem.go
+├── notes.txt
+├── rdb.go
+├── README.md
+├── USER.md
+├── value.go
+└── writer.go
 ```
 
 ## Protocol
@@ -359,10 +343,7 @@ See `DOCKER.md` for more detail
 
 * Single database only
 * No replication
-* No Pub/Sub
-* Only string data type
-* No WATCH
-* Partial eviction support
+* No Lua scripting
 
 ## License
 
@@ -370,10 +351,9 @@ Educational project implementing Redis-like functionality in Go.
 
 ## Version
 
-**v0.1**
+**v1.0**
 
 ## Author
 **Akash Maji (akashmaji@iisc.ac.in) - Contact for bugs and support**
 ## Configuration
 Configuration is handled via `redis.conf`. See `config/redis.conf` for available options like port, persistence settings, and memory limits.
-

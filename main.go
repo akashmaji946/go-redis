@@ -11,10 +11,13 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"sync"
+	"sync/atomic"
+	"syscall"
 )
 
-// main is the entry point of the Go-Redis server application.
+// Entry point of the Go-Redis-Server application.
 // It initializes the server, loads configuration, restores data from persistence,
 // and starts accepting client connections on port 6379.
 //
@@ -47,18 +50,25 @@ import (
 //   - Individual connection errors are logged but don't stop the server
 func main() {
 
-	fmt.Println(">>> Go-Redis Server v0.1 <<<")
-	fmt.Printf(ASCII_ART)
+	fmt.Println(">>> Go-Redis Server v1.0 <<<")
+	fmt.Println(ASCII_ART)
 
+	// defaults for config file and data directory
 	configFilePath := "./config/redis.conf"
 	dataDirectoryPath := "./data/"
 
+	// override from command line args if provided
 	args := os.Args[1:]
 	if len(args) > 0 {
 		configFilePath = args[0]
 	}
 	if len(args) > 1 {
 		dataDirectoryPath = args[1]
+	}
+
+	if len(args) > 2 {
+		log.Fatalln("usage: ./go-redis [config-file] [data-directory]")
+		os.Exit(1)
 	}
 
 	// read the config file
@@ -80,24 +90,39 @@ func main() {
 		InitRDBTrackers(conf, state)
 	}
 
-	// setup a tcp listener at localhost:6379
-	l, err := net.Listen("tcp", ":6379")
+	// setup a tcp listener
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", conf.port))
 	if err != nil {
-		log.Fatal("cannot listen on port 6379 due to:", err)
+		log.Fatalf("cannot listen on port %d due to: %v", conf.port, err)
 	}
-	defer l.Close()
 
 	// listener setup success
-	log.Println("listening on port 6379")
+	log.Printf("listening on port %d\n", conf.port)
 
-	var connectionCount int = 0
+	// Signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		<-sigChan
+		log.Println("\n[SHUTDOWN] Signal received, starting graceful shutdown...")
+
+		// 1. Stop accepting new connections
+		l.Close()
+
+		// 2. Close all existing client connections
+		state.CloseAllConnections()
+	}()
+
+	var connectionCount int32 = 0
 
 	// listener awaiting connection(s)
 	var wg sync.WaitGroup
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			log.Fatal("cannot accept connection due to:", err)
+			log.Println("[SHUTDOWN] Listener closed, stopping accept loop.")
+			break
 		}
 		// defer conn.Close()
 
@@ -113,6 +138,17 @@ func main() {
 	}
 	wg.Wait()
 
+	// 3. Final persistence save
+	log.Println("[SHUTDOWN] All connections closed. Saving final state...")
+	SaveRDB(state)
+
+	if state.config.aofEnabled && state.aof != nil {
+		log.Println("[SHUTDOWN] Flushing AOF to disk...")
+		state.aof.w.Flush()
+		state.aof.f.Sync()
+	}
+
+	log.Println("[SHUTDOWN] Graceful shutdown complete. Goodbye!")
 }
 
 // handleOneConnection manages a single client connection for its entire lifetime.
@@ -163,12 +199,15 @@ func main() {
 //	-> handle() routes to Get() handler
 //	-> Response sent back to client
 //	-> Loop continues for next command
-func handleOneConnection(conn net.Conn, state *AppState, connectionCount *int) {
+func handleOneConnection(conn net.Conn, state *AppState, connectionCount *int32) {
 
-	*connectionCount += 1
-	state.clients = *connectionCount
+	newCount := atomic.AddInt32(connectionCount, 1)
+	state.clients = int(newCount)
 	state.genStats.total_connections_received += 1
-	log.Printf("[%2d] [ACCEPT] Accepted connection from: %s\n", *connectionCount, conn.LocalAddr().String())
+	log.Printf("[%2d] [ACCEPT] Accepted connection from: %s\n", newCount, conn.LocalAddr().String())
+
+	state.AddConn(conn)
+	defer state.RemoveConn(conn)
 
 	client := NewClient(conn)
 	reader := bufio.NewReader(conn)
@@ -177,7 +216,7 @@ func handleOneConnection(conn net.Conn, state *AppState, connectionCount *int) {
 	defer func() {
 		newmonitors := state.monitors[:0] // same capacity but zero size
 		for _, mon := range state.monitors {
-			if mon != *client {
+			if &mon != client {
 				newmonitors = append(newmonitors, mon)
 			}
 		}
@@ -194,7 +233,6 @@ func handleOneConnection(conn net.Conn, state *AppState, connectionCount *int) {
 		err := v.ReadArray(reader)
 		if err != nil {
 			log.Println("[CLOSE] Closing connection due to: ", err)
-			*connectionCount -= 1
 			break
 		}
 
@@ -205,8 +243,8 @@ func handleOneConnection(conn net.Conn, state *AppState, connectionCount *int) {
 		handle(client, &v, state)
 	}
 
-	*connectionCount -= 1
-	state.clients = *connectionCount
-	log.Printf("[%2d] [CLOSED] Closed connection from: %s\n", *connectionCount, conn.LocalAddr().String())
+	newCount = atomic.AddInt32(connectionCount, -1)
+	state.clients = int(newCount)
+	log.Printf("[%2d] [CLOSED] Closed connection from: %s\n", newCount, conn.LocalAddr().String())
 
 }

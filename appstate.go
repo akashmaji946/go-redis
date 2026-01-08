@@ -5,7 +5,11 @@ file: go-redis/appstate.go
 */
 package main
 
-import "time"
+import (
+	"net"
+	"sync"
+	"time"
+)
 
 type RDBStats struct {
 	rdb_last_saved_ts int64
@@ -63,6 +67,14 @@ type AppState struct {
 	rdbStats  *RDBStats
 	aofStats  *AOFStats
 	genStats  *GeneralStats
+
+	// we will have in-memory pub-sub system
+	channels map[string][]*Client
+	topics   map[string][]*Client
+	pubsubMu sync.RWMutex
+
+	activeConns   map[net.Conn]struct{}
+	activeConnsMu sync.Mutex
 }
 
 // NewAppState creates and initializes a new AppState instance.
@@ -109,6 +121,12 @@ func NewAppState(config *Config) *AppState {
 		rdbStats:        &RDBStats{},
 		aofStats:        &AOFStats{},
 		genStats:        &GeneralStats{},
+		// initialize pubsub maps
+		channels:      make(map[string][]*Client),
+		topics:        make(map[string][]*Client),
+		pubsubMu:      sync.RWMutex{},
+		activeConns:   make(map[net.Conn]struct{}),
+		activeConnsMu: sync.Mutex{},
 	}
 
 	if config.aofEnabled {
@@ -125,4 +143,24 @@ func NewAppState(config *Config) *AppState {
 		}
 	}
 	return &state
+}
+
+func (s *AppState) AddConn(conn net.Conn) {
+	s.activeConnsMu.Lock()
+	defer s.activeConnsMu.Unlock()
+	s.activeConns[conn] = struct{}{}
+}
+
+func (s *AppState) RemoveConn(conn net.Conn) {
+	s.activeConnsMu.Lock()
+	defer s.activeConnsMu.Unlock()
+	delete(s.activeConns, conn)
+}
+
+func (s *AppState) CloseAllConnections() {
+	s.activeConnsMu.Lock()
+	defer s.activeConnsMu.Unlock()
+	for conn := range s.activeConns {
+		conn.Close()
+	}
 }
