@@ -15,12 +15,28 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      
       - name: Setup Pages
         uses: actions/configure-pages@v4
+      
+      - name: Install markdown converter
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+      
+      - name: Prepare Documentation
+        run: |
+          mkdir -p _site
+          pandoc DOCS.md -t html -s -o _site/index.html \
+            --metadata title="Go-Redis Documentation" \
+            -c https://cdn.jsdelivr.net/npm/github-markdown-css@5.2.0/github-markdown.min.css
+          cp go-redis-logo.png _site/ || true
+      
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: './_site'
+      
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
