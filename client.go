@@ -37,6 +37,10 @@ import (
 type Client struct {
 	conn          net.Conn
 	authenticated bool
+
+	// transaction
+	inTx bool         // in a txn?
+	tx   *Transaction // txn context
 }
 
 // NewClient creates a new Client instance for a network connection.
@@ -54,6 +58,8 @@ func NewClient(conn net.Conn) *Client {
 	return &Client{
 		conn:          conn,
 		authenticated: false,
+		inTx:          false,
+		tx:            nil,
 	}
 }
 

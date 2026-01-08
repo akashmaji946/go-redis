@@ -175,21 +175,29 @@ func handle(client *Client, v *Value, state *AppState) {
 		return
 	}
 
-	// handle transaction: if already running, then queue
-	if state.tx != nil && cmd != "EXEC" && cmd != "DISCARD" && cmd != "MULTI" {
-		txCmd := &TxCommand{
+	var reply *Value
+
+	// If client is in a transaction and the command is NOT a transaction control command, queue it.
+	if client.inTx && cmd != "MULTI" && cmd != "EXEC" && cmd != "DISCARD" {
+		// Append a copy of the command to the client's private queue
+		client.tx.cmds = append(client.tx.cmds, &TxCommand{
 			value:   v,
 			handler: handler,
+		})
+		reply = NewStringValue("QUEUED")
+	} else {
+		// Otherwise, execute the handler immediately (normal command or MULTI/EXEC/DISCARD).
+		// Transaction control commands are executed directly to avoid deadlocks with txMu.
+		if cmd == "MULTI" || cmd == "EXEC" || cmd == "DISCARD" {
+			reply = handler(client, v, state)
+		} else {
+			// Normal commands must wait if a transaction is currently executing.
+			DB.txMu.RLock()
+			reply = handler(client, v, state)
+			DB.txMu.RUnlock()
 		}
-		state.tx.cmds = append(state.tx.cmds, txCmd)
-		reply := NewStringValue("QUEUED")
-		w := NewWriter(client.conn)
-		w.Write(reply)
-		w.Flush()
-		return
 	}
 
-	reply := handler(client, v, state)
 	w := NewWriter(client.conn)
 	w.Write(reply)
 	w.Flush()

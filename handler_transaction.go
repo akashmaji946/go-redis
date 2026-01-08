@@ -2,6 +2,79 @@ package main
 
 import "log"
 
+// Transaction represents a transaction context that can queue multiple commands
+// to be executed atomically. Commands added to a transaction are queued and
+// can be executed together, ensuring atomicity and isolation.
+//
+// Fields:
+//   - cmds: A slice of TxCommand structures representing queued commands
+//     that will be executed as part of this transaction
+//
+// Usage:
+//   - Create a transaction with NewTransaction()
+//   - Add commands to the transaction
+//   - Execute all commands atomically
+//
+// Thread Safety:
+//   - Transactions should be used within a single goroutine
+//   - Multiple transactions can be created concurrently, but each should
+//     be managed by a single goroutine
+//
+// Note: This is a foundation for transaction support. Full implementation
+//
+//	would include MULTI, EXEC, DISCARD, and WATCH commands.
+
+// Transaction of commands per client connection
+type Transaction struct {
+	cmds []*TxCommand
+}
+
+// NewTransaction creates and returns a new empty Transaction instance.
+// Initializes a transaction with an empty command queue ready to accept commands.
+//
+// Returns: A pointer to a new Transaction with an empty command slice
+//
+// Example:
+//
+//	tx := NewTransaction()
+//	// Transaction is ready to queue commands
+//
+// Note: The transaction is initially empty and commands must be added
+//
+//	before execution.
+func NewTransaction() *Transaction {
+	return &Transaction{}
+}
+
+// TxCommand represents a single command queued within a transaction.
+// This structure stores both the command Value and its handler function,
+// allowing the transaction to execute the command later when the transaction
+// is committed.
+//
+// Fields:
+//   - value: The parsed command Value containing the command name and arguments
+//     in RESP protocol format
+//   - handler: The Handler function that will execute this command when the
+//     transaction is executed (e.g., Get, Set, Del, etc.)
+//
+// Purpose:
+//   - Allows commands to be queued without immediate execution
+//   - Enables atomic execution of multiple commands together
+//   - Maintains the relationship between command and its handler
+//
+// Usage:
+//   - Created when commands are added to a transaction
+//   - Executed when the transaction is committed (EXEC command)
+//   - Discarded if the transaction is aborted (DISCARD command)
+//
+// Note: This is part of the transaction infrastructure. The handler
+//
+//	function is looked up from the Handlers map based on the command name.
+type TxCommand struct {
+	value   *Value
+	handler Handler
+}
+
 // Multi handles the MULTI command.
 // Begins a transaction by creating a new transaction context for the client.
 // All subsequent commands (except EXEC, DISCARD, and MULTI) will be queued
@@ -50,13 +123,14 @@ func Multi(c *Client, v *Value, state *AppState) *Value {
 		log.Println("invalid use of MULTI")
 		return NewErrorValue("ERR inavlid argument to MULTI")
 	}
-	// check if some tx running, then don't run
-	if state.tx != nil {
-		log.Println("tx already running")
-		return NewErrorValue("ERR tx already running")
+	// check if this client already has a tx running
+	if c.inTx {
+		log.Println("MULTI calls can not be nested")
+		return NewErrorValue("ERR MULTI calls can not be nested")
 	}
 
-	state.tx = NewTransaction()
+	c.inTx = true
+	c.tx = NewTransaction()
 
 	log.Println("tx started")
 	return NewStringValue("Started")
@@ -115,26 +189,12 @@ func Exec(c *Client, v *Value, state *AppState) *Value {
 		return NewErrorValue("ERR inavlid argument to EXEC")
 	}
 	// check if some tx running
-	if state.tx == nil {
+	if !c.inTx || c.tx == nil {
 		log.Println("tx already NOT running")
 		return NewErrorValue("ERR tx already NOT running")
 	}
 
-	// commmit queued commands first
-	replies := make([]Value, len(state.tx.cmds))
-	for idx, txCmd := range state.tx.cmds {
-		reply := txCmd.handler(c, txCmd.value, state)
-		replies[idx] = *reply
-	}
-
-	state.tx = nil
-	state.genStats.total_txn_executed += 1
-	log.Println("tx executed")
-
-	return &Value{
-		typ: ARRAY,
-		arr: replies,
-	}
+	return ExecuteTransaction(c, state)
 }
 
 // Discard handles the DISCARD command.
@@ -187,14 +247,38 @@ func Discard(c *Client, v *Value, state *AppState) *Value {
 		return NewErrorValue("ERR inavlid argument to DISCARD")
 	}
 	// check if some tx running
-	if state.tx == nil {
+	if !c.inTx || c.tx == nil {
 		log.Println("tx already NOT running")
 		return NewErrorValue("ERR tx already NOT running")
 	}
 
 	// discard without commiting
-	state.tx = nil
+	c.inTx = false
+	c.tx = nil
 	log.Println("tx discarded")
 
 	return NewStringValue("Discarded")
+}
+
+func ExecuteTransaction(client *Client, state *AppState) *Value {
+	DB.txMu.Lock()
+	defer DB.txMu.Unlock()
+
+	state.genStats.total_txn_executed += 1
+
+	replies := make([]Value, len(client.tx.cmds))
+	for idx, txCmd := range client.tx.cmds {
+		reply := txCmd.handler(client, txCmd.value, state)
+		replies[idx] = *reply
+	}
+
+	// clear transaction
+	client.inTx = false
+	client.tx = nil
+
+	log.Println("tx executed")
+	return &Value{
+		typ: ARRAY,
+		arr: replies,
+	}
 }
