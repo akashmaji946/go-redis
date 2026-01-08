@@ -19,23 +19,22 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
       
-      - name: Install markdown converter
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pandoc
-      
       - name: Prepare Documentation
         run: |
           mkdir -p _site
-          pandoc DOCS.md -t html -s -o _site/index.html \
-            --metadata title="Go-Redis Documentation" \
-            -c https://cdn.jsdelivr.net/npm/github-markdown-css@5.2.0/github-markdown.min.css
+          cp DOCS.md _site/index.md
           cp go-redis-logo.png _site/ || true
+          
+      - name: Build with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: './_site'
+          destination: './_site/_build'
       
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './_site'
+          path: './_site/_build'
       
       - name: Deploy to GitHub Pages
         id: deployment
