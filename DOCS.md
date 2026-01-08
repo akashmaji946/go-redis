@@ -57,7 +57,7 @@ Go-Redis is a Redis-compatible in-memory key-value store server written in Go. I
     -   **AOF (Append-Only File)**: Logs every write operation with configurable `fsync` modes for high durability.
     -   **RDB (Redis Database)**: Creates point-in-time snapshots for fast startups and backups. Supports full AOF rewriting for all data types.
 -   **Key Expiration**: Supports `EXPIRE`, `TTL`, and `PERSIST` with lazy (on-access) key removal.
--   **Atomic Transactions**: Group commands in `MULTI`/`EXEC` blocks for atomic execution.
+-   **Atomic Transactions**: Group commands in `MULTI`/`EXEC` blocks with `WATCH`/`UNWATCH` for optimistic locking.
 -   **Server Security**: Built-in password authentication via the `AUTH` command.
 -   **Introspection & Monitoring**: 
     -   `INFO` provides a detailed look into server statistics.
@@ -197,89 +197,87 @@ Below is a categorized list of all supported commands.
 ### String Operations
 | Command | Description |
 |---|---|
-| `GET <key>` | Get the value of a key. |
-| `SET <key> <value>` | Set the string value of a key. |
-| `INCR <key>` | Increment the integer value of a key by one. |
-| `DECR <key>` | Decrement the integer value of a key by one. |
-| `INCRBY <key> <amount>`| Increment the integer value of a key by a given amount. |
-| `DECRBY <key> <amount>`| Decrement the integer value of a key by a given amount. |
-| `MGET <key> [key ...]` | Get the values of all the given keys. |
-| `MSET <key> <value> ...` | Set multiple keys to multiple values. |
+| `GET <key>` | Get the value of a key |
+| `SET <key> <value>` | Set the string value of a key |
+| `INCR <key>` | Increment the integer value of a key by one |
+| `DECR <key>` | Decrement the integer value of a key by one |
+| `INCRBY <key> <increment>` | Increment the integer value of a key by the given amount |
+| `DECRBY <key> <decrement>` | Decrement the integer value of a key by the given amount |
+| `MGET <key> [key ...]` | Get the values of all the given keys |
+| `MSET <key> <value> [key <value> ...]` | Set multiple keys to multiple values |
 
 ### Key Management
 | Command | Description |
 |---|---|
-| `DEL <key> [key ...]` | Delete one or more keys. |
-| `EXISTS <key>`| Check if a key exists. |
-| `KEYS <pattern>` | Find all keys matching a pattern. **Warning: O(N) complexity.** |
-| `RENAME <key> <newkey>`| Rename a key. |
-| `TYPE <key>` | Get the type of value stored at a key. |
-| `FLUSHDB`| Remove all keys from the database. **Warning: Irreversible.** |
-| `DBSIZE`| Return the number of keys in the database. |
+| `DEL <key> [key ...]` | Delete one or more keys |
+| `EXISTS <key> [key ...]` | Check if keys exist |
+| `KEYS <pattern>` | Find all keys matching the given pattern |
+| `RENAME <key> <newkey>` | Rename a key |
+| `TYPE <key>` | Determine the type stored at key |
+| `EXPIRE <key> <seconds>` | Set a key's time to live in seconds |
+| `TTL <key>` | Get the time to live for a key in seconds |
+| `PERSIST <key>` | Remove the expiration from a key |
 
 ### List Operations
 | Command | Description |
 |---|---|
-| `LPUSH <key> <value> ...` | Prepend one or more values to a list. |
-| `RPUSH <key> <value> ...` | Append one or more values to a list. |
-| `LPOP <key>` | Remove and get the first element in a list. |
-| `RPOP <key>` | Remove and get the last element in a list. |
-| `LRANGE <key> <start> <stop>`| Get a range of elements from a list. |
-| `LLEN <key>` | Get the length of a list. |
-| `LINDEX <key> <index>`| Get an element from a list by its index. |
-| `LGET <key>` | **(Custom)** Get all elements in a list. |
+| `LPUSH <key> <value> [value ...]` | Prepend one or multiple values to a list |
+| `RPUSH <key> <value> [value ...]` | Append one or multiple values to a list |
+| `LPOP <key>` | Remove and get the first element in a list |
+| `RPOP <key>` | Remove and get the last element in a list |
+| `LRANGE <key> <start> <stop>` | Get a range of elements from a list |
+| `LLEN <key>` | Get the length of a list |
+| `LINDEX <key> <index>` | Get an element from a list by its index |
+| `LGET <key>` | Get all elements in a list |
 
 ### Set Operations
 | Command | Description |
 |---|---|
-| `SADD <key> <member> ...` | Add one or more members to a set. |
-| `SREM <key> <member> ...` | Remove one or more members from a set. |
-| `SMEMBERS <key>`| Get all the members in a set. |
-| `SISMEMBER <key> <member>`| Determine if a given value is a member of a set. |
-| `SCARD <key>` | Get the number of members in a set. |
+| `SADD <key> <member> [member ...]` | Add one or more members to a set |
+| `SREM <key> <member> [member ...]` | Remove one or more members from a set |
+| `SMEMBERS <key>` | Get all the members in a set |
+| `SISMEMBER <key> <member>` | Determine if a given value is a member of a set |
+| `SCARD <key>` | Get the number of members in a set |
+| `SDIFF <key> [key ...]` | Subtract multiple sets |
+| `SINTER <key> [key ...]` | Intersect multiple sets |
+| `SUNION <key> [key ...]` | Add multiple sets |
+| `SRANDMEMBER <key> [count]` | Get one or multiple random members from a set |
 
 ### Hash Operations
 | Command | Description |
 |---|---|
-| `HSET <key> <field> <value>` | Set the string value of a hash field. |
-| `HGET <key> <field>` | Get the value of a hash field. |
-| `HDEL <key> <field> ...` | Delete one or more hash fields. |
-| `HGETALL <key>`| Get all the fields and values in a hash. |
-| `HINCRBY <key> <field> <inc>`| Increment the integer value of a hash field. |
-| `HEXISTS <key> <field>`| Determine if a hash field exists. |
-| `HLEN <key>` | Get the number of fields in a hash. |
-| `HKEYS <key>` | Get all the fields in a hash. |
-| `HVALS <key>` | Get all the values in a hash. |
-| `HMSET <key> <field> <value> ...` | Set multiple hash fields to multiple values. |
-| `HDELALL <key>`| **(Custom)** Delete the entire hash. |
-| `HEXPIRE <key> <seconds>`| **(Custom)** Set a TTL on a hash key. |
+| `HSET <key> <field> <value> [field <value> ...]` | Set the string value of a hash field |
+| `HGET <key> <field>` | Get the value of a hash field |
+| `HDEL <key> <field> [field ...]` | Delete one or more hash fields |
+| `HGETALL <key>` | Get all fields and values in a hash |
+| `HINCRBY <key> <field> <increment>` | Increment the integer value of a hash field by the given amount |
+| `HEXISTS <key> <field>` | Check if a hash field exists |
+| `HLEN <key>` | Get the number of fields in a hash |
+| `HKEYS <key>` | Get all field names in a hash |
+| `HVALS <key>` | Get all values in a hash |
+| `HMSET <key> <field> <value> [field <value> ...]` | Set multiple hash fields to multiple values |
+| `HDELALL <key>` | Delete all fields in a hash |
+| `HEXPIRE <key> <field> <seconds>` | Set expiration for a hash field |
 
 ### Sorted Set Operations
 | Command | Description |
 |---|---|
-| `ZADD <key> <score> <member> ...` | Add members to a sorted set, or update scores. |
-| `ZREM <key> <member> ...` | Remove members from a sorted set. |
-| `ZSCORE <key> <member>`| Get the score of a member. |
-| `ZCARD <key>` | Get the number of members in a sorted set. |
-| `ZRANGE <key> <start> <stop> ...`| Return a range of members, by index. |
-| `ZREVRANGE <key> <start> <stop> ...`| Return a range of members, by index, ordered high to low. |
-| `ZGET <key> [member]` | **(Custom)** Get score of a member or all members. |
+| `ZADD <key> <score> <member> [score <member> ...]` | Add one or more members to a sorted set, or update its score if it already exists |
+| `ZREM <key> <member> [member ...]` | Remove one or more members from a sorted set |
+| `ZSCORE <key> <member>` | Get the score associated with the given member in a sorted set |
+| `ZCARD <key>` | Get the number of members in a sorted set |
+| `ZRANGE <key> <start> <stop> [WITHSCORES]` | Return a range of members in a sorted set, by index |
+| `ZREVRANGE <key> <start> <stop> [WITHSCORES]` | Return a range of members in a sorted set, by index, with scores ordered from high to low |
+| `ZGET <key> [<member>]` | Get score of a member or all members with scores |
 
 ### Pub/Sub Operations
 | Command | Description |
 |---|---|
-| `PUBLISH <channel> <msg>` | Post a message to a channel. |
-| `SUBSCRIBE <chan> ...` | Listen for messages published to the given channels. |
-| `UNSUBSCRIBE [chan ...]` | Stop listening for messages on the given channels. |
-| `PSUBSCRIBE <pattern> ...` | Listen for messages matching glob patterns. |
-| `PUNSUBSCRIBE [pattern ...]` | Stop listening for messages on the given patterns. |
-
-### Expiration Commands
-| Command | Description |
-|---|---|
-| `EXPIRE <key> <seconds>`| Set a timeout on a key. |
-| `TTL <key>` | Get the remaining time to live of a key. |
-| `PERSIST <key>`| Remove the expiration from a key. |
+| `PUBLISH <channel> <message>` | Post a message to a channel |
+| `SUBSCRIBE <channel> [channel ...]` | Listen for messages published to the given channels |
+| `UNSUBSCRIBE [channel ...]` | Stop listening for messages posted to the given channels |
+| `PSUBSCRIBE <pattern> [pattern ...]` | Listen for messages published to channels matching the given patterns |
+| `PUNSUBSCRIBE [pattern ...]` | Stop listening for messages posted to channels matching the given patterns |
 
 ### Transactions
 | Command | Description |
@@ -287,27 +285,31 @@ Below is a categorized list of all supported commands.
 | `MULTI` | Mark the start of a transaction block. |
 | `EXEC` | Execute all commands queued in a transaction. |
 | `DISCARD`| Discard all commands issued after `MULTI`. |
+| `WATCH <key> [key ...]` | Watch the given keys to determine execution of the MULTI/EXEC block |
+| `UNWATCH` | Forget about all watched keys |
 
 ### Persistence Commands
 | Command | Description |
 |---|---|
-| `SAVE` | **Synchronously** save the dataset to disk. **Blocks the server.** |
-| `BGSAVE`| **Asynchronously** save the dataset to disk in the background. |
-| `BGREWRITEAOF`| Asynchronously rewrite the append-only file. |
+| `SAVE` | Synchronously save the database to disk |
+| `BGSAVE` | Asynchronously save the database to disk |
+| `BGREWRITEAOF` | Asynchronously rewrite the Append-Only File |
 
 ### Server & Connection
 | Command | Description |
 |---|---|
-| `PING [message]` | Check the connection. |
-| `AUTH <password>` | Authenticate to the server. |
-| `COMMAND`| A simple command that returns `OK`. |
-| `COMMANDS`| **(Custom)** List all available commands. |
+| `AUTH <password>` | Authenticate to the server |
+| `PING [message]` | Ping the server |
+| `COMMAND` | Get help about Redis commands |
+| `COMMANDS [pattern]` | List available commands or get help for a specific command |
 
 ### Monitoring & Information
 | Command | Description |
 |---|---|
-| `INFO` | Get information and statistics about the server. |
-| `MONITOR`| Listen for all requests received by the server in real-time. |
+| `INFO [key]` | Get server information and statistics or per-key metadata |
+| `MONITOR` | Listen for all requests received by the server in real time |
+| `DBSIZE` | Return the number of keys in the database |
+| `FLUSHDB` | Remove all keys from the database |
 
 ---
 
@@ -431,7 +433,6 @@ Go-Redis is an educational project and intentionally omits certain advanced Redi
 -   Single database only (no `SELECT` command).
 -   No replication or clustering.
 -   No Lua scripting.
--   No `WATCH` command for optimistic locking in transactions.
 
 ---
 
