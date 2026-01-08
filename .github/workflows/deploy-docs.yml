@@ -22,7 +22,7 @@ jobs:
       - name: Prepare Documentation
         run: |
           mkdir -p _site
-          cp DOCUMENTATION.md _site/index.md
+          cp .github/workflows/DOCUMENTATION.md _site/index.md
           cp go-redis-logo.png _site/ || true
           
       - name: Build with Jekyll
