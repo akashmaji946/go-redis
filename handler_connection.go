@@ -7,7 +7,9 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
+	"strings"
 )
 
 // can run these even if authenticated=0
@@ -37,19 +39,60 @@ func Command(c *Client, v *Value, state *AppState) *Value {
 
 // Commands handles the COMMANDS command.
 func Commands(c *Client, v *Value, state *AppState) *Value {
-	var cmds []string
+	args := v.arr[1:]
+
+	if len(args) > 1 {
+		return NewErrorValue("ERR wrong number of arguments for 'commands' command")
+	}
+
+	// Case 1: COMMANDS or COMMANDS * (Return list of all command names)
+	if len(args) == 0 || (len(args) == 1 && args[0].blk == "*") {
+		var cmds []string
+		for k := range Handlers {
+			cmds = append(cmds, k)
+		}
+		sort.Strings(cmds)
+		var arr []Value
+		for _, cmd := range cmds {
+			arr = append(arr, Value{typ: BULK, blk: cmd})
+		}
+		return NewArrayValue(arr)
+	}
+
+	// Case 2: COMMANDS <cmd> or <pattern>
+	arg := args[0].blk
+	if !state.config.sensitive {
+		arg = strings.ToUpper(arg)
+	}
+
+	// If it's an exact command match, show detailed info in 3 lines
+	if info, ok := CommandDetails[arg]; ok {
+		return NewArrayValue([]Value{
+			{typ: BULK, blk: fmt.Sprintf("Usage       : %s", info.Usage)},
+			{typ: BULK, blk: fmt.Sprintf("Description : %s", info.Description)},
+			{typ: BULK, blk: fmt.Sprintf("Category    : %s", info.Category)},
+		})
+	}
+
+	// Otherwise, treat as a pattern and return matching command names
+	var keys []string
 	for k := range Handlers {
-		cmds = append(cmds, k)
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var results []Value
+	for _, cmd := range keys {
+		matched, _ := filepath.Match(arg, cmd)
+		if matched {
+			results = append(results, Value{typ: BULK, blk: cmd})
+		}
 	}
 
-	// sort cmds for consistent order
-	sort.Strings(cmds)
-
-	var arr []Value
-	for _, cmd := range cmds {
-		arr = append(arr, Value{typ: BULK, blk: cmd})
+	if len(results) == 0 {
+		return NewErrorValue(fmt.Sprintf("ERR unknown command or no match for '%s'", arg))
 	}
-	return NewArrayValue(arr)
+	return NewArrayValue(results)
 }
 
 func Ping(c *Client, v *Value, state *AppState) *Value {

@@ -1,0 +1,142 @@
+{
+  "AUTH": {
+    "usage": "AUTH <password>",
+    "description": "Authenticate to the server",
+    "category": "connection"
+  },
+  "BGREWRITEAOF": {
+    "usage": "BGREWRITEAOF",
+    "description": "Asynchronously rewrite the Append-Only File",
+    "category": "persistence"
+  },
+  "BGSAVE": {
+    "usage": "BGSAVE",
+    "description": "Asynchronously save the database to disk",
+    "category": "persistence"
+  },
+  "COMMAND": {
+    "usage": "COMMAND",
+    "description": "Get help about Redis commands",
+    "category": "server"
+  },
+  "COMMANDS": {
+    "usage": "COMMANDS [pattern]",
+    "description": "List available commands or get help for a specific command",
+    "category": "server"
+  },
+  "DBSIZE": {
+    "usage": "DBSIZE",
+    "description": "Return the number of keys in the database",
+    "category": "server"
+  },
+  "DECR": {
+    "usage": "DECR <key>",
+    "description": "Decrement the integer value of a key by one",
+    "category": "string"
+  },
+  "DECRBY": {
+    "usage": "DECRBY <key> <decrement>",
+    "description": "Decrement the integer value of a key by the given amount",
+    "category": "string"
+  },
+  "DEL": {
+    "usage": "DEL <key> [key ...]",
+    "description": "Delete one or more keys",
+    "category": "key"
+  },
+  "DISCARD": {
+    "usage": "DISCARD",
+    "description": "Discard all commands issued after MULTI",
+    "category": "transaction"
+  },
+  "EXEC": {
+    "usage": "EXEC",
+    "description": "Execute all commands issued after MULTI",
+    "category": "transaction"
+  },
+  "EXISTS": {
+    "usage": "EXISTS <key> [key ...]",
+    "description": "Check if keys exist",
+    "category": "key"
+  },
+  "EXPIRE": {
+    "usage": "EXPIRE <key> <seconds>",
+    "description": "Set a key's time to live in seconds",
+    "category": "key"
+  },
+  "FLUSHDB": {
+    "usage": "FLUSHDB",
+    "description": "Remove all keys from the database",
+    "category": "server"
+  },
+  "GET": {
+    "usage": "GET <key>",
+    "description": "Get the value of a key",
+    "category": "string"
+  },
+  "HDEL": {
+    "usage": "HDEL <key> <field> [field ...]",
+    "description": "Delete one or more hash fields",
+    "category": "hash"
+  },
+  "HDELALL": {
+    "usage": "HDELALL <key>",
+    "description": "Delete all fields in a hash",
+    "category": "hash"
+  },
+  "HEXISTS": {
+    "usage": "HEXISTS <key> <field>",
+    "description": "Check if a hash field exists",
+    "category": "hash"
+  },
+  "HGET": {
+    "usage": "HGET <key> <field>",
+    "description": "Get the value of a hash field",
+    "category": "hash"
+  },
+  "HGETALL": {
+    "usage": "HGETALL <key>",
+    "description": "Get all fields and values in a hash",
+    "category": "hash"
+  },
+  "HINCRBY": {
+    "usage": "HINCRBY <key> <field> <increment>",
+    "description": "Increment the integer value of a hash field by the given amount",
+    "category": "hash"
+  },
+  "HSET": {
+    "usage": "HSET <key> <field> <value> [field <value> ...]",
+    "description": "Set the string value of a hash field",
+    "category": "hash"
+  },
+  "INCR": {
+    "usage": "INCR <key>",
+    "description": "Increment the integer value of a key by one",
+    "category": "string"
+  },
+  "INCRBY": {
+    "usage": "INCRBY <key> <increment>",
+    "description": "Increment the integer value of a key by the given amount",
+    "category": "string"
+  },
+  "PING": {
+    "usage": "PING [message]",
+    "description": "Ping the server",
+    "category": "connection"
+  },
+  "SET": {
+    "usage": "SET <key> <value>",
+    "description": "Set the string value of a key",
+    "category": "string"
+  },
+  "TTL": {
+    "usage": "TTL <key>",
+    "description": "Get the time to live for a key in seconds",
+    "category": "key"
+  },
+  "TYPE": {
+    "usage": "TYPE <key>",
+    "description": "Determine the type stored at key",
+    "category": "key"
+  }
+}
