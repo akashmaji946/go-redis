@@ -1,0 +1,25 @@
+[Unit]
+Description=Go-Redis Server
+# Ensures the server only starts after the network is ready
+After=network.target
+
+[Service]
+Type=simple
+# The user that will run the process (e.g., root or redis)
+User=root
+# The directory where your code and config live
+WorkingDirectory=/root/go-redis
+# The exact command to start your server
+ExecStart=/root/go-redis/go-redis /root/go-redis/config/redis.conf /root/go-redis/data/
+# Restart the service if it crashes
+Restart=always
+RestartSec=5
+# Increases the limit of open files (important for handling many client connections)
+LimitNOFILE=65535
+# Where to save the logs
+StandardOutput=append:/var/log/go-redis.log
+StandardError=append:/var/log/go-redis.log
+
+[Install]
+# Tells systemd to start this in standard multi-user mode
+WantedBy=multi-user.target

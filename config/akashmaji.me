@@ -1,0 +1,13 @@
+server {
+    listen 80;
+    server_name akashmaji.me www.akashmaji.me go.akashmaji.me;
+
+    # Point this to the 'dist' folder created by 'npm run build'
+    root /var/www/akashmaji.me/dist;
+    index index.html;
+
+    location / {
+        # This is important for React Router (SPA) support
+        try_files $uri $uri/ /index.html;
+    }
+}
