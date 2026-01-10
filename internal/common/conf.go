@@ -36,6 +36,11 @@ type Config struct {
 	Rdb   []RDBSnapshot
 	RdbFn string
 	Port  int
+	Binds []string
+
+	TlsPort     int
+	TlsCertFile string
+	TlsKeyFile  string
 
 	Dir string
 
@@ -133,6 +138,7 @@ const (
 func NewConfig() *Config {
 	return &Config{
 		Port:      6379, // Default Redis port
+		Binds:     []string{},
 		Sensitive: true, // Default command case sensitivity
 	}
 
@@ -305,6 +311,19 @@ func parseLine(l string, config *Config) {
 		}
 	case "dir":
 		config.Dir = args[1]
+
+	case "bind":
+		config.Binds = append(config.Binds, args[1:]...)
+
+	case "tls-port":
+		p, err := strconv.Atoi(args[1])
+		if err == nil {
+			config.TlsPort = p
+		}
+	case "tls-cert-file":
+		config.TlsCertFile = args[1]
+	case "tls-key-file":
+		config.TlsKeyFile = args[1]
 
 	case "save":
 		secs, err := strconv.Atoi(args[1])

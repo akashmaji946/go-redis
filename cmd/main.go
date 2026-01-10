@@ -7,6 +7,7 @@ package main
 
 import (
 	"bufio"
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net"
@@ -128,17 +129,52 @@ func main() {
 	// Start active expiration worker
 	go database.DB.ActiveExpire(state)
 
-	// setup a tcp listener
-	l, err := net.Listen("tcp", fmt.Sprintf(":%d", conf.Port))
-	if err != nil {
-		log.Fatalf("cannot listen on port %d due to: %v", conf.Port, err)
+	// Prepare listeners
+	var listeners []net.Listener
+	binds := conf.Binds
+	if len(binds) == 0 {
+		binds = []string{""} // Listen on all interfaces if none specified
 	}
 
-	// listener setup success
-	log.Printf("listening on port %d\n", conf.Port)
+	for _, ip := range binds {
+		// Standard TCP Listener
+		addr := fmt.Sprintf("%s:%d", ip, conf.Port)
+		l, err := net.Listen("tcp", addr)
+		if err != nil {
+			log.Printf("Failed to listen on %s: %v", addr, err)
+			continue
+		}
+		listeners = append(listeners, l)
+		log.Printf("Listening on %s (TCP)", addr)
+
+		// TLS Listener
+		if conf.TlsPort > 0 && conf.TlsCertFile != "" && conf.TlsKeyFile != "" {
+			cert, err := tls.LoadX509KeyPair(conf.TlsCertFile, conf.TlsKeyFile)
+			if err != nil {
+				log.Printf("Failed to load TLS keys: %v", err)
+			} else {
+				tlsConfig := &tls.Config{Certificates: []tls.Certificate{cert}}
+				tlsAddr := fmt.Sprintf("%s:%d", ip, conf.TlsPort)
+				tl, err := tls.Listen("tcp", tlsAddr, tlsConfig)
+				if err != nil {
+					log.Printf("Failed to listen on %s (TLS): %v", tlsAddr, err)
+				} else {
+					listeners = append(listeners, tl)
+					log.Printf("Listening on %s (TLS)", tlsAddr)
+				}
+			}
+		}
+	}
+
+	if len(listeners) == 0 {
+		log.Fatal("No listeners could be started.")
+	}
 
 	// print to console
-	fmt.Printf("[INFO] Go-Redis Server is up on port: %d\n", conf.Port)
+	fmt.Printf("[INFO] Go-Redis Server is up on port: %d (TCP)\n", conf.Port)
+	if conf.TlsPort > 0 {
+		fmt.Printf("[INFO] Go-Redis Server is up on port: %d (TLS)\n", conf.TlsPort)
+	}
 
 	// Signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -148,34 +184,35 @@ func main() {
 		<-sigChan
 		log.Println("\n[SHUTDOWN] Signal received, starting graceful shutdown...")
 
-		// 1. Stop accepting new connections
-		l.Close()
+		for _, l := range listeners {
+			l.Close()
+		}
 
 		// 2. Close all existing client connections
 		state.CloseAllConnections()
 	}()
 
 	var connectionCount int32 = 0
-
-	// listener awaiting connection(s)
 	var wg sync.WaitGroup
-	for {
-		conn, err := l.Accept()
-		if err != nil {
-			log.Println("[SHUTDOWN] Listener closed, stopping accept loop.")
-			break
-		}
-		// defer conn.Close()
 
-		// connection(s) accepted from client (here redis-cli)
-		log.Println("accepted connection from:", conn.RemoteAddr())
-
+	for _, l := range listeners {
 		wg.Add(1)
-		go func() {
-			handleOneConnection(conn, state, &connectionCount)
-			wg.Done()
-		}()
-
+		go func(ln net.Listener) {
+			defer wg.Done()
+			for {
+				conn, err := ln.Accept()
+				if err != nil {
+					log.Printf("[SHUTDOWN] Listener on %s closed.", ln.Addr())
+					break
+				}
+				log.Println("accepted connection from:", conn.RemoteAddr())
+				wg.Add(1)
+				go func() {
+					handleOneConnection(conn, state, &connectionCount)
+					wg.Done()
+				}()
+			}
+		}(l)
 	}
 	wg.Wait()
 
@@ -256,7 +293,12 @@ func main() {
 //	-> Loop continues for next command
 func handleOneConnection(conn net.Conn, state *common.AppState, connectionCount *int32) {
 
-	fmt.Printf("[INFO] Accepted connection from     : %s\n", conn.RemoteAddr())
+	protocol := "TCP"
+	if _, ok := conn.(*tls.Conn); ok {
+		protocol = "TLS"
+	}
+
+	fmt.Printf("[INFO] Accepted connection from  %-3s   : %s\n", protocol, conn.RemoteAddr())
 
 	newCount := atomic.AddInt32(connectionCount, 1)
 	state.NumClients = int(newCount)
@@ -304,5 +346,5 @@ func handleOneConnection(conn net.Conn, state *common.AppState, connectionCount 
 	state.NumClients = int(newCount)
 	log.Printf("[%2d] [CLOSED] Closed connection from: %s\n", newCount, conn.LocalAddr().String())
 
-	fmt.Printf("[INFO] Closed   connection from     : %s\n", conn.RemoteAddr())
+	fmt.Printf("[INFO] Closed      connection from %-3s    : %s\n", protocol, conn.RemoteAddr())
 }
