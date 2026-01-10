@@ -55,8 +55,8 @@ import (
 //   - Individual connection errors are logged but don't stop the server
 func main() {
 
-	fmt.Println(">>> Go-Redis Server v1.0 <<<")
 	fmt.Println(common.ASCII_ART)
+	log.Println(">>> Go-Redis Server v1.0 <<<")
 
 	// defaults for config file and data directory
 	configFilePath := "./config/redis.conf"
@@ -78,6 +78,8 @@ func main() {
 
 	// read the config file
 	log.Println("reading the config file...")
+	log.Printf("[INFO] config file   : %s\n", configFilePath)
+	log.Printf("[INFO] data directory: %s\n", dataDirectoryPath)
 
 	conf := common.ReadConf(configFilePath, dataDirectoryPath)
 	state := common.NewAppState(conf)
@@ -103,6 +105,9 @@ func main() {
 
 	// listener setup success
 	log.Printf("listening on port %d\n", conf.Port)
+
+	// print to console
+	fmt.Printf("[INFO] Go-Redis Server is up and running on port: %d\n", conf.Port)
 
 	// Signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)

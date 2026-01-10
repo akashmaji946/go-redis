@@ -49,7 +49,9 @@ var CommandDetails map[string]CommandInfo
 func init() {
 	CommandDetails = make(map[string]CommandInfo)
 
-	data, err := os.ReadFile("commands.json")
+	jsonPath := "./static/commands.json"
+
+	data, err := os.ReadFile(jsonPath)
 	if err != nil {
 		log.Fatalf("failed to read commands.json: %v", err)
 	}

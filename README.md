@@ -1,5 +1,5 @@
-# Go-Redis
-![go-redis logo](go-redis-logo.png)
+# Go-Redis-Server (v1.0)
+![go-redis logo](images/go-redis-logo.png)
 
 A lightweight, multi-threaded Redis server implementation in Go.
 
