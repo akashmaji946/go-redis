@@ -35,7 +35,7 @@ A Redis-compatible in-memory key-value store server written in Go. This implemen
 
 ## Prerequisites
 
-- **Go 1.20** or later
+- **Go 1.24** or later
 - **redis-cli** (for testing and connecting to the server)
 - **Linux/Unix environment** (tested on Linux)
 
