@@ -303,7 +303,7 @@ func handleOneConnection(conn net.Conn, state *common.AppState, connectionCount 
 	newCount := atomic.AddInt32(connectionCount, 1)
 	state.NumClients = int(newCount)
 	state.GenStats.TotalConnectionsReceived += 1
-	log.Printf("[%2d] [ACCEPT] Accepted connection from: %s\n", newCount, conn.LocalAddr().String())
+	log.Printf("[%2d] [ACCEPT] Protocol: %s | Client: %s\n", newCount, protocol, conn.RemoteAddr().String())
 
 	state.AddConn(conn)
 	defer state.RemoveConn(conn)
@@ -344,7 +344,7 @@ func handleOneConnection(conn net.Conn, state *common.AppState, connectionCount 
 
 	newCount = atomic.AddInt32(connectionCount, -1)
 	state.NumClients = int(newCount)
-	log.Printf("[%2d] [CLOSED] Closed connection from: %s\n", newCount, conn.LocalAddr().String())
+	log.Printf("[%2d] [CLOSED] Client disconnected: %s\n", newCount, conn.RemoteAddr().String())
 
 	fmt.Printf("[INFO] Closed      connection from %-3s    : %s\n", protocol, conn.RemoteAddr())
 }
