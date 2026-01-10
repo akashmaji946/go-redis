@@ -48,6 +48,13 @@ func Del(c *common.Client, v *common.Value, state *common.AppState) *common.Valu
 		m += 1
 	}
 	database.DB.Mu.Unlock()
+
+	// Signal changes for automatic RDB saving
+	if m > 0 && len(state.Config.Rdb) > 0 {
+		for i := 0; i < m; i++ {
+			common.IncrRDBTrackers()
+		}
+	}
 	return common.NewIntegerValue(int64(m))
 }
 
@@ -199,6 +206,11 @@ func Expire(c *common.Client, v *common.Value, state *common.AppState) *common.V
 	database.DB.Touch(k)
 	database.DB.Mu.RUnlock()
 
+	// Signal change for automatic RDB saving
+	if len(state.Config.Rdb) > 0 {
+		common.IncrRDBTrackers()
+	}
+
 	return common.NewIntegerValue(1)
 
 }
@@ -290,6 +302,11 @@ func Persist(c *common.Client, v *common.Value, state *common.AppState) *common.
 
 	item.Exp = time.Time{} // Clear expiration
 	database.DB.Touch(key)
+
+	// Signal change for automatic RDB saving
+	if len(state.Config.Rdb) > 0 {
+		common.IncrRDBTrackers()
+	}
 	return common.NewIntegerValue(1)
 }
 

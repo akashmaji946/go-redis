@@ -76,6 +76,11 @@ type AppState struct {
 
 	ActiveConns   map[net.Conn]struct{}
 	ActiveConnsMu sync.Mutex
+	// BGSaveFunc is an optional callback that performs a background RDB save.
+	// It's set by the application (main) to avoid import cycles between
+	// packages. If non-nil, `InitRDBTrackers` will call this to perform
+	// background saves when snapshot conditions trigger.
+	BGSaveFunc func(*AppState)
 }
 
 // NewAppState creates and initializes a new AppState instance.
@@ -122,6 +127,7 @@ func NewAppState(config *Config) *AppState {
 		RdbStats:        &RDBStats{},
 		AofStats:        &AOFStats{},
 		GenStats:        &GeneralStats{},
+
 		// initialize pubsub maps
 		Channels:      make(map[string][]*Client),
 		Topics:        make(map[string][]*Client),

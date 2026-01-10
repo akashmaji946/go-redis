@@ -101,6 +101,11 @@ func (DB *Database) Put(k string, v string, state *common.AppState) (err error) 
 	// put value
 	DB.Store[k] = item
 
+	// Increment RDB change tracker for automatic saving
+	if len(state.Config.Rdb) > 0 {
+		common.IncrRDBTrackers()
+	}
+
 	log.Printf("memory = %d\n", DB.Mem)
 	if DB.Mem < 0 {
 		panic("DB memory went negative!")

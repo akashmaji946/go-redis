@@ -84,16 +84,44 @@ func main() {
 	conf := common.ReadConf(configFilePath, dataDirectoryPath)
 	state := common.NewAppState(conf)
 
+	// Register BGSave callback so `InitRDBTrackers` can trigger background
+	// saves without creating import cycles.
+	state.BGSaveFunc = func(s *common.AppState) {
+		// reuse handlers.BGSave which handles copying DB and launching SaveRDB
+		handlers.BGSave(nil, nil, s)
+	}
+
 	// if aof
 	if conf.AofEnabled {
 		log.Println("syncing records")
-		mem := database.NewMem(conf)
-		state.Aof.Synchronize(mem)
+		state.Aof.Synchronize(state, func(client *common.Client, v *common.Value, appState *common.AppState) *common.Value {
+			handlers.Handle(client, v, appState)
+			return nil
+		})
 	}
 
 	// if rdb
 	if len(conf.Rdb) > 0 {
-		common.SyncRDB(conf, state)
+		restored, err := common.SyncRDB(conf, state)
+		if err == nil && restored != nil {
+			// apply restored map to the global DB
+			database.DB.Mu.Lock()
+			// replace store
+			database.DB.Store = restored
+			// recompute memory accounting
+			var total int64 = 0
+			for k, item := range database.DB.Store {
+				if item == nil {
+					continue
+				}
+				total += item.ApproxMemoryUsage(k)
+			}
+			database.DB.Mem = total
+			if database.DB.Mem > database.DB.Mempeak {
+				database.DB.Mempeak = database.DB.Mem
+			}
+			database.DB.Mu.Unlock()
+		}
 		common.InitRDBTrackers(conf, state)
 	}
 
@@ -153,7 +181,21 @@ func main() {
 
 	// 3. Final persistence save
 	log.Println("[SHUTDOWN] All connections closed. Saving final state...")
+	// Prepare a DBCopy and perform a synchronous SaveRDB to avoid truncating the
+	// RDB file prematurely. This mirrors BGSave's copy step.
+	database.DB.Mu.RLock()
+	copy := make(map[string]*common.Item, len(database.DB.Store))
+	for k, v := range database.DB.Store {
+		copy[k] = v
+	}
+	state.Bgsaving = true
+	state.DBCopy = copy
+	database.DB.Mu.RUnlock()
+
 	common.SaveRDB(state)
+
+	state.Bgsaving = false
+	state.DBCopy = nil
 
 	if state.Config.AofEnabled && state.Aof != nil {
 		log.Println("[SHUTDOWN] Flushing AOF to disk...")

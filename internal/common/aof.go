@@ -125,9 +125,19 @@ func NewAof(config *Config) *Aof {
 // Use Cases:
 //   - Server startup: Restore database from AOF
 //   - After AOF rewrite: Verify rewritten file is valid
-func (aof *Aof) Synchronize(mem interface{}) {
+func (aof *Aof) Synchronize(state *AppState, handler func(*Client, *Value, *AppState) *Value) {
 	reader := bufio.NewReader(aof.F)
 	total := 0
+
+	// Disable AOF writing during synchronization to prevent recursive command logging
+	originalAofEnabled := state.Config.AofEnabled
+	state.Config.AofEnabled = false
+	defer func() { state.Config.AofEnabled = originalAofEnabled }()
+
+	// create a dummy client used during replay. Mark it authenticated so that
+	// commands are executed even if the server requires authentication.
+	dummyClient := &Client{Authenticated: true}
+
 	for {
 		v := Value{}
 		err := v.ReadArray(reader)
@@ -139,19 +149,8 @@ func (aof *Aof) Synchronize(mem interface{}) {
 			break
 		}
 
-		// config := Config{
-		// 	Maxmemory:       0,
-		// 	Maxmemorysample: 0,
-		// 	Eviction:        NoEviction,
-		// }
-		// blankState := NewAppState(&config) // new blank state with empty config
-		// blankClient := Client{}            // dummy
-
-		// Lookup the command handler and execute it
 		if len(v.Arr) > 0 {
-			// cmd := v.Arr[0].Blk
-			// Handlers map will be initialized by the handlers package
-			// For now, skip command execution during sync
+			handler(dummyClient, &v, state)
 		}
 
 		total += 1

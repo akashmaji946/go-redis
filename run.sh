@@ -14,7 +14,7 @@ echo -e "${YELLOW}====================================${NC}"
 # optional parameters: ./run.sh [config-file] [data-directory] [bin-directory]
 CONFIG_FILE="${1:-./config/redis.conf}"
 DATA_DIR="${2:-./data/}"
-BIN_DIR="${3:-./}"
+BIN_DIR="${3:-./bin/}"
 
 # exit if no of arguments is more than 3
 if [ $# -gt 3 ]; then

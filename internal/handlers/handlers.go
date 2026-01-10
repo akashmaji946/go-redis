@@ -177,18 +177,22 @@ func Handle(client *common.Client, v *common.Value, state *common.AppState) {
 		log.Println("common.ERROR: no such command:", cmd)
 		msg := fmt.Sprintf("ERR no such command '%s', use COMMANDS for help", cmd)
 		reply := common.NewErrorValue(msg)
-		w := common.NewWriter(client.Conn)
-		w.Write(reply)
-		w.Flush()
+		if client != nil && client.Conn != nil {
+			w := common.NewWriter(client.Conn)
+			w.Write(reply)
+			w.Flush()
+		}
 		return
 	}
 
 	// handle authentication: if password needed & not Authenticated, then block running command
 	if state.Config.Requirepass && !client.Authenticated && !IsSafeCmd(cmd, safeCommands) {
 		reply := common.NewErrorValue("NOAUTH client not Authenticated, use AUTH <password>")
-		w := common.NewWriter(client.Conn)
-		w.Write(reply)
-		w.Flush()
+		if client != nil && client.Conn != nil {
+			w := common.NewWriter(client.Conn)
+			w.Write(reply)
+			w.Flush()
+		}
 		return
 	}
 
@@ -215,9 +219,11 @@ func Handle(client *common.Client, v *common.Value, state *common.AppState) {
 		}
 	}
 
-	w := common.NewWriter(client.Conn)
-	w.Write(reply)
-	w.Flush()
+	if client != nil && client.Conn != nil {
+		w := common.NewWriter(client.Conn)
+		w.Write(reply)
+		w.Flush()
+	}
 
 	// for MONITOR handle will send to all monitors
 	go func() {
