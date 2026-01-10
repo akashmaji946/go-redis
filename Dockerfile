@@ -15,7 +15,8 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy source code
-COPY *.go ./
+# copy entire project so internal packages and subdirectories are available
+COPY . ./
 
 # Build the application
 # CGO_ENABLED=0 creates a static binary (no C dependencies)
@@ -41,6 +42,9 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /build/go-redis /app/go-redis
 
+# Copy static files (commands.json etc.) from builder so runtime can read them
+COPY --from=builder /build/static /app/static
+
 # Copy default configuration file
 COPY config/redis.conf /app/config/redis.conf
 
@@ -52,11 +56,11 @@ RUN mkdir -p /app/data && \
 USER redis
 
 # Expose Redis port
-EXPOSE 6379
+EXPOSE 7379
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD nc -z localhost 6379 || exit 1
+    CMD nc -z localhost 7379 || exit 1
 
 # Default command
 # Accepts config file and data directory as arguments
