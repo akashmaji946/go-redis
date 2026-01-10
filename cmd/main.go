@@ -107,7 +107,7 @@ func main() {
 	log.Printf("listening on port %d\n", conf.Port)
 
 	// print to console
-	fmt.Printf("[INFO] Go-Redis Server is up and running on port: %d\n", conf.Port)
+	fmt.Printf("[INFO] Go-Redis Server is up on port: %d\n", conf.Port)
 
 	// Signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -211,6 +211,8 @@ func main() {
 //	-> Loop continues for next command
 func handleOneConnection(conn net.Conn, state *common.AppState, connectionCount *int32) {
 
+	fmt.Printf("[INFO] Accepted connection from     : %s\n", conn.RemoteAddr())
+
 	newCount := atomic.AddInt32(connectionCount, 1)
 	state.NumClients = int(newCount)
 	state.GenStats.TotalConnectionsReceived += 1
@@ -257,4 +259,5 @@ func handleOneConnection(conn net.Conn, state *common.AppState, connectionCount 
 	state.NumClients = int(newCount)
 	log.Printf("[%2d] [CLOSED] Closed connection from: %s\n", newCount, conn.LocalAddr().String())
 
+	fmt.Printf("[INFO] Closed   connection from     : %s\n", conn.RemoteAddr())
 }

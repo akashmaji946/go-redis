@@ -35,7 +35,7 @@ A Redis-compatible in-memory key-value store server written in Go. This implemen
 
 ## Prerequisites
 
-- **Go 1.24.4** or later
+- **Go 1.20** or later
 - **redis-cli** (for testing and connecting to the server)
 - **Linux/Unix environment** (tested on Linux)
 
@@ -48,11 +48,28 @@ sudo systemctl status redis-server.service
 
 ## Building
 
+Build as:
 ```bash
-go build
+# from within project_root
+cd cmd
+go build -o go-redis .
+```
+This will create an executable named `go-redis` that you can run.
+
+Run as:
+```bash
+# from within project_root
+cd cmd
+./go-redis ../config/redis.conf ../data/
 ```
 
-This will create an executable named `go-redis` that you can run.
+## Running
+Run the script `run.sh` as:
+```bash
+# from within project_root
+chmod +x run.sh
+./run.sh ./config/redis.conf ./data/
+```
 
 ## Configuration
 
@@ -138,7 +155,7 @@ The server accepts command-line arguments for configuration file and data direct
 
 ### Server Startup
 
-When you run the server, you'll see output like:
+When you run the server, you'll see output or log like:
 
 ```bash
 >>> Go-Redis Server v1.0 <<<
