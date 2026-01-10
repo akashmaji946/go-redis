@@ -182,6 +182,12 @@ func (DB *Database) Rem(k string) {
 		if item.Type == common.HASH_TYPE && item.Hash != nil {
 			item.Hash = nil // help GC
 		}
+		if item.Type == common.SET_TYPE && item.ItemSet != nil {
+			item.ItemSet = nil // help GC
+		}
+		if item.Type == common.ZSET_TYPE && item.ZSet != nil {
+			item.ZSet = nil // help GC
+		}
 		delete(DB.Store, k)
 	}
 	log.Printf("memory = %d\n", DB.Mem)
@@ -229,6 +235,27 @@ func (DB *Database) RemIfExpired(k string, item *common.Item, state *common.AppS
 		}
 	}
 	return false
+}
+
+// ActiveExpire periodically samples keys and removes expired ones.
+// This prevents memory leaks from expired keys that are never accessed.
+func (DB *Database) ActiveExpire(state *common.AppState) {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		DB.Mu.Lock()
+		// Sample up to 20 keys (Redis default behavior)
+		iterationCount := 0
+		for k, item := range DB.Store {
+			DB.RemIfExpired(k, item, state)
+			iterationCount++
+			if iterationCount >= 20 {
+				break
+			}
+		}
+		DB.Mu.Unlock()
+	}
 }
 
 // Touch marks all clients watching the given key as having a failed transaction.

@@ -305,6 +305,32 @@ func Mset(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 	return common.NewStringValue("OK")
 }
 
+// Strlen handles the STRLEN command.
+// Returns the length of the string value stored at key.
+//
+// Syntax:
+//
+//	STRLEN <key>
+func Strlen(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) != 1 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'strlen' command")
+	}
+	key := args[0].Blk
+
+	database.DB.Mu.RLock()
+	item, ok := database.DB.Poll(key)
+	database.DB.Mu.RUnlock()
+
+	if !ok || item.IsExpired() {
+		return common.NewIntegerValue(0)
+	}
+	if !item.IsString() {
+		return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+	return common.NewIntegerValue(int64(len(item.Str)))
+}
+
 func incrDecrBy(c *common.Client, key string, delta int64, state *common.AppState, v *common.Value) *common.Value {
 	database.DB.Mu.Lock()
 	defer database.DB.Mu.Unlock()

@@ -97,6 +97,9 @@ func main() {
 		common.InitRDBTrackers(conf, state)
 	}
 
+	// Start active expiration worker
+	go database.DB.ActiveExpire(state)
+
 	// setup a tcp listener
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", conf.Port))
 	if err != nil {

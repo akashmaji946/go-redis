@@ -34,6 +34,7 @@ var Handlers = map[string]common.Handler{
 	"DECRBY": DecrBy,
 	"MGET":   Mget,
 	"MSET":   Mset,
+	"STRLEN": Strlen,
 
 	// List commands
 	"LPUSH":  Lpush,

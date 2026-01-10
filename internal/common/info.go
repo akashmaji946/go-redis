@@ -42,7 +42,7 @@ func NewRedisInfo() *RedisInfo {
 //   - memory: Used/peak/total memory, eviction policy
 //   - persistence: RDB/AOF status, save times, counts
 //   - general: Connections, commands, transactions, expired/evicted keys
-func (info *RedisInfo) Build(state *AppState) {
+func (info *RedisInfo) Build(state *AppState, usedMem int64, usedMemPeak int64) {
 	exePath, err := os.Executable()
 	if err != nil {
 		exePath = ""
@@ -68,8 +68,8 @@ func (info *RedisInfo) Build(state *AppState) {
 		memoryTotal = virtual_memory.Total
 	}
 	info.memory = map[string]string{
-		"used_memory":         fmt.Sprintf("%d B", 0), // DB.mem
-		"used_memory_peak":    fmt.Sprintf("%d B", 0), // DB.mempeak
+		"used_memory":         fmt.Sprintf("%d B", usedMem),
+		"used_memory_peak":    fmt.Sprintf("%d B", usedMemPeak),
 		"total_memory_peak":   fmt.Sprintf("%d B", memoryTotal),
 		"total_memory_usable": fmt.Sprintf("%d B", state.Config.Maxmemory),
 		"eviction_policy":     string(state.Config.Eviction),
@@ -129,9 +129,9 @@ func (info *RedisInfo) PrintCategory(header string, m map[string]string) string 
 //  3. Combines all categories into a single formatted string
 //
 // Output includes: Server, Clients, Memory, Persistence, and General statistics.
-func (info *RedisInfo) Print(state *AppState) string {
+func (info *RedisInfo) Print(state *AppState, usedMem int64, usedMemPeak int64) string {
 
-	info.Build(state)
+	info.Build(state, usedMem, usedMemPeak)
 
 	var msg string = "\n"
 

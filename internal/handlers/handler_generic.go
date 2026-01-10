@@ -123,7 +123,9 @@ func Info(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 
 	// INFO (no args) -> global server info
 	if len(args) == 0 {
-		msg := state.RedisInfo.Print(state)
+		usedMem := database.DB.Mem
+		usedMemPeak := database.DB.Mempeak
+		msg := state.RedisInfo.Print(state, usedMem, usedMemPeak)
 		return &common.Value{Typ: common.BULK, Blk: msg}
 	}
 
