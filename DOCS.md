@@ -1,4 +1,4 @@
-![Go-Redis Logo](go-redis-logo.png)
+![Go-Redis Logo](images/go-redis-logo.png)
 
 # Go-Redis: The Complete Guide (v1.0)
 
