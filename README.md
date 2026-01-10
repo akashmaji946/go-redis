@@ -39,11 +39,26 @@ A Redis-compatible in-memory key-value store server written in Go. This implemen
 - **redis-cli** (for testing and connecting to the server)
 - **Linux/Unix environment** (tested on Linux)
 
-### Stopping Default Redis (if running)
-
+## Stopping Default Process (if any)
+We will be using port 7379 as default (See `config/redis.conf` file).
 ```bash
+# find and kill process at 7379 forcefully
+sudo kill -9 $(sudo lsof -t -i :7379)
+```
+
+However, if you want to use port 6379 then do these if redis-server is running:
+```bash
+## ONE WAY:
 sudo systemctl stop redis-server.service
 sudo systemctl status redis-server.service
+# start later
+# systemctl start redis-server.service
+
+## ANOTHER WAY:
+# find and kill forcefully
+sudo kill -9 $(sudo lsof -t -i :6379)
+# start it later
+- # systemctl start redis-server.service
 ```
 
 ## Building
@@ -164,6 +179,13 @@ Data directory: /app/data
 listening on port 6379
 ```
 
+### Server Connection
+Multiple clients can connect to the server
+```bash
+redis-cli -p <port_number>
+# e.g. redis-cli -p 7379
+```
+
 ## Available Commands
 
 **Connection**
@@ -198,6 +220,10 @@ listening on port 6379
 
 **ZSet**
 `ZADD`, `ZCARD`, `ZGET`, `ZRANGE`, `ZREM`, `ZREVRANGE`, `ZSCORE`
+
+#### For more details:
+- Refer to our docs for full guide on usage and description of commands.
+- Access it here: [Docs](https://akashmaji946.github.io/go-redis/)
 
 ## Persistence
 ### AOF
