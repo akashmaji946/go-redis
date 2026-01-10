@@ -56,7 +56,7 @@ import (
 func main() {
 
 	fmt.Println(common.ASCII_ART)
-	log.Println(">>> Go-Redis Server v1.0 <<<")
+	log.Println(">>>> Go-Redis Server v1.0 <<<<")
 
 	// defaults for config file and data directory
 	configFilePath := "./config/redis.conf"

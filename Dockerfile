@@ -24,7 +24,7 @@ COPY . ./
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -ldflags="-w -s" \
     -o go-redis \
-    .
+    ./cmd
 
 # Stage 2: Runtime
 FROM alpine:latest
@@ -59,8 +59,8 @@ USER redis
 EXPOSE 7379
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD nc -z localhost 7379 || exit 1
+# HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+#     CMD nc -z localhost 7379 || exit 1
 
 # Default command
 # Accepts config file and data directory as arguments
