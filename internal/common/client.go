@@ -12,6 +12,14 @@ import (
 	"time"
 )
 
+type User struct {
+	Username string
+	FullName string
+	Password string
+	ClientIP string
+	Admin    bool
+}
+
 // Client represents a connected client session.
 // Each client connection has its own Client instance that tracks connection-specific state.
 //
@@ -37,6 +45,7 @@ import (
 type Client struct {
 	Conn          net.Conn
 	Authenticated bool
+	User          *User
 
 	// transaction
 	InTx bool         // in a txn?
