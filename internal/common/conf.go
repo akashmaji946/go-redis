@@ -385,10 +385,13 @@ func parseMemory(s string) (mem int64, err error) {
 	switch {
 	case strings.HasSuffix(s, "gb"):
 		mult = 1024 * 1024 * 1024
+		s = strings.TrimSuffix(s, "gb")
 	case strings.HasSuffix(s, "mb"):
 		mult = 1024 * 1024
+		s = strings.TrimSuffix(s, "mb")
 	case strings.HasSuffix(s, "kb"):
 		mult = 1024
+		s = strings.TrimSuffix(s, "kb")
 	default:
 		mult = 1
 	}

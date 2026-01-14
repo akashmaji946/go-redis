@@ -36,7 +36,7 @@ A Redis-compatible in-memory key-value store server written in Go. This implemen
 Go to your terminal and access it here:
 ```bash
 # use redis-cli to access the hosted sever
-redis-cli -h go.akashmaji.me -p 7380
+redis-cli -h go.akashmaji.me -p 7380 --tls
 # use pass `dsl` when connected
 # 
 ```
@@ -87,11 +87,19 @@ cd cmd
 ```
 
 ## Running
-Run the script `run.sh` as:
+Run the script `run_server.sh` as:
 ```bash
 # from within project_root
-chmod +x run.sh
+chmod +x run_server.sh
 ./run.sh ./config/redis.conf ./data/
+```
+
+## Connecting to local server so built and ran
+```bash
+# TCP
+redis-cli -p 7379 
+# TLS
+redis-cli -p 7380 --tls
 ```
 
 ## Configuration
