@@ -7,6 +7,9 @@ package common
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
@@ -74,8 +77,20 @@ func SaveRDB(state *AppState, dbID int, data map[string]*Item) {
 
 	encodedData := buf.Bytes()
 
+	if state.Config.Encrypt {
+		key := sha256.Sum256([]byte(state.Config.Nonce))
+		block, _ := aes.NewCipher(key[:])
+		gcm, _ := cipher.NewGCM(block)
+		nonce := make([]byte, gcm.NonceSize())
+		if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+			log.Println("failed to generate nonce:", err)
+			return
+		}
+		encodedData = gcm.Seal(nonce, nonce, encodedData, nil)
+	}
+
 	// checksum of buffer data
-	bsum, err := Hash(&buf)
+	bsum, err := Hash(bytes.NewReader(encodedData))
 	if err != nil {
 		log.Println("can't compute buf checksum bsum: ", err)
 		return
@@ -143,8 +158,28 @@ func SyncRDB(conf *Config, state *AppState, dbID int) (map[string]*Item, error) 
 		return nil, nil
 	}
 
+	content, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+
+	if conf.Encrypt {
+		key := sha256.Sum256([]byte(conf.Nonce))
+		block, _ := aes.NewCipher(key[:])
+		gcm, _ := cipher.NewGCM(block)
+		nonceSize := gcm.NonceSize()
+		if len(content) < nonceSize {
+			return nil, fmt.Errorf("ciphertext too short")
+		}
+		nonce, ciphertext := content[:nonceSize], content[nonceSize:]
+		content, err = gcm.Open(nil, nonce, ciphertext, nil)
+		if err != nil {
+			return nil, fmt.Errorf("decryption failed: %v", err)
+		}
+	}
+
 	var restored map[string]*Item
-	dec := gob.NewDecoder(f)
+	dec := gob.NewDecoder(bytes.NewReader(content))
 	if err := dec.Decode(&restored); err != nil {
 		log.Println("error restoring rdb file using gob: ", err)
 		return nil, err

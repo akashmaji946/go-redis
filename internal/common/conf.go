@@ -52,6 +52,9 @@ type Config struct {
 	Password    string
 	Sensitive   bool
 
+	Encrypt bool
+	Nonce   string
+
 	Maxmemory       int64
 	Eviction        Eviction
 	Maxmemorysample int64
@@ -311,6 +314,10 @@ func parseLine(l string, config *Config) {
 		} else {
 			config.Sensitive = true
 		}
+	case "encrypt":
+		config.Encrypt = args[1] == "yes"
+	case "nonce":
+		config.Nonce = args[1]
 	case "dir":
 		config.Dir = args[1]
 

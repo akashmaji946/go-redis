@@ -7,7 +7,6 @@ package database
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"sort"
 	"sync"
@@ -287,7 +286,7 @@ func (DB *Database) RemIfExpired(k string, item *common.Item, state *common.AppS
 	}
 	if item.IsExpired() { // check if expired
 		if _, exists := DB.Store[k]; exists {
-			fmt.Println("Deleting expired key: ", k)
+			log.Println("Deleting expired key: ", k)
 			DB.Rem(k)
 			state.GenStats.TotalExpiredKeys += 1
 			return true
