@@ -4,6 +4,7 @@ deploy/
 *.aof
 *.rdb
 
+
 WINDSURF.md
 GEMINI.md
 CLAUDE.md
@@ -22,6 +23,13 @@ node_modules/
 
 dist/
 build/
+
+*.egg-info/
+*.egg
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
 .env
 .env.local
