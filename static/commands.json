@@ -44,10 +44,20 @@
     "description": "Delete one or more keys",
     "category": "key"
   },
+  "DELETE": {
+    "usage": "DELETE <key> [key ...]",
+    "description": "Delete one or more keys",
+    "category": "key"
+  },
   "DISCARD": {
     "usage": "DISCARD",
     "description": "Discard all commands issued after MULTI",
     "category": "transaction"
+  },
+  "DROPDB": {
+    "usage": "DROPDB",
+    "description": "Remove all keys from the database",
+    "category": "server"
   },
   "EXEC": {
     "usage": "EXEC",
@@ -219,13 +229,28 @@
     "description": "Listen for messages published to channels matching the given patterns",
     "category": "pubsub"
   },
+  "PSUB": {
+    "usage": "PSUBSCRIBE <pattern> [pattern ...]",
+    "description": "Listen for messages published to channels matching the given patterns",
+    "category": "pubsub"
+  },
   "PUBLISH": {
     "usage": "PUBLISH <channel> <message>",
     "description": "Post a message to a channel",
     "category": "pubsub"
   },
+  "PUB": {
+    "usage": "PUB <channel> <message>",
+    "description": "Post a message to a channel",
+    "category": "pubsub"
+  },
   "PUNSUBSCRIBE": {
     "usage": "PUNSUBSCRIBE [pattern ...]",
+    "description": "Stop listening for messages posted to channels matching the given patterns",
+    "category": "pubsub"
+  },
+  "PUNSUB": {
+    "usage": "PUNSUB [pattern ...]",
     "description": "Stop listening for messages posted to channels matching the given patterns",
     "category": "pubsub"
   },
@@ -279,6 +304,11 @@
     "description": "Determine if a given value is a member of a set",
     "category": "set"
   },
+  "SIZE": {
+    "usage": "SIZE [idx]",
+    "description": "Get the size of server, i.e, number of databases, else DBSIZE of specified db idx",
+    "category": "server"
+  },
   "SMEMBERS": {
     "usage": "SMEMBERS <key>",
     "description": "Get all the members in a set",
@@ -293,6 +323,11 @@
     "usage": "SREM <key> <member> [member ...]",
     "description": "Remove one or more members from a set",
     "category": "set"
+  },
+  "STRLEN": {
+    "usage": "STRLEN <key>",
+    "description": "Get the length of the value stored in a key",
+    "category": "string"
   },
   "SUBSCRIBE": {
     "usage": "SUBSCRIBE <channel> [channel ...]",
@@ -315,6 +350,11 @@
     "category": "key"
   },
   "UNSUBSCRIBE": {
+    "usage": "UNSUBSCRIBE [channel ...]",
+    "description": "Stop listening for messages posted to the given channels",
+    "category": "pubsub"
+  },
+  "UNSUB": {
     "usage": "UNSUBSCRIBE [channel ...]",
     "description": "Stop listening for messages posted to the given channels",
     "category": "pubsub"

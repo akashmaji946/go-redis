@@ -86,7 +86,7 @@ func Zadd(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 		}
 	}
 	if len(state.Config.Rdb) > 0 {
-		common.IncrRDBTrackers()
+		database.DB.IncrTrackers()
 	}
 
 	return common.NewIntegerValue(addedCount)
@@ -149,7 +149,7 @@ func Zrem(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 		}
 	}
 	if len(state.Config.Rdb) > 0 {
-		common.IncrRDBTrackers()
+		database.DB.IncrTrackers()
 	}
 
 	return common.NewIntegerValue(removedCount)

@@ -45,6 +45,8 @@ type Client struct {
 	// optimistic locking
 	WatchedKeys []string
 	TxFailed    bool // set to true if a watched key is modified
+
+	DatabaseID int
 }
 
 // NewClient creates a new Client instance for a network connection.
@@ -66,6 +68,7 @@ func NewClient(conn net.Conn) *Client {
 		Tx:            nil,
 		WatchedKeys:   make([]string, 0),
 		TxFailed:      false,
+		DatabaseID:    0,
 	}
 }
 

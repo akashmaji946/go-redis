@@ -36,6 +36,9 @@ type Database struct {
 	WatchersMu sync.Mutex                  // Protects the watchers map
 	Mem        int64
 	Mempeak    int64
+	ID         int
+	Aof        *common.Aof
+	Trackers   []*common.SnapshotTracker
 }
 
 // NewDatabase creates and returns a new empty Database instance.
@@ -47,12 +50,63 @@ type Database struct {
 //
 //	db := NewDatabase()
 //	// db is ready to use with empty store
-func NewDatabase() *Database {
+func NewDatabase(id int) *Database {
 	return &Database{
 		Store:    map[string]*common.Item{},
 		Mu:       sync.RWMutex{},
 		TxMu:     sync.RWMutex{},
 		Watchers: make(map[string][]*common.Client),
+		ID:       id,
+	}
+}
+
+// DBMu is the global mutex protecting access to the global DB instance.
+// It should be used whenever switching or accessing the global DB variable.
+var DBMu sync.Mutex
+
+// DB is the global database instance used throughout the application.
+// All database operations should use this shared instance to maintain
+// consistency across the application.
+var DB *Database
+
+// DBS is the global slice of database instances.
+// Each index corresponds to a separate logical database.
+//
+// This is initialized at server startup based on the configured number of databases.
+// All database operations should use the appropriate DB instance from this slice.
+var DBS []*Database
+
+// InitDBS initializes the global database slice with n databases.
+func InitDBS(n int, conf *common.Config, state *common.AppState) {
+	DBS = make([]*Database, n)
+	for i := 0; i < n; i++ {
+		DBS[i] = NewDatabase(i)
+		if conf.AofEnabled {
+			DBS[i].Aof = common.NewAof(conf, i)
+		}
+		if len(conf.Rdb) > 0 {
+			DBS[i].Trackers = common.InitRDBTrackers(conf, state, i, DBS[i].Snapshot)
+		}
+	}
+	// Set the default DB to the first one
+	DB = DBS[0]
+}
+
+// Snapshot returns a point-in-time copy of the database store.
+func (db *Database) Snapshot() map[string]*common.Item {
+	db.Mu.RLock()
+	defer db.Mu.RUnlock()
+	copy := make(map[string]*common.Item, len(db.Store))
+	for k, v := range db.Store {
+		copy[k] = v
+	}
+	return copy
+}
+
+// IncrTrackers increments the change counter for all RDB trackers associated with this database.
+func (db *Database) IncrTrackers() {
+	for _, t := range db.Trackers {
+		t.Incr()
 	}
 }
 
@@ -103,7 +157,7 @@ func (DB *Database) Put(k string, v string, state *common.AppState) (err error) 
 
 	// Increment RDB change tracker for automatic saving
 	if len(state.Config.Rdb) > 0 {
-		common.IncrRDBTrackers()
+		DB.IncrTrackers()
 	}
 
 	log.Printf("memory = %d\n", DB.Mem)
@@ -290,19 +344,6 @@ func (DB *Database) TouchAll() {
 	}
 	DB.Watchers = make(map[string][]*common.Client)
 }
-
-// DB is the global database instance used throughout the application.
-// All database operations should use this shared instance to maintain
-// consistency across the application.
-//
-// This is initialized at package load time using NewDatabase(),
-// creating a single shared database that all handlers and operations access.
-//
-// Thread Safety:
-//   - All operations on DB should be protected by DB.Mu (read or write locks)
-//   - Use DB.Mu.RLock() for read operations (GET, EXISTS, KEYS, etc.)
-//   - Use DB.Mu.Lock() for write operations (SET, DEL, FLUSHDB, etc.)
-var DB = NewDatabase()
 
 // EvictKeys removes keys from the database to free up memory when the maximum
 // memory limit is reached. This function implements the eviction policy configured

@@ -72,11 +72,12 @@ type Aof struct {
 // Note: The file is kept open for the lifetime of the Aof instance.
 //
 //	Close operations are typically handled by the OS when the process exits.
-func NewAof(config *Config) *Aof {
+func NewAof(config *Config, dbID int) *Aof {
 	aof := Aof{
 		Config: config,
 	}
-	fp := path.Join(aof.Config.Dir, aof.Config.AofFn)                  //filepath
+	filename := fmt.Sprintf("%s%d.aof", config.AofFn, dbID)
+	fp := path.Join(aof.Config.Dir, filename)                          //filepath
 	f, err := os.OpenFile(fp, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644) // append only + readwrite // perm = -rw-r--r--
 
 	if err != nil {

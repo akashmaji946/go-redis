@@ -85,6 +85,9 @@ func main() {
 	conf := common.ReadConf(configFilePath, dataDirectoryPath)
 	state := common.NewAppState(conf)
 
+	// Initialize multiple databases based on config
+	database.InitDBS(conf.Databases, conf, state)
+
 	// Register BGSave callback so `InitRDBTrackers` can trigger background
 	// saves without creating import cycles.
 	state.BGSaveFunc = func(s *common.AppState) {
@@ -94,40 +97,46 @@ func main() {
 
 	// if aof
 	if conf.AofEnabled {
-		log.Println("syncing records")
-		state.Aof.Synchronize(state, func(client *common.Client, v *common.Value, appState *common.AppState) *common.Value {
-			handlers.Handle(client, v, appState)
-			return nil
-		})
+		for i := 0; i < conf.Databases; i++ {
+			log.Printf("syncing records for DB %d", i)
+			database.DBS[i].Aof.Synchronize(state, func(client *common.Client, v *common.Value, appState *common.AppState) *common.Value {
+				client.DatabaseID = i
+				database.DB = database.DBS[i]
+				handlers.Handle(client, v, appState)
+				return nil
+			})
+		}
 	}
 
 	// if rdb
 	if len(conf.Rdb) > 0 {
-		restored, err := common.SyncRDB(conf, state)
-		if err == nil && restored != nil {
-			// apply restored map to the global DB
-			database.DB.Mu.Lock()
-			// replace store
-			database.DB.Store = restored
-			// recompute memory accounting
-			var total int64 = 0
-			for k, item := range database.DB.Store {
-				if item == nil {
-					continue
+		for i := 0; i < conf.Databases; i++ {
+			restored, err := common.SyncRDB(conf, state, i)
+			if err == nil && restored != nil {
+				db := database.DBS[i]
+				db.Mu.Lock()
+				db.Store = restored
+				var total int64 = 0
+				for k, item := range db.Store {
+					if item == nil {
+						continue
+					}
+					total += item.ApproxMemoryUsage(k)
 				}
-				total += item.ApproxMemoryUsage(k)
+				db.Mem = total
+				if db.Mem > db.Mempeak {
+					db.Mempeak = db.Mem
+				}
+				db.Mu.Unlock()
 			}
-			database.DB.Mem = total
-			if database.DB.Mem > database.DB.Mempeak {
-				database.DB.Mempeak = database.DB.Mem
-			}
-			database.DB.Mu.Unlock()
 		}
-		common.InitRDBTrackers(conf, state)
 	}
 
 	// Start active expiration worker
-	go database.DB.ActiveExpire(state)
+	// Run expiration for all databases
+	for _, db := range database.DBS {
+		go db.ActiveExpire(state)
+	}
 
 	// Prepare listeners
 	var listeners []net.Listener
@@ -217,21 +226,12 @@ func main() {
 
 	// 3. Final persistence save
 	log.Println("[SHUTDOWN] All connections closed. Saving final state...")
-	// Prepare a DBCopy and perform a synchronous SaveRDB to avoid truncating the
-	// RDB file prematurely. This mirrors BGSave's copy step.
-	database.DB.Mu.RLock()
-	copy := make(map[string]*common.Item, len(database.DB.Store))
-	for k, v := range database.DB.Store {
-		copy[k] = v
+
+	for i := 0; i < conf.Databases; i++ {
+		db := database.DBS[i]
+		data := db.Snapshot()
+		common.SaveRDB(state, i, data)
 	}
-	state.Bgsaving = true
-	state.DBCopy = copy
-	database.DB.Mu.RUnlock()
-
-	common.SaveRDB(state)
-
-	state.Bgsaving = false
-	state.DBCopy = nil
 
 	if state.Config.AofEnabled && state.Aof != nil {
 		log.Println("[SHUTDOWN] Flushing AOF to disk...")
@@ -322,7 +322,6 @@ func handleOneConnection(conn net.Conn, state *common.AppState, connectionCount 
 
 	// Remove from monitors list on disconnect
 
-
 	for {
 
 		v := common.Value{
@@ -343,8 +342,12 @@ func handleOneConnection(conn net.Conn, state *common.AppState, connectionCount 
 			log.Printf("[%2d] [EXEC] %s", newCount, v.Arr[0].Blk)
 		}
 
-		// handle the Value (abstracting the command and its args)
+		// Swap the global DB pointer to the client's selected database
+		database.DBMu.Lock()
+		database.DB = database.DBS[client.DatabaseID]
+		state.Aof = database.DB.Aof
 		handlers.Handle(client, &v, state)
+		database.DBMu.Unlock()
 	}
 
 	newCount = atomic.AddInt32(connectionCount, -1)

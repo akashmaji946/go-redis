@@ -82,7 +82,7 @@ func Hset(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 		}
 	}
 	if len(state.Config.Rdb) > 0 {
-		common.IncrRDBTrackers()
+		database.DB.IncrTrackers()
 	}
 
 	return common.NewIntegerValue(count)
@@ -203,7 +203,7 @@ func Hdel(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 		}
 	}
 	if len(state.Config.Rdb) > 0 {
-		common.IncrRDBTrackers()
+		database.DB.IncrTrackers()
 	}
 
 	return common.NewIntegerValue(count)
@@ -305,7 +305,7 @@ func Hdelall(c *common.Client, v *common.Value, state *common.AppState) *common.
 		state.Aof.W.Write(v)
 	}
 	if len(state.Config.Rdb) > 0 {
-		common.IncrRDBTrackers()
+		database.DB.IncrTrackers()
 	}
 
 	return common.NewIntegerValue(count)
@@ -395,7 +395,7 @@ func Hincrby(c *common.Client, v *common.Value, state *common.AppState) *common.
 		state.Aof.W.Write(v)
 	}
 	if len(state.Config.Rdb) > 0 {
-		common.IncrRDBTrackers()
+		database.DB.IncrTrackers()
 	}
 
 	return common.NewIntegerValue(newVal)
@@ -457,7 +457,7 @@ func Hmset(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 		state.Aof.W.Write(v)
 	}
 	if len(state.Config.Rdb) > 0 {
-		common.IncrRDBTrackers()
+		database.DB.IncrTrackers()
 	}
 
 	return common.NewStringValue("OK")

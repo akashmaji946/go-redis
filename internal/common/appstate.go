@@ -137,7 +137,9 @@ func NewAppState(config *Config) *AppState {
 	}
 
 	if config.AofEnabled {
-		state.Aof = NewAof(config)
+		state.Aof = NewAof(config, 0) // default DB ID 0 for now
+
+		// start AOF fsync worker if everysec mode
 		if config.AofFsync == Everysec {
 			go func() {
 				t := time.NewTicker(time.Second)

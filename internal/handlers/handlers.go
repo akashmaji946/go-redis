@@ -68,6 +68,7 @@ var Handlers = map[string]common.Handler{
 
 	"TYPE": Type,
 
+	"DELETE": Del,
 	"DEL":    Del,
 	"RENAME": Rename,
 
@@ -80,7 +81,10 @@ var Handlers = map[string]common.Handler{
 	"BGREWRITEAOF": BGRewriteAOF,
 
 	"FLUSHDB": FlushDB,
+	"DROPDB":  FlushDB,
 	"DBSIZE":  DBSize,
+
+	"SIZE": Size,
 
 	"EXPIRE":  Expire,
 	"TTL":     Ttl,
@@ -117,12 +121,21 @@ var Handlers = map[string]common.Handler{
 	"PUBLISH":     Publish,
 	"SUBSCRIBE":   Subscribe,
 	"UNSUBSCRIBE": Unsubscribe,
+	"PUB":         Publish,
+	"SUB":         Subscribe,
+	"UNSUB":       Unsubscribe,
 
 	"PSUBSCRIBE":   Psubscribe,
 	"PUNSUBSCRIBE": Punsubscribe,
+
+	"PSUB":   Psubscribe,
+	"PUNSUB": Punsubscribe,
 	// "PUBSUB":       Pubsub,
 	// "ECHO":         Echo,
 	// "QUIT":         Quit,
+
+	"SELECT": Select,
+	"SEL":    Select,
 }
 
 // Handler is a function type that processes Redis commands.
