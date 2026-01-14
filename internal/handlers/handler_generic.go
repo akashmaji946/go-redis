@@ -327,3 +327,65 @@ func DBSize(c *common.Client, v *common.Value, state *common.AppState) *common.V
 	return common.NewIntegerValue(int64(size))
 
 }
+
+// Select handles the SELECT command.
+// Changes the selected database for the current connection.
+//
+// Syntax:
+//
+//	SELECT <db_index>
+//
+// Parameters:
+//   - db_index: Integer index of the database to select (0-based)
+//
+// Returns:
+//
+//	+OK\r\n on success
+//	Error if db_index is invalid
+//
+// Behavior:
+//  1. Validates db_index is within range of available databases
+//  2. Updates client's DatabaseID to the specified index
+//  3. Subsequent commands from this client will operate on the selected database
+func Select(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) != 1 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'select' command")
+	}
+
+	dbIndex, err := common.ParseInt(args[0].Blk)
+	if err != nil || dbIndex < 0 || dbIndex >= int64(len(database.DBS)) {
+		return common.NewErrorValue("ERR invalid DB index")
+	}
+
+	c.DatabaseID = int(dbIndex)
+	return common.NewStringValue("OK")
+}
+
+// Size handles the SIZE command.
+// Returns the number of databases configured in the server.
+//
+// Syntax:
+//
+//	SIZE [dbIndex]
+//
+// Returns:
+//
+//	Integer: The number of databases configured
+func Size(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) > 1 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'size' command")
+	}
+
+	if len(args) == 1 {
+		idx, err := common.ParseInt(args[0].Blk)
+		if err != nil || idx < 0 || idx >= int64(len(database.DBS)) {
+			return common.NewErrorValue("ERR invalid DB index")
+		}
+		dbSize := len(database.DBS[idx].Store)
+		return common.NewIntegerValue(int64(dbSize))
+	}
+	numDBs := len(database.DBS)
+	return common.NewIntegerValue(int64(numDBs))
+}

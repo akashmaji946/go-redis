@@ -32,9 +32,8 @@ import (
 //
 //	Use BGSAVE for non-blocking persistence
 func Save(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
-	// database.DB.Mu.Lock()
-	common.SaveRDB(state)
-	// database.DB.Mu.Unlock()
+	data := database.DB.Snapshot()
+	common.SaveRDB(state, database.DB.ID, data)
 	return common.NewStringValue("OK")
 }
 
@@ -63,6 +62,7 @@ func BGSave(c *common.Client, v *common.Value, state *common.AppState) *common.V
 		return common.NewErrorValue("already in progress")
 	}
 
+	dbID := database.DB.ID
 	copy := make(map[string]*common.Item, len(database.DB.Store)) // actual copy of database.DB.Store
 	maps.Copy(copy, database.DB.Store)
 	state.Bgsaving = true
@@ -76,7 +76,7 @@ func BGSave(c *common.Client, v *common.Value, state *common.AppState) *common.V
 			state.DBCopy = nil
 		}()
 
-		common.SaveRDB(state)
+		common.SaveRDB(state, dbID, copy)
 	}()
 
 	return common.NewStringValue("OK")

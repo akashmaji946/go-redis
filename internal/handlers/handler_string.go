@@ -7,6 +7,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/akashmaji946/go-redis/internal/common"
@@ -131,14 +132,13 @@ func Set(c *common.Client, v *common.Value, state *common.AppState) *common.Valu
 		state.Aof.W.Write(v)
 
 		if state.Config.AofFsync == common.Always {
-			fmt.Println("save AOF record on SET")
+			log.Println("save AOF record on SET")
 			state.Aof.W.Flush()
 		}
 
 	}
-
 	if len(state.Config.Rdb) > 0 {
-		common.IncrRDBTrackers()
+		database.DB.IncrTrackers()
 	}
 
 	database.DB.Mu.Unlock()
@@ -299,9 +299,8 @@ func Mset(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 		}
 	}
 	if len(state.Config.Rdb) > 0 {
-		common.IncrRDBTrackers()
+		database.DB.IncrTrackers()
 	}
-
 	return common.NewStringValue("OK")
 }
 
@@ -377,7 +376,7 @@ func incrDecrBy(c *common.Client, key string, delta int64, state *common.AppStat
 		}
 	}
 	if len(state.Config.Rdb) > 0 {
-		common.IncrRDBTrackers()
+		database.DB.IncrTrackers()
 	}
 
 	return common.NewIntegerValue(newVal)

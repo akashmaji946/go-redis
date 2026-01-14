@@ -22,72 +22,57 @@ type SnapshotTracker struct {
 	keys   int
 	ticker time.Ticker
 	rdb    *RDBSnapshot
+	dbID   int
 }
 
-func NewSnapshotTracker(rdb *RDBSnapshot) *SnapshotTracker {
+func NewSnapshotTracker(rdb *RDBSnapshot, dbID int) *SnapshotTracker {
 	return &SnapshotTracker{
 		keys:   0,
 		ticker: *time.NewTicker(time.Second * time.Duration(rdb.Secs)),
 		rdb:    rdb,
+		dbID:   dbID,
 	}
 }
 
-var trackers = []*SnapshotTracker{}
+func (tr *SnapshotTracker) Incr() {
+	tr.keys++
+}
 
-func InitRDBTrackers(conf *Config, state *AppState) {
+func InitRDBTrackers(conf *Config, state *AppState, dbID int, getSnapshot func() map[string]*Item) []*SnapshotTracker {
+	var dbTrackers []*SnapshotTracker
 	for _, rdb := range conf.Rdb {
-		tracker := NewSnapshotTracker(&rdb)
-		trackers = append(trackers, tracker)
+		tracker := NewSnapshotTracker(&rdb, dbID)
+		dbTrackers = append(dbTrackers, tracker)
 
 		go func(tr *SnapshotTracker) {
 			defer tr.ticker.Stop()
 			for range tr.ticker.C {
 				if tr.keys >= tr.rdb.KeysChanged {
-					fmt.Println("RDB automatic saving triggered")
-					if state != nil && state.BGSaveFunc != nil {
-						state.BGSaveFunc(state)
-					} else {
-						SaveRDB(state)
-					}
+					log.Printf("[..RDB..] Automatic saving triggered for DB %d", tr.dbID)
+					SaveRDB(state, tr.dbID, getSnapshot())
 				}
 				tr.keys = 0
 			}
 		}(tracker)
 	}
-}
-
-func IncrRDBTrackers() {
-	for _, t := range trackers {
-		t.keys += 1
-	}
+	return dbTrackers
 }
 
 // SaveRDB writes a gob-encoded snapshot to disk. It expects that when
 // state.Bgsaving is true a prepared copy exists in state.DBCopy. To avoid
 // truncating the RDB file prematurely, the file is opened only after the
 // buffer is prepared.
-func SaveRDB(state *AppState) {
-	log.Println("saving rdb file")
+func SaveRDB(state *AppState, dbID int, data map[string]*Item) {
+	log.Printf("saving rdb file for DB %d", dbID)
 
 	log.Println("copying data from DB to buffer....")
 	var buf bytes.Buffer
-	// require a prepared copy for background saving
-	if state.Bgsaving {
-		if state.DBCopy == nil {
-			fmt.Println("error: state.Bgsaving set but DBCopy is nil")
-			return
-		}
-		if err := gob.NewEncoder(&buf).Encode(&state.DBCopy); err != nil {
-			fmt.Println("error copying DB to buf", err)
-			return
-		}
-	} else {
-		// Not a background save: caller should prepare DBCopy or use BGSave
-		fmt.Println("RDB save requires DBCopy to be set for background or use BGSave for synchronous save")
+	if err := gob.NewEncoder(&buf).Encode(&data); err != nil {
+		fmt.Println("error copying DB to buf", err)
 		return
 	}
 
-	data := buf.Bytes()
+	encodedData := buf.Bytes()
 
 	// checksum of buffer data
 	bsum, err := Hash(&buf)
@@ -97,7 +82,8 @@ func SaveRDB(state *AppState) {
 	}
 
 	// Now open the file for writing/truncation and write data
-	fp := path.Join(state.Config.Dir, state.Config.RdbFn)
+	filename := fmt.Sprintf("%s%d.rdb", state.Config.RdbFn, dbID)
+	fp := path.Join(state.Config.Dir, filename)
 	f, err := os.OpenFile(fp, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
 		fmt.Println("error opening rdb file for saving", err)
@@ -105,8 +91,8 @@ func SaveRDB(state *AppState) {
 	}
 	defer f.Close()
 
-	fmt.Println("copying data from from buf to file")
-	if _, err := f.Write(data); err != nil {
+	log.Println("saveRDB: copying data from from buf to file")
+	if _, err := f.Write(encodedData); err != nil {
 		fmt.Printf("error copying data from from buf to file")
 		return
 	}
@@ -136,8 +122,9 @@ func SaveRDB(state *AppState) {
 
 // SyncRDB decodes the rdb file and returns the restored map for the caller
 // to apply to the in-memory database (avoids import cycles).
-func SyncRDB(conf *Config, state *AppState) (map[string]*Item, error) {
-	fp := path.Join(conf.Dir, conf.RdbFn)
+func SyncRDB(conf *Config, state *AppState, dbID int) (map[string]*Item, error) {
+	filename := fmt.Sprintf("%s%d.rdb", conf.RdbFn, dbID)
+	fp := path.Join(conf.Dir, filename)
 	f, err := os.OpenFile(fp, os.O_RDONLY, 0644)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -175,6 +162,6 @@ func Hash(r io.Reader) (string, error) {
 		return "", err
 	}
 	hash := hex.EncodeToString(h.Sum(nil))
-	fmt.Printf("HASH = %s\n", hash)
+	log.Printf("HASH = %s\n", hash)
 	return hash, nil
 }

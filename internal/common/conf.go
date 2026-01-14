@@ -55,6 +55,7 @@ type Config struct {
 	Maxmemory       int64
 	Eviction        Eviction
 	Maxmemorysample int64
+	Databases       int
 
 	Filepath string
 }
@@ -140,6 +141,7 @@ func NewConfig() *Config {
 		Port:      6379, // Default Redis port
 		Binds:     []string{},
 		Sensitive: true, // Default command case sensitivity
+		Databases: 16,   // Default number of databases
 	}
 
 }
@@ -319,6 +321,11 @@ func parseLine(l string, config *Config) {
 		p, err := strconv.Atoi(args[1])
 		if err == nil {
 			config.TlsPort = p
+		}
+	case "databases", "dbs":
+		n, err := strconv.Atoi(args[1])
+		if err == nil {
+			config.Databases = n
 		}
 	case "tls-cert-file":
 		config.TlsCertFile = args[1]

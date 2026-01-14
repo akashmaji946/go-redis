@@ -70,7 +70,7 @@ func Lpush(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 		}
 	}
 	if len(state.Config.Rdb) > 0 {
-		common.IncrRDBTrackers()
+		database.DB.IncrTrackers()
 	}
 
 	return common.NewIntegerValue(int64(len(item.List)))
@@ -133,7 +133,7 @@ func Rpush(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 		}
 	}
 	if len(state.Config.Rdb) > 0 {
-		common.IncrRDBTrackers()
+		database.DB.IncrTrackers()
 	}
 
 	return common.NewIntegerValue(int64(len(item.List)))
@@ -196,7 +196,7 @@ func Lpop(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 		}
 	}
 	if len(state.Config.Rdb) > 0 {
-		common.IncrRDBTrackers()
+		database.DB.IncrTrackers()
 	}
 
 	return common.NewBulkValue(val)
@@ -260,7 +260,7 @@ func Rpop(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 		}
 	}
 	if len(state.Config.Rdb) > 0 {
-		common.IncrRDBTrackers()
+		database.DB.IncrTrackers()
 	}
 
 	return common.NewBulkValue(val)

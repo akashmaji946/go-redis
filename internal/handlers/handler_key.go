@@ -52,7 +52,7 @@ func Del(c *common.Client, v *common.Value, state *common.AppState) *common.Valu
 	// Signal changes for automatic RDB saving
 	if m > 0 && len(state.Config.Rdb) > 0 {
 		for i := 0; i < m; i++ {
-			common.IncrRDBTrackers()
+			database.DB.IncrTrackers()
 		}
 	}
 	return common.NewIntegerValue(int64(m))
@@ -208,7 +208,7 @@ func Expire(c *common.Client, v *common.Value, state *common.AppState) *common.V
 
 	// Signal change for automatic RDB saving
 	if len(state.Config.Rdb) > 0 {
-		common.IncrRDBTrackers()
+		database.DB.IncrTrackers()
 	}
 
 	return common.NewIntegerValue(1)
@@ -305,7 +305,7 @@ func Persist(c *common.Client, v *common.Value, state *common.AppState) *common.
 
 	// Signal change for automatic RDB saving
 	if len(state.Config.Rdb) > 0 {
-		common.IncrRDBTrackers()
+		database.DB.IncrTrackers()
 	}
 	return common.NewIntegerValue(1)
 }
@@ -380,7 +380,7 @@ func Rename(c *common.Client, v *common.Value, state *common.AppState) *common.V
 		}
 	}
 	if len(state.Config.Rdb) > 0 {
-		common.IncrRDBTrackers()
+		database.DB.IncrTrackers()
 	}
 
 	return common.NewIntegerValue(1)
