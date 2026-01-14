@@ -1,4 +1,5 @@
 data/
+deploy/
 
 *.aof
 *.rdb
@@ -9,6 +10,7 @@ CLAUDE.md
 CHATGPT.md
 VSCODE.md
 
+*.env
 .vscode/
 .idea/
 .DS_Store
