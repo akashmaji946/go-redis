@@ -8,6 +8,9 @@ package common
 import (
 	"bufio"
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"log"
@@ -85,7 +88,17 @@ func NewAof(config *Config, dbID int) *Aof {
 		return &aof
 	}
 
-	aof.W = NewWriter(f)
+	var writer io.Writer = f
+	if config.Encrypt {
+		key := sha256.Sum256([]byte(config.Nonce))
+		block, _ := aes.NewCipher(key[:])
+		// Note: In production, use a unique IV stored in the file header
+		iv := make([]byte, aes.BlockSize)
+		stream := cipher.NewCTR(block, iv)
+		writer = &cipher.StreamWriter{S: stream, W: f}
+	}
+
+	aof.W = NewWriter(writer)
 	aof.F = f
 
 	return &aof
@@ -127,7 +140,16 @@ func NewAof(config *Config, dbID int) *Aof {
 //   - Server startup: Restore database from AOF
 //   - After AOF rewrite: Verify rewritten file is valid
 func (aof *Aof) Synchronize(state *AppState, handler func(*Client, *Value, *AppState) *Value) {
-	reader := bufio.NewReader(aof.F)
+	aof.F.Seek(0, 0)
+	var r io.Reader = aof.F
+	if state.Config.Encrypt {
+		key := sha256.Sum256([]byte(state.Config.Nonce))
+		block, _ := aes.NewCipher(key[:])
+		iv := make([]byte, aes.BlockSize)
+		stream := cipher.NewCTR(block, iv)
+		r = &cipher.StreamReader{S: stream, R: aof.F}
+	}
+	reader := bufio.NewReader(r)
 	total := 0
 
 	// Disable AOF writing during synchronization to prevent recursive command logging

@@ -105,7 +105,11 @@ var Handlers = map[string]common.Handler{
 	"HEXPIRE": Hexpire,
 
 	// authorize
-	"AUTH": Auth,
+	"AUTH":    Auth,
+	"USERADD": UserAdd,
+	"PASSWD":  Passwd,
+	"USERS":   Users,
+	"WHOAMI":  WhoAmI,
 
 	// transaction
 	"MULTI":   Multi,
@@ -207,6 +211,17 @@ func Handle(client *common.Client, v *common.Value, state *common.AppState) {
 			w.Flush()
 		}
 		return
+	}
+
+	// Check for admin permissions on sensitive commands
+	if sensitiveCommands[cmd] {
+		if client.User == nil || !client.User.Admin {
+			reply := common.NewErrorValue("ERR only admins can run this command")
+			w := common.NewWriter(client.Conn)
+			w.Write(reply)
+			w.Flush()
+			return
+		}
 	}
 
 	var reply *common.Value

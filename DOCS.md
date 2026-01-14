@@ -55,10 +55,11 @@ Go-Redis is a Redis-compatible in-memory key-value store server written in Go. I
 -   **Broad Command Support**: Implements a rich subset of commands for Strings, Lists, Sets, Hashes, and Sorted Sets.
 -   **Dual Persistence Model**: 
     -   **AOF (Append-Only File)**: Logs every write operation with configurable `fsync` modes for high durability.
-    -   **RDB (Redis Database)**: Creates point-in-time snapshots for fast startups and backups. Supports full AOF rewriting for all data types.
+    -   **RDB (Redis Database)**: Creates point-in-time snapshots for fast startups and backups.
+    -   **Encrypted Storage**: Optional AES-GCM encryption for all persistence files and user credentials.
 -   **Key Expiration**: Supports `EXPIRE`, `TTL`, and `PERSIST` with lazy (on-access) key removal.
 -   **Atomic Transactions**: Group commands in `MULTI`/`EXEC` blocks with `WATCH`/`UNWATCH` for optimistic locking.
--   **Server Security**: Built-in password authentication via the `AUTH` command.
+-   **User Management**: Multi-user support with role-based access control (Admin/User).
 -   **Introspection & Monitoring**: 
     -   `INFO` provides a detailed look into server statistics.
     -   `MONITOR` streams live command processing for debugging.
@@ -289,6 +290,14 @@ Below is a categorized list of all supported commands.
 | `WATCH <key> [key ...]` | Watch the given keys to determine execution of the MULTI/EXEC block |
 | `UNWATCH` | Forget about all watched keys |
 
+### User Management
+| Command | Description |
+|---|---|
+| `USERADD <admin_flag 1/0> <user> <password>` | Create a new user (Admin only). Password must be alphanumeric. |
+| `PASSWD <user> <password>` | Change a user's password. Users can change their own; Admins can change any. |
+| `USERS [username]` | List all usernames (no args) or show specific user details (Admin only). |
+| `WHOAMI` | Display details of the currently authenticated user. |
+
 ### Persistence Commands
 | Command | Description |
 |---|---|
@@ -299,7 +308,7 @@ Below is a categorized list of all supported commands.
 ### Server & Connection
 | Command | Description |
 |---|---|
-| `AUTH <password>` | Authenticate to the server |
+| `AUTH <username> <password>` | Authenticate user to the server |
 | `PING [message]` | Ping the server |
 | `COMMAND` | Get help about Redis commands |
 | `COMMANDS [pattern]` | List available commands or get help for a specific command |

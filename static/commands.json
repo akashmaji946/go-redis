@@ -1,6 +1,6 @@
 {
   "AUTH": {
-    "usage": "AUTH <password>",
+    "usage": "AUTH <user> <password>",
     "description": "Authenticate to the server",
     "category": "connection"
   },
@@ -214,6 +214,11 @@
     "description": "Mark the start of a transaction block",
     "category": "transaction"
   },
+  "PASSWD": {
+    "usage": "PASSWD <user> <password>",
+    "description": "Change a user's password",
+    "category": "connection"
+  },
   "PERSIST": {
     "usage": "PERSIST <key>",
     "description": "Remove the expiration from a key",
@@ -364,10 +369,25 @@
     "description": "Forget about all watched keys",
     "category": "transaction"
   },
+  "USERADD": {
+    "usage": "USERADD <admin_flag 1/0> <user> <password>",
+    "description": "Create a new user (Admin only)",
+    "category": "connection"
+  },
+  "USERS": {
+    "usage": "USERS [username]",
+    "description": "List all usernames or show specific user details (Admin only)",
+    "category": "connection"
+  },
   "WATCH": {
     "usage": "WATCH <key> [key ...]",
     "description": "Watch the given keys to determine execution of the MULTI/EXEC block",
     "category": "transaction"
+  },
+  "WHOAMI": {
+    "usage": "WHOAMI",
+    "description": "Display details of the currently authenticated user",
+    "category": "connection"
   },
   "ZADD": {
     "usage": "ZADD <key> <score> <member> [score <member> ...]",

@@ -128,6 +128,10 @@ dbfilename backup.rdb
 # Authentication
 requirepass dsl
 
+# Encryption (AES-GCM)
+encrypt yes
+nonce 1234567890
+
 # Memory Management
 maxmemory 1024
 maxmemory-policy allkeys-random
@@ -243,7 +247,7 @@ redis-cli -p <port_number>
 ## Available Commands
 
 **Connection**
-`AUTH`, `PING`, `SELECT`, `SEL`
+`AUTH`, `USERADD`, `PASSWD`, `USERS`, `WHOAMI`, `PING`, `SELECT`, `SEL`
 
 **Persistence**
 `BGREWRITEAOF`, `BGSAVE`, `SAVE`

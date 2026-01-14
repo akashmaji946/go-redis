@@ -6,7 +6,17 @@ file: go-redis/appstate.go
 package common
 
 import (
+	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/gob"
+	"io"
+	"log"
 	"net"
+	"os"
+	"path"
 	"sync"
 	"time"
 )
@@ -68,6 +78,9 @@ type AppState struct {
 	RdbStats  *RDBStats
 	AofStats  *AOFStats
 	GenStats  *GeneralStats
+
+	Users   map[string]*User
+	UsersMu sync.RWMutex
 
 	// we will have in-memory pub-sub system
 	Channels map[string][]*Client
@@ -134,7 +147,18 @@ func NewAppState(config *Config) *AppState {
 		PubsubMu:      sync.RWMutex{},
 		ActiveConns:   make(map[net.Conn]struct{}),
 		ActiveConnsMu: sync.Mutex{},
+		Users:         make(map[string]*User),
 	}
+
+	// Initialize root user
+	state.Users["root"] = &User{
+		Username: "root",
+		FullName: "root",
+		Password: config.Password,
+		Admin:    true,
+	}
+
+	state.LoadUsers()
 
 	if config.AofEnabled {
 		state.Aof = NewAof(config, 0) // default DB ID 0 for now
@@ -152,6 +176,63 @@ func NewAppState(config *Config) *AppState {
 		}
 	}
 	return &state
+}
+
+func (s *AppState) LoadUsers() {
+	fp := path.Join(s.Config.Dir, "passwd.bin")
+	f, err := os.Open(fp)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	content, _ := io.ReadAll(f)
+	if len(content) == 0 {
+		return
+	}
+
+	if s.Config.Encrypt {
+		key := sha256.Sum256([]byte(s.Config.Nonce))
+		block, _ := aes.NewCipher(key[:])
+		gcm, _ := cipher.NewGCM(block)
+		nonceSize := gcm.NonceSize()
+		if len(content) > nonceSize {
+			nonce, ciphertext := content[:nonceSize], content[nonceSize:]
+			content, err = gcm.Open(nil, nonce, ciphertext, nil)
+			if err != nil {
+				log.Println("failed to decrypt passwd.bin")
+				return
+			}
+		}
+	}
+
+	var loadedUsers map[string]*User
+	gob.NewDecoder(bytes.NewReader(content)).Decode(&loadedUsers)
+	s.UsersMu.Lock()
+	for k, v := range loadedUsers {
+		s.Users[k] = v
+	}
+	s.UsersMu.Unlock()
+}
+
+func (s *AppState) SaveUsers() {
+	var buf bytes.Buffer
+	s.UsersMu.RLock()
+	gob.NewEncoder(&buf).Encode(s.Users)
+	s.UsersMu.RUnlock()
+
+	data := buf.Bytes()
+	if s.Config.Encrypt {
+		key := sha256.Sum256([]byte(s.Config.Nonce))
+		block, _ := aes.NewCipher(key[:])
+		gcm, _ := cipher.NewGCM(block)
+		nonce := make([]byte, gcm.NonceSize())
+		io.ReadFull(rand.Reader, nonce)
+		data = gcm.Seal(nonce, nonce, data, nil)
+	}
+
+	fp := path.Join(s.Config.Dir, "passwd.bin")
+	os.WriteFile(fp, data, 0600)
 }
 
 func (s *AppState) AddConn(conn net.Conn) {
