@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/akashmaji946/go-redis/internal/common"
+	"github.com/akashmaji946/go-redis/internal/database"
 )
 
 // Multi handles the MULTI command.
@@ -202,13 +203,13 @@ func Watch(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 		return common.NewErrorValue("ERR WATCH inside MULTI is not allowed")
 	}
 
-	// DB.watchersMu.Lock()
-	// defer DB.watchersMu.Unlock()
+	database.DB.WatchersMu.Lock()
+	defer database.DB.WatchersMu.Unlock()
 
 	for _, arg := range args {
 		key := arg.Blk
 		c.WatchedKeys = append(c.WatchedKeys, key)
-		// DB.watchers[key] = append(DB.watchers[key], c)
+		database.DB.Watchers[key] = append(database.DB.Watchers[key], c)
 	}
 
 	return common.NewStringValue("OK")
@@ -222,22 +223,22 @@ func Unwatch(c *common.Client, v *common.Value, state *common.AppState) *common.
 
 // unwatchClient clears all watched keys for a client and resets the failure flag.
 func unwatchClient(c *common.Client) {
-	// DB.watchersMu.Lock()
-	// defer DB.watchersMu.Unlock()
+	database.DB.WatchersMu.Lock()
+	defer database.DB.WatchersMu.Unlock()
 
-	for _, _ = range c.WatchedKeys {
-		// clients := DB.watchers[key]
-		// for i, client := range clients {
-		// 	if client == c {
-		// 		// Remove this client from the global watchers list for this key
-		// 		DB.watchers[key] = append(clients[:i], clients[i+1:]...)
-		// 		break
-		// 	}
-		// }
-		// // Clean up the map entry if no one is watching the key anymore
-		// if len(DB.watchers[key]) == 0 {
-		// 	delete(DB.watchers, key)
-		// }
+	for _, key := range c.WatchedKeys {
+		clients := database.DB.Watchers[key]
+		for i, client := range clients {
+			if client == c {
+				// Remove this client from the global watchers list for this key
+				database.DB.Watchers[key] = append(clients[:i], clients[i+1:]...)
+				break
+			}
+		}
+		// Clean up the map entry if no one is watching the key anymore
+		if len(database.DB.Watchers[key]) == 0 {
+			delete(database.DB.Watchers, key)
+		}
 	}
 
 	// Reset client state
@@ -246,8 +247,8 @@ func unwatchClient(c *common.Client) {
 }
 
 func ExecuteTransaction(client *common.Client, state *common.AppState) *common.Value {
-	// DB.txMu.Lock()
-	// defer DB.txMu.Unlock()
+	database.DB.TxMu.Lock()
+	defer database.DB.TxMu.Unlock()
 
 	// If a watched key was modified, fail the transaction
 	if client.TxFailed {

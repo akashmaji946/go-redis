@@ -154,6 +154,9 @@ func (DB *Database) Put(k string, v string, state *common.AppState) (err error) 
 	// put value
 	DB.Store[k] = item
 
+	// Notify watchers that the key has changed
+	DB.Touch(k)
+
 	// Increment RDB change tracker for automatic saving
 	if len(state.Config.Rdb) > 0 {
 		DB.IncrTrackers()
@@ -247,6 +250,9 @@ func (DB *Database) Rem(k string) {
 			item.ZSet = nil // help GC
 		}
 		delete(DB.Store, k)
+
+		// Notify watchers that the key has been deleted
+		DB.Touch(k)
 	}
 	log.Printf("memory = %d\n", DB.Mem)
 	if DB.Mem < 0 {
