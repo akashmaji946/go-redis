@@ -94,7 +94,9 @@ Go-Redis is a Redis-compatible in-memory key-value store server written in Go. I
 
 Clone the repository and run the build command:
 ```bash
-go build
+cd <project_directory>
+cd cmd
+go build -o go-redis .
 ```
 This creates a `go-redis` executable in your project directory.
 
@@ -124,7 +126,6 @@ maxmemory-policy allkeys-random
 ```
 
 ### Running the Server
-
 The server can be started with default paths or custom ones.
 
 **Syntax:**
@@ -147,11 +148,11 @@ The server will log its startup process and listen on port `6379`.
 
 Open a new terminal and connect:
 ```bash
-redis-cli -p 6379
+redis-cli -p 7379
 ```
 If you've set `requirepass`, authenticate your session:
 ```
-127.0.0.1:6379> AUTH your-secret-password
+127.0.0.1:7379> AUTH your-secret-password
 OK
 ```
 You're all set to run commands!
@@ -169,12 +170,12 @@ The quickest way to run Go-Redis is with the official Docker image.
 docker pull akashmaji/go-redis:latest
 
 # 2. Run the container, mounting a volume for persistent data
-docker run -d -p 6379:6379 \
+docker run -d -p 7379:7379 \
   -v $(pwd)/data:/app/data \
   akashmaji/go-redis:latest
 
 # 3. Connect from your host
-redis-cli
+redis-cli -p 7379
 ```
 
 ### Building a Custom Image
@@ -187,7 +188,7 @@ docker build -t go-redis:latest .
 
 # 2. Run the container
 # This example mounts a custom config file and data directory
-docker run -d -p 6379:6379 \
+docker run -d -p 7379:7379 \
   -v $(pwd)/config/redis.conf:/app/config/redis.conf:ro \
   -v $(pwd)/data:/app/data \
   go-redis:latest
@@ -367,23 +368,71 @@ This section details the internal design of Go-Redis for developers and contribu
 ```
 
 ### Project Structure & Core Components
-```
-go-redis/
-├── main.go         # Server entrypoint, TCP listener
-├── handlers.go     # Command handlers and dispatch logic
-├── database.go     # Thread-safe in-memory database store
-├── client.go       # Per-client connection handling and RESP parsing
-├── value.go        # Data structure for stored values and metadata (TTL)
-├── writer.go       # RESP protocol writer/encoder
-├── conf.go         # Configuration loading from redis.conf
-├── appstate.go     # Global server state management
-├── aof.go          # Append-Only File (AOF) persistence logic
-├── rdb.go          # Snapshot (RDB) persistence logic
-├── mem.go          # Memory accounting and eviction logic
-├── info.go         # Logic for the INFO command
-├── config/
-│   └── redis.conf  # Default configuration file
-└── data/           # Default directory for persistence files
+```bash
+tree .
+├── bench
+│   └── benchmark.txt
+├── cmd
+│   ├── go-redis.service
+│   └── main.go
+├── config
+│   ├── akashmaji.me
+│   ├── cert_gen.sh
+│   ├── cert.pem
+│   ├── go-redis.service
+│   ├── key.pem
+│   └── redis.conf
+├── data
+├── Dockerfile
+├── DOCKER.md
+├── DOCS.md
+├── go.mod
+├── go-redis.code-workspace
+├── go.sum
+├── images
+│   ├── go-redis-logo.png
+│   └── go-redis.png
+├── internal
+│   ├── common
+│   │   ├── aof.go
+│   │   ├── appstate.go
+│   │   ├── client.go
+│   │   ├── conf.go
+│   │   ├── constants.go
+│   │   ├── helpers.go
+│   │   ├── info.go
+│   │   ├── rdb.go
+│   │   ├── transaction.go
+│   │   ├── value.go
+│   │   └── writer.go
+│   ├── database
+│   │   ├── database.go
+│   │   └── mem.go
+│   ├── handlers
+│   │   ├── handler_connection.go
+│   │   ├── handler_generic.go
+│   │   ├── handler_hash.go
+│   │   ├── handler_key.go
+│   │   ├── handler_list.go
+│   │   ├── handler_persistence.go
+│   │   ├── handler_pubsub.go
+│   │   ├── handler_set.go
+│   │   ├── handlers.go
+│   │   ├── handler_string.go
+│   │   ├── handler_transaction.go
+│   │   └── handler_zset.go
+│   └── info
+├── LICENSE
+├── README.md
+├── run_clean.sh
+├── run_client.sh
+├── run_server.sh
+├── static
+│   ├── commands.json
+│   └── notes.txt
+└── VSCODE.md
+
+12 directories, 50 files
 ```
 
 ### Concurrency Model

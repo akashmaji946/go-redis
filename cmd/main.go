@@ -205,7 +205,6 @@ func main() {
 					log.Printf("[SHUTDOWN] Listener on %s closed.", ln.Addr())
 					break
 				}
-				log.Println("accepted connection from:", conn.RemoteAddr())
 				wg.Add(1)
 				go func() {
 					handleOneConnection(conn, state, &connectionCount)
@@ -303,7 +302,17 @@ func handleOneConnection(conn net.Conn, state *common.AppState, connectionCount 
 	newCount := atomic.AddInt32(connectionCount, 1)
 	state.NumClients = int(newCount)
 	state.GenStats.TotalConnectionsReceived += 1
-	log.Printf("[%2d] [ACCEPT] Protocol: %s | Client: %s\n", newCount, protocol, conn.RemoteAddr().String())
+
+	// Explicitly trigger handshake for TLS connections to catch protocol errors early
+	if tlsConn, ok := conn.(*tls.Conn); ok {
+		if err := tlsConn.Handshake(); err != nil {
+			log.Printf("[%2d] [TLS_ERROR] Handshake failed from %s: %v", newCount, conn.RemoteAddr(), err)
+			conn.Close()
+			return
+		}
+	}
+
+	log.Printf("[%2d] [ACCEPT] Protocol: %s | Client: %s", newCount, protocol, conn.RemoteAddr().String())
 
 	state.AddConn(conn)
 	defer state.RemoveConn(conn)
@@ -311,16 +320,8 @@ func handleOneConnection(conn net.Conn, state *common.AppState, connectionCount 
 	client := common.NewClient(conn)
 	reader := bufio.NewReader(conn)
 
-	// remove from monitors list if there
-	defer func() {
-		newmonitors := state.Monitors[:0] // same capacity but zero size
-		for _, mon := range state.Monitors {
-			if &mon != client {
-				newmonitors = append(newmonitors, mon)
-			}
-		}
-		state.Monitors = newmonitors
-	}()
+	// Remove from monitors list on disconnect
+
 
 	for {
 
@@ -331,12 +332,16 @@ func handleOneConnection(conn net.Conn, state *common.AppState, connectionCount 
 		// receive a Value and print it
 		err := v.ReadArray(reader)
 		if err != nil {
-			log.Println("[CLOSE] Closing connection due to: ", err)
+			if err.Error() != "EOF" {
+				log.Printf("[%2d] [ERROR] Read error: %v", newCount, err)
+			}
 			break
 		}
 
-		// optional: print what we got
-		log.Printf("%v\n", v)
+		// Log the command name for debugging
+		if len(v.Arr) > 0 {
+			log.Printf("[%2d] [EXEC] %s", newCount, v.Arr[0].Blk)
+		}
 
 		// handle the Value (abstracting the command and its args)
 		handlers.Handle(client, &v, state)
