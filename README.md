@@ -11,7 +11,7 @@ A Redis-compatible in-memory key-value store server written in Go. This implemen
 
 ## Features
 
-- **Core Commands**: GET, SET, DEL, EXISTS, KEYS, DBSIZE, FLUSHDB, ...
+- **Core Commands**: GET, SET, DEL, DELETE, EXISTS, KEYS, DBSIZE, FLUSHDB, DROPDB, STRLEN, SIZE, SELECT, ...
 - **In-Memory Storage**: Fast key-value store supporting Strings, Lists, Sets, and Hashes.
 - **Persistence**:
   - **AOF (Append-Only File)**: Logs every write operation with configurable fsync modes
@@ -243,19 +243,19 @@ redis-cli -p <port_number>
 ## Available Commands
 
 **Connection**
-`AUTH`, `PING`
+`AUTH`, `PING`, `SELECT`, `SEL`
 
 **Persistence**
 `BGREWRITEAOF`, `BGSAVE`, `SAVE`
 
 **Server**
-`COMMAND`, `COMMANDS`, `DBSIZE`, `FLUSHDB`, `INFO`, `MONITOR`
+`COMMAND`, `COMMANDS`, `DBSIZE`, `FLUSHDB`, `DROPDB`, `INFO`, `MONITOR`, `SIZE`
 
 **String**
-`DECR`, `DECRBY`, `GET`, `INCR`, `INCRBY`, `MGET`, `MSET`, `SET`
+`DECR`, `DECRBY`, `GET`, `INCR`, `INCRBY`, `MGET`, `MSET`, `SET`, `STRLEN`
 
 **Key**
-`DEL`, `EXISTS`, `EXPIRE`, `KEYS`, `PERSIST`, `RENAME`, `TTL`, `TYPE`
+`DEL`, `DELETE`, `EXISTS`, `EXPIRE`, `KEYS`, `PERSIST`, `RENAME`, `TTL`, `TYPE`
 
 **Transaction**
 `DISCARD`, `EXEC`, `MULTI`, `UNWATCH`, `WATCH`
@@ -267,7 +267,7 @@ redis-cli -p <port_number>
 `LGET`, `LINDEX`, `LLEN`, `LPOP`, `LPUSH`, `LRANGE`, `RPOP`, `RPUSH`
 
 **PubSub**
-`PSUBSCRIBE`, `PUBLISH`, `PUNSUBSCRIBE`, `SUBSCRIBE`, `UNSUBSCRIBE`
+`PSUBSCRIBE`, `PSUB`, `PUBLISH`, `PUB`, `PUNSUBSCRIBE`, `PUNSUB`, `SUBSCRIBE`, `SUB`, `UNSUBSCRIBE`, `UNSUB`
 
 **Set**
 `SADD`, `SCARD`, `SDIFF`, `SINTER`, `SISMEMBER`, `SMEMBERS`, `SRANDMEMBER`, `SREM`, `SUNION`
@@ -462,7 +462,6 @@ See `DOCKER.md` for more detail
 
 ## Limitations
 
-* Single database only
 * No replication
 * No Lua scripting
 

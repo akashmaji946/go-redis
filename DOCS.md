@@ -205,11 +205,12 @@ Below is a categorized list of all supported commands.
 | `DECRBY <key> <decrement>` | Decrement the integer value of a key by the given amount |
 | `MGET <key> [key ...]` | Get the values of all the given keys |
 | `MSET <key> <value> [key <value> ...]` | Set multiple keys to multiple values |
+| `STRLEN <key>` | Get the length of the string value stored at key |
 
 ### Key Management
 | Command | Description |
 |---|---|
-| `DEL <key> [key ...]` | Delete one or more keys |
+| `DEL <key> [key ...] / DELETE <key> [key ...]` | Delete one or more keys |
 | `EXISTS <key> [key ...]` | Check if keys exist |
 | `KEYS <pattern>` | Find all keys matching the given pattern |
 | `RENAME <key> <newkey>` | Rename a key |
@@ -273,11 +274,11 @@ Below is a categorized list of all supported commands.
 ### Pub/Sub Operations
 | Command | Description |
 |---|---|
-| `PUBLISH <channel> <message>` | Post a message to a channel |
-| `SUBSCRIBE <channel> [channel ...]` | Listen for messages published to the given channels |
-| `UNSUBSCRIBE [channel ...]` | Stop listening for messages posted to the given channels |
-| `PSUBSCRIBE <pattern> [pattern ...]` | Listen for messages published to channels matching the given patterns |
-| `PUNSUBSCRIBE [pattern ...]` | Stop listening for messages posted to channels matching the given patterns |
+| `PUBLISH / PUB <channel> <message>` | Post a message to a channel |
+| `SUBSCRIBE / SUB <channel> [channel ...]` | Listen for messages published to the given channels |
+| `UNSUBSCRIBE / UNSUB [channel ...]` | Stop listening for messages posted to the given channels |
+| `PSUBSCRIBE / PSUB <pattern> [pattern ...]` | Listen for messages published to channels matching the given patterns |
+| `PUNSUBSCRIBE / PUNSUB [pattern ...]` | Stop listening for messages posted to channels matching the given patterns |
 
 ### Transactions
 | Command | Description |
@@ -302,6 +303,8 @@ Below is a categorized list of all supported commands.
 | `PING [message]` | Ping the server |
 | `COMMAND` | Get help about Redis commands |
 | `COMMANDS [pattern]` | List available commands or get help for a specific command |
+| `SELECT / SEL <db_index>` | Change the selected database for the current connection |
+| `SIZE [dbIndex]` | Get the number of databases or size of a specific database |
 
 ### Monitoring & Information
 | Command | Description |
@@ -309,7 +312,7 @@ Below is a categorized list of all supported commands.
 | `INFO [key]` | Get server information and statistics or per-key metadata |
 | `MONITOR` | Listen for all requests received by the server in real time |
 | `DBSIZE` | Return the number of keys in the database |
-| `FLUSHDB` | Remove all keys from the database |
+| `FLUSHDB / DROPDB` | Remove all keys from the database |
 
 ---
 
@@ -430,7 +433,6 @@ Go-Redis supports all primary RESP data types, making it fully compatible with `
 
 Go-Redis is an educational project and intentionally omits certain advanced Redis features:
 
--   Single database only (no `SELECT` command).
 -   No replication or clustering.
 -   No Lua scripting.
 
