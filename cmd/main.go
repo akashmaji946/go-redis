@@ -303,6 +303,16 @@ func handleOneConnection(conn net.Conn, state *common.AppState, connectionCount 
 	newCount := atomic.AddInt32(connectionCount, 1)
 	state.NumClients = int(newCount)
 	state.GenStats.TotalConnectionsReceived += 1
+
+	// Explicitly trigger handshake for TLS connections to catch protocol errors early
+	if tlsConn, ok := conn.(*tls.Conn); ok {
+		if err := tlsConn.Handshake(); err != nil {
+			log.Printf("[%2d] [TLS_ERROR] Handshake failed from %s: %v", newCount, conn.RemoteAddr(), err)
+			conn.Close()
+			return
+		}
+	}
+
 	log.Printf("[%2d] [ACCEPT] Protocol: %s | Client: %s\n", newCount, protocol, conn.RemoteAddr().String())
 
 	state.AddConn(conn)

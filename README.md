@@ -32,6 +32,14 @@ A Redis-compatible in-memory key-value store server written in Go. This implemen
 - **Transactions**: Basic `MULTI`, `EXEC`, `DISCARD` support.
 - **Eviction**: LRU/Random eviction policies when maxmemory is reached.
 
+## Quick Access:
+Go to your terminal and access it here:
+```bash
+# use redis-cli to access the hosted sever
+redis-cli -h go.akashmaji.me -p 7380
+# use pass `dsl` when connected
+# 
+```
 
 ## Prerequisites
 
@@ -170,13 +178,51 @@ The server accepts command-line arguments for configuration file and data direct
 
 ### Server Startup
 
-When you run the server, you'll see output or log like:
+When you run the server (or run `./run_server,sh`), you'll see console output or log like:
 
+Console Output:
 ```bash
->>> Go-Redis Server v1.0 <<<
-reading the config file...
-Data directory: /app/data
-listening on port 6379
+[INFO] Building go-redis...
+[INFO] Running go-redis...
+
+                   ██████╗  ██████╗ 
+                  ██╔════╝ ██╔═══██╗
+                  ██║  ███╗██║   ██║
+                  ██║   ██║██║   ██║
+                  ╚██████╔╝╚██████╔╝
+                   ╚═════╝  ╚═════╝ 
+
+           ██████╗ ███████╗██████╗ ██╗███████╗
+           ██╔══██╗██╔════╝██╔══██╗██║██╔════╝
+           ██████╔╝█████╗  ██║  ██║██║███████╗
+           ██╔══██╗██╔══╝  ██║  ██║██║╚════██║
+           ██║  ██║███████╗██████╔╝██║███████║
+           ╚═╝  ╚═╝╚══════╝╚═════╝ ╚═╝╚══════╝
+
+   ███████╗███████╗██████╗ ██╗   ██╗███████╗██████╗ 
+   ██╔════╝██╔════╝██╔══██╗██║   ██║██╔════╝██╔══██╗
+   ███████╗█████╗  ██████╔╝██║   ██║█████╗  ██████╔╝
+   ╚════██║██╔══╝  ██╔══██╗╚██╗ ██╔╝██╔══╝  ██╔══██╗
+   ███████║███████╗██║  ██║ ╚████╔╝ ███████╗██║  ██║
+   ╚══════╝╚══════╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝
+             >>> Go-Redis Server v1.0 <<<      
+
+[INFO] Go-Redis Server is up on port: 7379 (TCP)
+[INFO] Go-Redis Server is up on port: 7380 (TLS)
+```
+Log Output:
+```bash
+2026/01/14 09:17:18 >>>> Go-Redis Server v1.0 <<<<
+2026/01/14 09:17:18 reading the config file...
+2026/01/14 09:17:18 [INFO] config file   : ./config/redis.conf
+2026/01/14 09:17:18 [INFO] data directory: ./data/
+2026/01/14 09:17:18 using data directory from command line: /home/akashmaji/Documents/go-redis/data
+2026/01/14 09:17:18 data directory: /home/akashmaji/Documents/go-redis/data
+2026/01/14 09:17:18 syncing records
+2026/01/14 09:17:18 error in ReadArray: EOF
+2026/01/14 09:17:18 records synchronized: 0
+2026/01/14 09:17:18 Listening on 0.0.0.0:7379 (TCP)
+2026/01/14 09:17:18 Listening on 0.0.0.0:7380 (TLS)
 ```
 
 ### Server Connection
@@ -254,9 +300,13 @@ redis-cli -p <port_number>
 * Triggered via `save` rules
 * Uses Go `gob` encoding
 * SHA-256 checksum verification
+
 3. **Connect using `redis-cli`:**
    ```bash
-   redis-cli -p 6379
+   # normal TCP
+   redis-cli -p 7379
+   # secured TLS
+   redis-cli -p 7380
    ```
 
 ## Memory Management
@@ -279,51 +329,71 @@ redis-cli -p <port_number>
 ## Project Structure
 
 ```bash
+>> tree .
 .
-├── aof.go
-├── appstate.go
-├── client.go
-├── commands.json
-├── conf.go
+├── bench
+│   └── benchmark.txt
+├── cmd
+│   ├── go-redis.service
+│   └── main.go
 ├── config
+│   ├── akashmaji.me
+│   ├── cert_gen.sh
+│   ├── cert.pem
+│   ├── go-redis.service
+│   ├── key.pem
 │   └── redis.conf
-├── constants.go
 ├── data
-│   ├── redisdb.aof
-│   └── redisdb.rdb
-├── database.go
 ├── Dockerfile
 ├── DOCKER.md
 ├── DOCS.md
 ├── go.mod
-├── go-redis
 ├── go-redis.code-workspace
-├── go-redis-logo.png
-├── go-redis.png
 ├── go.sum
-├── handler_connection.go
-├── handler_generic.go
-├── handler_hash.go
-├── handler_key.go
-├── handler_list.go
-├── handler_persistence.go
-├── handler_pubsub.go
-├── handler_set.go
-├── handlers.go
-├── handler_string.go
-├── handler_transaction.go
-├── handler_zset.go
-├── helpers.go
-├── info.go
+├── images
+│   ├── go-redis-logo.png
+│   └── go-redis.png
+├── internal
+│   ├── common
+│   │   ├── aof.go
+│   │   ├── appstate.go
+│   │   ├── client.go
+│   │   ├── conf.go
+│   │   ├── constants.go
+│   │   ├── helpers.go
+│   │   ├── info.go
+│   │   ├── rdb.go
+│   │   ├── transaction.go
+│   │   ├── value.go
+│   │   └── writer.go
+│   ├── database
+│   │   ├── database.go
+│   │   └── mem.go
+│   ├── handlers
+│   │   ├── handler_connection.go
+│   │   ├── handler_generic.go
+│   │   ├── handler_hash.go
+│   │   ├── handler_key.go
+│   │   ├── handler_list.go
+│   │   ├── handler_persistence.go
+│   │   ├── handler_pubsub.go
+│   │   ├── handler_set.go
+│   │   ├── handlers.go
+│   │   ├── handler_string.go
+│   │   ├── handler_transaction.go
+│   │   └── handler_zset.go
+│   └── info
 ├── LICENSE
-├── main.go
-├── mem.go
-├── notes.txt
-├── rdb.go
 ├── README.md
-├── USER.md
-├── value.go
-└── writer.go
+├── run_clean.sh
+├── run_client.sh
+├── run_server.sh
+├── static
+│   ├── commands.json
+│   └── notes.txt
+└── VSCODE.md
+
+12 directories, 50 files
 ```
 
 ## Protocol
@@ -353,7 +423,7 @@ Use an image:
 docker pull akashmaji/go-redis:latest
 
 # Run it
-docker run -d -p 6379:6379 \
+docker run -d -p 7379:7379 \
   -v $(pwd)/data:/app/data \
   akashmaji/go-redis:latest
 
@@ -369,10 +439,10 @@ Build the image:
 docker build -t go-redis:latest .
 
 # Run with default config
-docker run -d -p 6379:6379 -v $(pwd)/data:/app/data go-redis:latest
+docker run -d -p 7379:7379 -v $(pwd)/data:/app/data go-redis:latest
 
 # Run with custom paths
-docker run -d -p 6379:6379 \
+docker run -d -p 7379:7379 \
   -v $(pwd)/config/redis.conf:/app/config/redis.conf:ro \
   -v $(pwd)/data:/app/data \
   go-redis:latest /app/config/redis.conf /app/data
