@@ -60,10 +60,20 @@ redis-cli
 ```bash
 docker build -t go-redis:latest .
 ```
-Run it
+Run it for TCP
 ```bash
 docker run -d -p 7379:7379 \
+  -v $(pwd)/config:/app/config \
   -v $(pwd)/data:/app/data \
+  --name go-redis \
+  go-redis:latest
+```
+
+Run it for TLS
+```bash
+docker run -d -p 7379:7379 -p 7380:7380 \
+  -v $(pwd)/data:/app/data \
+  --name go-redis \
   go-redis:latest
 ```
 
