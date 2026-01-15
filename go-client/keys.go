@@ -7,6 +7,11 @@ func Del(keys ...string) (interface{}, error) {
 	return mustGetClient().SendCommand(cmdArgs...)
 }
 
+// Delete is an alias for Del.
+func Delete(keys ...string) (interface{}, error) {
+	return Del(keys...)
+}
+
 // Exists checks if one or more keys exist.
 // It returns the server's response or an error if the command fails.
 func Exists(keys ...string) (interface{}, error) {

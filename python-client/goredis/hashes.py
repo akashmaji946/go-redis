@@ -48,6 +48,10 @@ def HMSet(key, **mapping):
         args.extend([k, v])
     return get_client().send_command("HMSET", *args)
 
+def HMGet(key, *fields):
+    """Get the values of all the given hash fields."""
+    return get_client().send_command("HMGET", key, *fields)
+
 def HDelAll(key):
     """Delete all fields in a hash."""
     return get_client().send_command("HDELALL", key)

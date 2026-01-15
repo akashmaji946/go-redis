@@ -463,6 +463,54 @@ func Hmset(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 	return common.NewStringValue("OK")
 }
 
+// Hmget handles the HMGET command.
+// Returns the values associated with the specified fields in the hash stored at key.
+//
+// Syntax:
+//
+//	HMGET <key> <field> [<field> ...]
+//
+// Returns:
+//
+//	Array: List of values associated with the given fields, in the same order as they are requested.
+func Hmget(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) < 2 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'hmget' command")
+	}
+
+	key := args[0].Blk
+	fields := args[1:]
+
+	database.DB.Mu.RLock()
+	defer database.DB.Mu.RUnlock()
+
+	item, ok := database.DB.Store[key]
+	if !ok {
+		result := make([]common.Value, len(fields))
+		for i := range fields {
+			result[i] = common.Value{Typ: common.NULL}
+		}
+		return common.NewArrayValue(result)
+	}
+
+	if !item.IsHash() {
+		return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	result := make([]common.Value, 0, len(fields))
+	for _, fieldArg := range fields {
+		field := fieldArg.Blk
+		if fieldItem, exists := item.Hash[field]; exists && !fieldItem.IsExpired() {
+			result = append(result, common.Value{Typ: common.BULK, Blk: fieldItem.Str})
+		} else {
+			result = append(result, common.Value{Typ: common.NULL})
+		}
+	}
+
+	return common.NewArrayValue(result)
+}
+
 // Hexists handles the HEXISTS command.
 // Checks if a hash field exists.
 //

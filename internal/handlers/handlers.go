@@ -80,9 +80,10 @@ var Handlers = map[string]common.Handler{
 	"BGSAVE":       BGSave,
 	"BGREWRITEAOF": BGRewriteAOF,
 
-	"FLUSHDB": FlushDB,
-	"DROPDB":  FlushDB,
-	"DBSIZE":  DBSize,
+	"FLUSHALL": FlushAll,
+	"FLUSHDB":  FlushDB,
+	"DROPDB":   FlushDB,
+	"DBSIZE":   DBSize,
 
 	"SIZE": Size,
 
@@ -98,6 +99,7 @@ var Handlers = map[string]common.Handler{
 	"HDELALL": Hdelall,
 	"HINCRBY": Hincrby,
 	"HMSET":   Hmset,
+	"HMGET":   Hmget,
 	"HEXISTS": Hexists,
 	"HLEN":    Hlen,
 	"HKEYS":   Hkeys,
@@ -107,6 +109,7 @@ var Handlers = map[string]common.Handler{
 	// authorize
 	"AUTH":    Auth,
 	"USERADD": UserAdd,
+	"USERDEL": UserDel,
 	"PASSWD":  Passwd,
 	"USERS":   Users,
 	"WHOAMI":  WhoAmI,

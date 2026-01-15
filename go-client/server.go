@@ -60,6 +60,11 @@ func Select(index int) (interface{}, error) {
 	return mustGetClient().SendCommand("SELECT", index)
 }
 
+// Sel is an alias for Select.
+func Sel(index int) (interface{}, error) {
+	return Select(index)
+}
+
 // Info retrieves information and statistics about the Redis server.
 // If a key is provided, it retrieves information specific to that key.
 // It returns the server's response or an error if the command fails.
@@ -87,6 +92,11 @@ func DbSize() (interface{}, error) {
 // It returns the server's response or an error if the command fails.
 func FlushDb() (interface{}, error) {
 	return mustGetClient().SendCommand("FLUSHDB")
+}
+
+// DropDb is an alias for FlushDb.
+func DropDb() (interface{}, error) {
+	return FlushDb()
 }
 
 // FlushAll removes all keys from all databases.
@@ -166,4 +176,13 @@ func BgRewriteAof() (interface{}, error) {
 // It returns the server's response or an error if the command fails.
 func Command() (interface{}, error) {
 	return mustGetClient().SendCommand("COMMAND")
+}
+
+// Commands retrieves details about Redis commands matching a pattern.
+func Commands(pattern ...string) (interface{}, error) {
+	cmdArgs := []interface{}{"COMMANDS"}
+	if len(pattern) > 0 {
+		cmdArgs = append(cmdArgs, pattern[0])
+	}
+	return mustGetClient().SendCommand(cmdArgs...)
 }

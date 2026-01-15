@@ -51,6 +51,10 @@ def FlushDb():
     """Remove all keys from the database."""
     return get_client().send_command("FLUSHDB")
 
+def FlushAll():
+    """Remove all keys from all databases."""
+    return get_client().send_command("FLUSHALL")
+
 def DropDb():
     """Alias for FlushDb."""
     return FlushDb()
@@ -64,6 +68,10 @@ def Size(db_index=None):
 def UserAdd(admin_flag, user, password):
     """Create a new user (Admin only)."""
     return get_client().send_command("USERADD", admin_flag, user, password)
+
+def UserDel(user):
+    """Delete the specified user (Admin only)."""
+    return get_client().send_command("USERDEL", user)
 
 def Passwd(user, password):
     """Change a user's password."""

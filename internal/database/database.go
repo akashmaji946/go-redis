@@ -91,6 +91,19 @@ func InitDBS(n int, conf *common.Config, state *common.AppState) {
 	DB = DBS[0]
 }
 
+// FlushAll clears all data from all logical databases.
+func FlushAll(state *common.AppState) {
+	DBMu.Lock()
+	defer DBMu.Unlock()
+	for _, db := range DBS {
+		db.Mu.Lock()
+		db.Store = make(map[string]*common.Item)
+		db.Mem = 0
+		db.TouchAll()
+		db.Mu.Unlock()
+	}
+}
+
 // Snapshot returns a point-in-time copy of the database store.
 func (db *Database) Snapshot() map[string]*common.Item {
 	db.Mu.RLock()

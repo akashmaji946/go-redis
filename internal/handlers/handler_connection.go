@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/akashmaji946/go-redis/internal/common"
+	"github.com/akashmaji946/go-redis/internal/database"
 )
 
 // can run these even if authenticated=0
@@ -27,8 +28,9 @@ var safeCommands = []string{
 
 // sensitiveCommands is a set of commands that need root user
 var sensitiveCommands = map[string]bool{
-	"FLUSHDB": true,
-	"DROPDB":  true,
+	"FLUSHDB":  true,
+	"DROPDB":   true,
+	"FLUSHALL": true,
 
 	"USERADD": true,
 	"USERDEL": true,
@@ -122,6 +124,15 @@ func Commands(c *common.Client, v *common.Value, state *common.AppState) *common
 	return common.NewArrayValue(results)
 }
 
+// FlushAll handles the FLUSHALL command.
+func FlushAll(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	if c.User == nil || !c.User.Admin {
+		return common.NewErrorValue("ERR only admins can flush all databases")
+	}
+	database.FlushAll(state)
+	return common.NewStringValue("OK")
+}
+
 func Ping(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) > 1 {
@@ -187,6 +198,34 @@ func UserAdd(c *common.Client, v *common.Value, state *common.AppState) *common.
 		Password: password,
 		Admin:    isAdmin,
 	}
+	state.UsersMu.Unlock()
+	state.SaveUsers()
+
+	return common.NewStringValue("OK")
+}
+
+// UserDel handles the USERDEL command.
+func UserDel(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	if c.User == nil || !c.User.Admin {
+		return common.NewErrorValue("ERR only admins can delete users")
+	}
+
+	args := v.Arr[1:]
+	if len(args) != 1 {
+		return common.NewErrorValue("ERR usage: USERDEL <user>")
+	}
+
+	username := args[0].Blk
+	if username == "root" {
+		return common.NewErrorValue("ERR cannot delete root user")
+	}
+
+	state.UsersMu.Lock()
+	if _, ok := state.Users[username]; !ok {
+		state.UsersMu.Unlock()
+		return common.NewErrorValue("ERR user not found")
+	}
+	delete(state.Users, username)
 	state.UsersMu.Unlock()
 	state.SaveUsers()
 
