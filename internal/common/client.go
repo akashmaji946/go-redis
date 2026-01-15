@@ -21,7 +21,7 @@ type User struct {
 }
 
 // Client represents a connected client session.
-// Each client connection has its own Client instance that tracks connection-specific state.
+// Each client connection has its own Client instance on the server that tracks connection-specific state.
 //
 // Fields:
 //   - conn: The network connection to the client (used for reading commands and sending responses)

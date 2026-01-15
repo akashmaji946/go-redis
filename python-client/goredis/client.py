@@ -1,14 +1,39 @@
 import socket
 import io
 
+"""
+GoRedis Python Client
+
+This module provides a simple client to interact with a Go-Redis server
+using the RESP protocol. It includes basic commands for connecting,
+authenticating, and performing common Redis operations.
+"""
 class GoRedisClient:
-    """Internal class to handle RESP protocol and socket communication."""
+    """
+    Internal class to handle RESP protocol and socket communication.
+    
+    This class manages the TCP connection to the Go-Redis server and
+    implements the Redis Serialization Protocol (RESP) for sending
+    commands and parsing responses.
+    """
     def __init__(self, host, port):
+        """
+        Initialize the socket connection.
+        
+        Args:
+            host (str): The server hostname or IP address.
+            port (int): The port number the server is listening on.
+        """
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((host, port))
         self.file = self.sock.makefile('rb')
 
     def send_command(self, *args):
+        """
+        Send a command and its arguments to the server using RESP.
+        
+        Returns the parsed response from the server.
+        """
         # RESP requires length in BYTES, not characters.
         cmd = f"*{len(args)}\r\n".encode('utf-8')
         for arg in args:
@@ -20,6 +45,11 @@ class GoRedisClient:
         return self._read_response()
 
     def _read_response(self):
+        """
+        Read and parse a RESP response from the server.
+        
+        Handles Simple Strings, Errors, Integers, Bulk Strings, and Arrays.
+        """
         line = self.file.readline()
         if not line:
             raise EOFError("Connection closed by server")
@@ -44,11 +74,23 @@ class GoRedisClient:
         raise Exception(f"Unknown RESP type received: {prefix}")
 
     def close(self):
+        """Close the underlying socket connection."""
         self.sock.close()
 
+"""
+Global client instance.
+"""
 _global_client = None
 
+"""
+Connect to the Go-Redis server.
+"""
 def get_client():
+    """
+    Retrieve the global client instance.
+    
+    Raises RuntimeError if Connect() has not been called.
+    """
     global _global_client
     if _global_client is None:
         raise RuntimeError("Client not connected. Call Connect() first.")
