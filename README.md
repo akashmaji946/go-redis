@@ -1,4 +1,5 @@
 # Go-Redis-Server (v1.0)
+
 ![go-redis logo](images/go-redis-logo.png)
 
 A lightweight, multi-threaded Redis server implementation in Go.
@@ -6,13 +7,14 @@ A lightweight, multi-threaded Redis server implementation in Go.
 A Redis-compatible in-memory key-value store server written in Go. This implementation supports core Redis commands, persistence mechanisms (AOF and RDB), authentication, expiration, transactions, monitoring, and memory management with eviction policies.
 
 ## Docs
+
 - Refer to our docs for full guide on usage and description of commands.
 - Access it here: [Docs](https://akashmaji946.github.io/go-redis/)
 
 ## Features
 
 - **Core Commands**: GET, SET, DEL, DELETE, EXISTS, KEYS, DBSIZE, FLUSHDB, DROPDB, STRLEN, SIZE, SELECT, ...
-- **In-Memory Storage**: Fast key-value store supporting Strings, Lists, Sets, and Hashes.
+- **In-Memory Storage**: Fast key-value store supporting Strings, Lists, Sets, Hashes, Sorted Sets, HyperLogLog, Bitmaps, and Geospatial data.
 - **Persistence**:
   - **AOF (Append-Only File)**: Logs every write operation with configurable fsync modes
   - **RDB (Redis Database)**: Point-in-time snapshots with automatic triggers
@@ -32,8 +34,10 @@ A Redis-compatible in-memory key-value store server written in Go. This implemen
 - **Transactions**: Basic `MULTI`, `EXEC`, `DISCARD` support.
 - **Eviction**: LRU/Random eviction policies when maxmemory is reached.
 
-## Quick Try:
+## Quick Try
+
 Go to your terminal and access it here:
+
 ```bash
 # use redis-cli to access the hosted sever
 redis-cli -h go.akashmaji.me -p 7380 --tls
@@ -56,13 +60,16 @@ redis-cli -h go.akashmaji.me -p 7380 --tls
 - **Linux/Unix environment** (tested on Linux)
 
 ## Stopping Default Process (if any)
+
 We will be using port 7379 as default (See `config/redis.conf` file).
+
 ```bash
 # find and kill process at 7379 forcefully
 sudo kill -9 $(sudo lsof -t -i :7379)
 ```
 
 However, if you want to use port 6379 then do these if redis-server is running:
+
 ```bash
 ## ONE WAY:
 sudo systemctl stop redis-server.service
@@ -80,14 +87,17 @@ sudo kill -9 $(sudo lsof -t -i :6379)
 ## Building
 
 Build as:
+
 ```bash
 # from within project_root
 cd cmd
 go build -o go-redis .
 ```
+
 This will create an executable named `go-redis` that you can run.
 
 Run as:
+
 ```bash
 # from within project_root
 cd cmd
@@ -95,7 +105,9 @@ cd cmd
 ```
 
 ## Running
+
 Run the script `run_server.sh` as:
+
 ```bash
 # from within project_root
 chmod +x run_server.sh
@@ -103,6 +115,7 @@ chmod +x run_server.sh
 ```
 
 ## Connecting to local server so built and ran
+
 ```bash
 # TCP
 redis-cli -p 7379 
@@ -146,7 +159,7 @@ maxmemory-policy allkeys-random
 maxmemory-samples 5
 ```
 
-## Running
+## Running server
 
 ### Basic Usage
 
@@ -157,6 +170,7 @@ The server accepts command-line arguments for configuration file and data direct
 ```
 
 **Arguments:**
+
 - `config_file` (optional): Path to the configuration file
   - Default: `./config/redis.conf`
 - `data_directory` (optional): Path to the data directory for persistence files
@@ -165,26 +179,31 @@ The server accepts command-line arguments for configuration file and data direct
 ### Examples
 
 **1. Default configuration (uses `./config/redis.conf` and `./data/`):**
+
 ```bash
 ./go-redis
 ```
 
 **2. Custom configuration file:**
+
 ```bash
 ./go-redis /etc/go-redis/redis.conf
 ```
 
 **3. Custom configuration and data directory:**
+
 ```bash
 ./go-redis /etc/go-redis/redis.conf /var/lib/go-redis
 ```
 
 **4. Relative paths:**
+
 ```bash
 ./go-redis ./myconfig.conf ./mydata
 ```
 
 **5. Absolute paths:**
+
 ```bash
 ./go-redis /home/user/config/redis.conf /home/user/data
 ```
@@ -201,6 +220,7 @@ The server accepts command-line arguments for configuration file and data direct
 When you run the server (or run `./run_server,sh`), you'll see console output or log like:
 
 Console Output:
+
 ```bash
 [INFO] Building go-redis...
 [INFO] Running go-redis...
@@ -230,7 +250,9 @@ Console Output:
 [INFO] Go-Redis Server is up on port: 7379 (TCP)
 [INFO] Go-Redis Server is up on port: 7380 (TLS)
 ```
+
 Log Output:
+
 ```bash
 2026/01/14 09:17:18 >>>> Go-Redis Server v1.0 <<<<
 2026/01/14 09:17:18 reading the config file...
@@ -246,7 +268,9 @@ Log Output:
 ```
 
 ### Server Connection
+
 Multiple clients can connect to the server
+
 ```bash
 redis-cli -p <port_number>
 # e.g. redis-cli -p 7379
@@ -290,31 +314,45 @@ redis-cli -p <port_number>
 **HyperLogLog**
 `PFADD`, `PFCOUNT`, `PFDEBUG`, `PFMERGE`
 
-#### For more details:
+**Bitmap**
+`BITCOUNT`, `BITFIELD`, `BITOP`, `BITPOS`, `GETBIT`, `SETBIT`
+
+**Geospatial**
+`GEOADD`, `GEODIST`, `GEOHASH`, `GEOPOS`, `GEORADIUS`, `GEOSEARCH`, `GEOSEARCHSTORE`
+
+### For more details
+
 - Refer to our docs for full guide on usage and description of commands.
 - Access it here: [Docs](https://akashmaji946.github.io/go-redis/)
 
 ## Persistence
-### AOF
+
 
 ### AOF
+
 ## Getting Started
 
 * Logs every write
 * Replayed on startup
 * Supports `always`, `everysec`, `no` fsync modes
 * Rewritten using BGREWRITEAOF
+
 1. **Build the server:**
+
    ```bash
    go build -o go-redis .
    ```
 
 ### RDB
+
 2. **Run the server:**
+
    ```bash
    ./go-redis
    ```
+
    *Optionally specify config file and data directory:*
+
    ```bash
    ./go-redis ./config/redis.conf ./data/
    ```
@@ -325,6 +363,7 @@ redis-cli -p <port_number>
 * SHA-256 checksum verification
 
 3. **Connect using `redis-cli`:**
+
    ```bash
    # normal TCP
    redis-cli -p 7379
@@ -421,14 +460,16 @@ Implements full Redis RESP:
 ## Docker Deployment
 
 **Prerequisites**
+
 - docker
 - redis-cli
-
 
 The project includes a Dockerfile for containerized deployment. See the `Dockerfile` for details.
 
 **Very Quick Docker usage:**
+
 Use an image:
+
 ```bash
 # Pull the image
 docker pull akashmaji/go-redis:latest
@@ -444,7 +485,9 @@ redis-cli
 ```
 
 **Quick Docker usage:**
+
 Build the image:
+
 ```bash
 # Build
 docker build -t go-redis:latest .
@@ -461,6 +504,7 @@ docker run -d -p 7379:7379 \
 ## Access it from host
 redis-cli
 ```
+
 See `DOCKER.md` for more detail
 
 ## Limitations
@@ -477,6 +521,9 @@ Educational project implementing Redis-like functionality in Go.
 **v1.0**
 
 ## Author
+
 **Akash Maji (akashmaji@iisc.ac.in) - Contact for bugs and support**
-## Configuration
+
+## Configuration for Go-Redis-Server
+
 Configuration is handled via `redis.conf`. See `config/redis.conf` for available options like port, persistence settings, and memory limits.

@@ -3,9 +3,9 @@ layout: default
 title: Go-Redis-Server Documentation
 ---
 
-![Go-Redis-Server Logo](images/go-redis-logo.png)
-
 # Go-Redis-Server: The Complete Guide (v1.0)
+
+![Go-Redis-Server Logo](images/go-redis-logo.png)
 
 Welcome to the complete developer and user documentation for **Go-Redis**, a lightweight, multi-threaded, Redis-compatible server implemented in Go.
 
@@ -33,6 +33,10 @@ This document provides a deep dive into the project's features, architecture, an
     -   [Set Operations](#set-operations)
     -   [Hash Operations](#hash-operations)
     -   [Sorted Set Operations](#sorted-set-operations)
+    -   [HyperLogLog Operations](#hyperloglog-operations)
+    -   [Bitmap Operations](#bitmap-operations)
+    -   [Geospatial Operations](#geospatial-operations)
+    -   [Pub/Sub Operations](#pubsub-operations)
     -   [Expiration Commands](#expiration-commands)
     -   [Transactions](#transactions)
     -   [Persistence Commands](#persistence-commands)
@@ -57,7 +61,7 @@ This document provides a deep dive into the project's features, architecture, an
 
 Go-Redis is a Redis-compatible in-memory key-value store server written in Go. It is designed to be a learning tool for understanding how a database like Redis works under the hood, while also being a functional server for development and testing purposes.
 
--   **Broad Command Support**: Implements a rich subset of commands for Strings, Lists, Sets, Hashes, and Sorted Sets.
+-   **Broad Command Support**: Implements a rich subset of commands for Strings, Lists, Sets, Hashes, Sorted Sets, HyperLogLog, Bitmaps, and Geospatial data.
 -   **Dual Persistence Model**: 
     -   **AOF (Append-Only File)**: Logs every write operation with configurable `fsync` modes for high durability.
     -   **RDB (Redis Database)**: Creates point-in-time snapshots for fast startups and backups.
@@ -331,6 +335,31 @@ Below is a categorized list of all supported commands.
 | `PFCOUNT <key> [key ...]` | Return the approximated cardinality (number of unique elements) observed by the HyperLogLog(s). When called with multiple keys, returns the cardinality of the union. Standard error rate is approximately 0.81%. |
 | `PFDEBUG <key>` | Return internal debugging information about a HyperLogLog including encoding type (sparse/dense), number of registers, and estimated cardinality. |
 | `PFMERGE <destkey> <sourcekey> [sourcekey ...]` | Merge multiple HyperLogLog values into a single destination HyperLogLog. The merged result approximates the cardinality of the union of all sources. |
+
+
+### Bitmap Operations
+
+| Command | Description |
+|---|---|
+| `SETBIT <key> <offset> <value>` | Set or clear the bit at offset in the string value stored at key. The offset must be >= 0 and < 2^32. The value must be 0 or 1. Returns the original bit value at offset. When the string is grown, added bits are set to 0. Time complexity: O(1). |
+| `GETBIT <key> <offset>` | Return the bit value at offset in the string value stored at key. When offset is beyond the string length, the bit is assumed to be 0. If the key does not exist, it is treated as an empty string. Time complexity: O(1). |
+| `BITCOUNT <key> [start end [BYTE\|BIT]]` | Count the number of set bits (population counting) in a string. By default, all bytes are examined. Optional start and end parameters specify a range (byte or bit indices). Negative values count from the end. The BYTE/BIT modifier (Redis 7.0+) specifies whether the range is in bytes or bits. Time complexity: O(N) where N is the number of bytes in the range. |
+| `BITOP <operation> <destkey> <key> [key ...]` | Perform a bitwise operation between multiple keys and store the result in destkey. Operations: AND, OR, XOR, NOT. NOT requires exactly one source key. When strings have different lengths, shorter strings are zero-padded. Returns the size of the result string. Time complexity: O(N) where N is the size of the longest string. |
+| `BITPOS <key> <bit> [start [end [BYTE\|BIT]]]` | Return the position of the first bit set to 1 or 0 in a string. The bit parameter must be 0 or 1. Optional start and end specify a range to search within (byte or bit indices). Returns -1 if the bit is not found. Time complexity: O(N) where N is the number of bytes in the range. |
+| `BITFIELD <key> [GET <encoding> <offset>] [SET <encoding> <offset> <value>] [INCRBY <encoding> <offset> <increment>] [OVERFLOW <WRAP\|SAT\|FAIL>]` | Perform arbitrary bitfield integer operations on strings. Encoding format: i<bits> for signed, u<bits> for unsigned (e.g., i8, u16). Offset format: absolute number or #N (multiplied by encoding size). OVERFLOW controls behavior: WRAP (default, wrap around), SAT (saturate at min/max), FAIL (return nil on overflow). Returns an array with one element per operation. Time complexity: O(1) for each subcommand. |
+
+
+### Geospatial Operations
+
+| Command | Description |
+|---|---|
+| `GEOADD <key> <longitude> <latitude> <member> [<longitude> <latitude> <member> ...]` | Add one or more geospatial items (longitude, latitude, member name) to a sorted set. Longitude must be between -180 and 180 degrees. Latitude must be between -90 and 90 degrees. Internally stores items as geohash scores in a sorted set. Returns the number of elements added. Time complexity: O(log(N)) for each item added, where N is the number of elements in the sorted set. |
+| `GEOPOS <key> <member> [<member> ...]` | Return the positions (longitude, latitude) of all specified members in the geospatial index. Returns an array of positions, where each position is an array of two elements: [longitude, latitude]. Returns NULL for members that do not exist. Time complexity: O(N) where N is the number of members requested. |
+| `GEODIST <key> <member1> <member2> [m\|km\|ft\|mi]` | Return the distance between two members in the geospatial index. The optional unit parameter specifies the unit of measurement: m (meters, default), km (kilometers), ft (feet), mi (miles). Returns NULL if either member does not exist. Uses the Haversine formula for calculation. Time complexity: O(log(N)). |
+| `GEOHASH <key> <member> [<member> ...]` | Return the geohash strings representing the positions of the specified members. Geohashes are base32-encoded strings that represent geographic coordinates. Returns an array of geohash strings. Returns NULL for members that do not exist. Time complexity: O(log(N)) for each member. |
+| `GEORADIUS <key> <longitude> <latitude> <radius> <unit> [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT <count>] [ASC\|DESC]` | Query members within a radius from a given longitude/latitude point. Unit can be m, km, ft, or mi. Options: WITHCOORD (include coordinates), WITHDIST (include distance), WITHHASH (include geohash), COUNT (limit results), ASC/DESC (sort by distance). Returns an array of matching members with optional metadata. Time complexity: O(N+log(M)) where N is the number of elements in the grid and M is the number of items inside the radius. |
+| `GEOSEARCH <key> FROMMEMBER <member> \| FROMLONLAT <longitude> <latitude> BYRADIUS <radius> <unit> \| BYBOX <width> <height> <unit> [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT <count>] [ASC\|DESC]` | Advanced geospatial search supporting both radius and box queries. Can search from a member's position (FROMMEMBER) or from coordinates (FROMLONLAT). Search area can be circular (BYRADIUS) or rectangular (BYBOX). Supports same options as GEORADIUS. Returns an array of matching members with optional metadata. Time complexity: O(N+log(M)) where N is the number of elements in the grid and M is the number of items in the search area. |
+| `GEOSEARCHSTORE <destination> <source> FROMMEMBER <member> \| FROMLONLAT <longitude> <latitude> BYRADIUS <radius> <unit> \| BYBOX <width> <height> <unit> [COUNT <count>] [ASC\|DESC] [STOREDIST]` | Perform a GEOSEARCH query and store the results in a destination sorted set. Same syntax as GEOSEARCH but stores results instead of returning them. The STOREDIST option stores distances as scores instead of geohash scores. Returns the number of elements in the resulting sorted set. Useful for caching search results. Time complexity: O(N+log(M)) where N is the number of elements in the grid and M is the number of items in the search area. |
 
 
 ### Pub/Sub Operations
