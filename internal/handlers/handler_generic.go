@@ -7,7 +7,6 @@ package handlers
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -257,7 +256,7 @@ func Info(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 func Monitor(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) != 0 {
-		log.Println("invalid use of MONITOR")
+		logger.Warn("invalid use of MONITOR\n")
 		return common.NewErrorValue("ERR invalid argument to MONITOR")
 	}
 	state.Monitors = append(state.Monitors, *c)

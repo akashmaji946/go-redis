@@ -13,7 +13,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path"
 	"strconv"
@@ -178,7 +177,7 @@ func (aof *Aof) Synchronize(state *AppState, handler func(*Client, *Value, *AppS
 
 		total += 1
 	}
-	log.Printf("records synchronized: %d\n", total)
+	logger.Info("records synchronized: %d\n", total)
 
 }
 
@@ -248,12 +247,12 @@ func (aof *Aof) Rewrite(cp map[string]*Item) {
 	// Truncate the file
 	err := aof.F.Truncate(0)
 	if err != nil {
-		log.Println("ERR AOF Rewrite issue! Can't Truncate")
+		logger.Error("ERR AOF Rewrite issue! Can't Truncate\n")
 		return
 	}
 	_, err = aof.F.Seek(0, 0)
 	if err != nil {
-		log.Println("ERR AOF Rewrite issue! Can't Seek")
+		logger.Error("ERR AOF Rewrite issue! Can't Seek\n")
 		return
 	}
 
@@ -363,18 +362,18 @@ func (aof *Aof) Rewrite(cp map[string]*Item) {
 			fwriter.Write(&hllCmd)
 
 		default:
-			log.Printf("Warning: Unknown type %s for key %s in AOF Rewrite\n", item.Type, k)
+			logger.Warn("Warning: Unknown type %s for key %s in AOF Rewrite\n", item.Type, k)
 		}
 	}
 	fwriter.Flush()
-	log.Println("done BGREWRITE.")
+	logger.Info("done BGREWRITE.")
 
 	// if buffer b is not empty, write it as well
 	if _, err := b.WriteTo(aof.F); err != nil {
-		log.Println("ERR AOF Rewrite issue! Can't append buffered commands:", err)
+		logger.Error("ERR AOF Rewrite issue! Can't append buffered commands\n", err)
 		return
 	} else if err := aof.F.Sync(); err != nil {
-		log.Println("ERR AOF Rewrite issue! Can't sync after appending buffer:", err)
+		logger.Error("ERR AOF Rewrite issue! Can't sync after appending buffer\n", err)
 		return
 	}
 

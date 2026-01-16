@@ -49,7 +49,7 @@ var CommandDetails map[string]CommandInfo
 
 func init() {
 
-	log.Println(">>>> Go-Redis Server v1.0 <<<<")
+	logger.Info(">>>> Go-Redis Server v1.0 <<<<\n")
 
 	CommandDetails = make(map[string]CommandInfo)
 	staticDir := "./static"
@@ -71,7 +71,7 @@ func init() {
 		path := filepath.Join(staticDir, file.Name())
 		data, err := os.ReadFile(path)
 		if err != nil {
-			log.Printf("warning: failed to read %s: %v", path, err)
+			logger.Warn("warning: failed to read %s: %v\n", path, err)
 			continue
 		}
 
@@ -86,6 +86,6 @@ func init() {
 			CommandDetails[k] = v
 		}
 
-		log.Printf("[INFO] successfully loaded commands from %s", file.Name())
+		logger.Info("[SERVER] successfully loaded commands from %s\n", file.Name())
 	}
 }

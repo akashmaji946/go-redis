@@ -7,7 +7,6 @@ package handlers
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"time"
 
@@ -72,7 +71,7 @@ func Hset(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 	if database.DB.Mem > database.DB.Mempeak {
 		database.DB.Mempeak = database.DB.Mem
 	}
-	log.Printf("memory = %d\n", database.DB.Mem)
+	logger.Warn("memory = %d\n", database.DB.Mem)
 
 	if state.Config.AofEnabled {
 		state.Aof.W.Write(v)
@@ -193,7 +192,7 @@ func Hdel(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 	newMemory := item.ApproxMemoryUsage(key)
 	database.DB.Mem -= oldMemory
 	database.DB.Mem += newMemory
-	log.Printf("memory = %d\n", database.DB.Mem)
+	logger.Warn("memory = %d\n", database.DB.Mem)
 
 	if state.Config.AofEnabled {
 		state.Aof.W.Write(v)
@@ -299,7 +298,7 @@ func Hdelall(c *common.Client, v *common.Value, state *common.AppState) *common.
 	newMemory := item.ApproxMemoryUsage(key)
 	database.DB.Mem -= oldMemory
 	database.DB.Mem += newMemory
-	log.Printf("memory = %d\n", database.DB.Mem)
+	logger.Warn("memory = %d\n", database.DB.Mem)
 
 	if state.Config.AofEnabled {
 		state.Aof.W.Write(v)
@@ -389,7 +388,7 @@ func Hincrby(c *common.Client, v *common.Value, state *common.AppState) *common.
 	if database.DB.Mem > database.DB.Mempeak {
 		database.DB.Mempeak = database.DB.Mem
 	}
-	log.Printf("memory = %d\n", database.DB.Mem)
+	logger.Warn("memory = %d\n", database.DB.Mem)
 
 	if state.Config.AofEnabled {
 		state.Aof.W.Write(v)
@@ -451,7 +450,7 @@ func Hmset(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 	if database.DB.Mem > database.DB.Mempeak {
 		database.DB.Mempeak = database.DB.Mem
 	}
-	log.Printf("memory = %d\n", database.DB.Mem)
+	logger.Warn("memory = %d\n", database.DB.Mem)
 
 	if state.Config.AofEnabled {
 		state.Aof.W.Write(v)

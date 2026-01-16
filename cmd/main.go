@@ -13,6 +13,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -22,6 +23,12 @@ import (
 	"github.com/akashmaji946/go-redis/internal/handlers"
 	_ "github.com/akashmaji946/go-redis/internal/handlers"
 )
+
+var logger = common.NewLogger()
+
+func init() {
+
+}
 
 // Entry point of the Go-Redis-Server application.
 // It initializes the server, loads configuration, restores data from persistence,
@@ -57,7 +64,7 @@ import (
 func main() {
 
 	fmt.Println(common.ASCII_ART)
-	log.Println(">>>> Go-Redis Server v1.0 <<<<")
+	logger.Info(">>>> Go-Redis Server v1.0 <<<<\n")
 
 	// defaults for config file and data directory
 	configFilePath := "./config/redis.conf"
@@ -78,15 +85,16 @@ func main() {
 	}
 
 	// read the config file
-	log.Println("reading the config file...")
-	log.Printf("[INFO] config file   : %s\n", configFilePath)
-	log.Printf("[INFO] data directory: %s\n", dataDirectoryPath)
+	logger.Info("reading the config file...\n")
+	logger.Info("config file   : %s\n", configFilePath)
+	logger.Info("reading the config file...\n")
+	logger.Info("data directory: %s\n", dataDirectoryPath)
 
 	conf := common.ReadConf(configFilePath, dataDirectoryPath)
 
 	// Check if running inside a container and override TLS paths
 	if os.Getenv("INSIDE_CONTAINER") == "true" {
-		log.Println("[INFO] Running inside container, using container TLS certificate paths")
+		logger.Info("running inside container, using container TLS certificate paths\n")
 		conf.TlsCertFile = "/app/config/cert.pem"
 		conf.TlsKeyFile = "/app/config/key.pem"
 	}
@@ -130,7 +138,7 @@ func main() {
 	// if aof
 	if conf.AofEnabled {
 		for i := 0; i < conf.Databases; i++ {
-			log.Printf("syncing records for DB %d", i)
+			logger.Info("syncing records for DB %d", i)
 			database.DBS[i].Aof.Synchronize(state, func(client *common.Client, v *common.Value, appState *common.AppState) *common.Value {
 				client.DatabaseID = i
 				database.DB = database.DBS[i]
@@ -158,26 +166,26 @@ func main() {
 		addr := fmt.Sprintf("%s:%d", ip, conf.Port)
 		l, err := net.Listen("tcp", addr)
 		if err != nil {
-			log.Printf("Failed to listen on %s: %v", addr, err)
+			logger.Warn("failed to listen on %s: %v\n", addr, err)
 			continue
 		}
 		listeners = append(listeners, l)
-		log.Printf("Listening on %s (TCP)", addr)
+		logger.Info("listening on %s (TCP)\n", addr)
 
 		// TLS Listener
 		if conf.TlsPort > 0 && conf.TlsCertFile != "" && conf.TlsKeyFile != "" {
 			cert, err := tls.LoadX509KeyPair(conf.TlsCertFile, conf.TlsKeyFile)
 			if err != nil {
-				log.Printf("Failed to load TLS keys: %v", err)
+				logger.Warn("failed to load TLS keys: %v\n", err)
 			} else {
 				tlsConfig := &tls.Config{Certificates: []tls.Certificate{cert}}
 				tlsAddr := fmt.Sprintf("%s:%d", ip, conf.TlsPort)
 				tl, err := tls.Listen("tcp", tlsAddr, tlsConfig)
 				if err != nil {
-					log.Printf("Failed to listen on %s (TLS): %v", tlsAddr, err)
+					logger.Warn("failed to listen on %s (TLS): %v\n", tlsAddr, err)
 				} else {
 					listeners = append(listeners, tl)
-					log.Printf("Listening on %s (TLS)", tlsAddr)
+					logger.Info("listening on %s (TLS)\n", tlsAddr)
 				}
 			}
 		}
@@ -188,9 +196,9 @@ func main() {
 	}
 
 	// print to console
-	fmt.Printf("[INFO] Go-Redis Server is up on port: %d (TCP)\n", conf.Port)
+	fmt.Printf("[SERVER] Go-Redis Server is up on port: %d (TCP)\n", conf.Port)
 	if conf.TlsPort > 0 {
-		fmt.Printf("[INFO] Go-Redis Server is up on port: %d (TLS)\n", conf.TlsPort)
+		fmt.Printf("[SERVER] Go-Redis Server is up on port: %d (TLS)\n", conf.TlsPort)
 	}
 
 	// Signal handling for graceful shutdown
@@ -199,7 +207,7 @@ func main() {
 
 	go func() {
 		<-sigChan
-		log.Println("\n[SHUTDOWN] Signal received, starting graceful shutdown...")
+		logger.Warn("[SHUTDOWN] Signal received, starting graceful shutdown...\n")
 
 		for _, l := range listeners {
 			l.Close()
@@ -219,7 +227,7 @@ func main() {
 			for {
 				conn, err := ln.Accept()
 				if err != nil {
-					log.Printf("[SHUTDOWN] Listener on %s closed.", ln.Addr())
+					logger.Warn("[SHUTDOWN] listener on %s closed.\n", ln.Addr())
 					break
 				}
 				wg.Add(1)
@@ -233,7 +241,7 @@ func main() {
 	wg.Wait()
 
 	// 3. Final persistence save
-	log.Println("[SHUTDOWN] All connections closed. Saving final state...")
+	logger.Warn("[SHUTDOWN] All connections closed. Saving final state...\n")
 
 	for i := 0; i < conf.Databases; i++ {
 		db := database.DBS[i]
@@ -242,12 +250,12 @@ func main() {
 	}
 
 	if state.Config.AofEnabled && state.Aof != nil {
-		log.Println("[SHUTDOWN] Flushing AOF to disk...")
+		logger.Warn("[SHUTDOWN] Flushing AOF to disk...\n")
 		state.Aof.W.Flush()
 		state.Aof.F.Sync()
 	}
 
-	log.Println("[SHUTDOWN] Graceful shutdown complete. Goodbye!")
+	logger.Warn("[SHUTDOWN] Graceful shutdown complete. Goodbye!\n")
 }
 
 // handleOneConnection manages a single client connection for its entire lifetime.
@@ -305,7 +313,8 @@ func handleOneConnection(conn net.Conn, state *common.AppState, connectionCount 
 		protocol = "TLS"
 	}
 
-	fmt.Printf("[INFO] Accepted connection from  %-3s   : %s\n", protocol, conn.RemoteAddr())
+	logger.Info("Accepted connection from  %-3s   : %s\n", protocol, conn.RemoteAddr())
+	fmt.Printf("Accepted connection from  %-3s   : %s\n", protocol, conn.RemoteAddr())
 
 	newCount := atomic.AddInt32(connectionCount, 1)
 	state.NumClients = int(newCount)
@@ -314,13 +323,13 @@ func handleOneConnection(conn net.Conn, state *common.AppState, connectionCount 
 	// Explicitly trigger handshake for TLS connections to catch protocol errors early
 	if tlsConn, ok := conn.(*tls.Conn); ok {
 		if err := tlsConn.Handshake(); err != nil {
-			log.Printf("[%2d] [TLS_ERROR] Handshake failed from %s: %v", newCount, conn.RemoteAddr(), err)
+			logger.Error("[%2d] [TLS_ERROR] Handshake failed from %s: %v", newCount, conn.RemoteAddr(), err)
 			conn.Close()
 			return
 		}
 	}
 
-	log.Printf("[%2d] [ACCEPT] Protocol: %s | Client: %s", newCount, protocol, conn.RemoteAddr().String())
+	logger.Info("[%2d] [ACCEPT] Protocol: %s | Client: %s", newCount, protocol, conn.RemoteAddr().String())
 
 	state.AddConn(conn)
 	defer state.RemoveConn(conn)
@@ -340,14 +349,17 @@ func handleOneConnection(conn net.Conn, state *common.AppState, connectionCount 
 		err := v.ReadArray(reader)
 		if err != nil {
 			if err.Error() != "EOF" {
-				log.Printf("[%2d] [ERROR] Read error: %v", newCount, err)
+				logger.Error("[%2d] read error: %v", newCount, err)
 			}
 			break
 		}
 
 		// Log the command name for debugging
 		if len(v.Arr) > 0 {
-			log.Printf("[%2d] [EXEC] %s", newCount, v.Arr[0].Blk)
+			if !state.Config.Sensitive {
+				v.Arr[0].Blk = strings.ToUpper(v.Arr[0].Blk)
+			}
+			fmt.Printf("[%2d] [SERVER] %s\n", newCount, v.Arr[0].Blk)
 		}
 
 		// Swap the global DB pointer to the client's selected database
@@ -360,7 +372,7 @@ func handleOneConnection(conn net.Conn, state *common.AppState, connectionCount 
 
 	newCount = atomic.AddInt32(connectionCount, -1)
 	state.NumClients = int(newCount)
-	log.Printf("[%2d] [CLOSED] Client disconnected: %s\n", newCount, conn.RemoteAddr().String())
 
-	fmt.Printf("[INFO] Closed      connection from %-3s    : %s\n", protocol, conn.RemoteAddr())
+	logger.Warn("[%2d] [CLOSED] Client disconnected: %s\n", newCount, conn.RemoteAddr().String())
+	fmt.Printf("[SERVER] Closed      connection from %-3s    : %s\n", protocol, conn.RemoteAddr())
 }

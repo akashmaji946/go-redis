@@ -15,7 +15,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path"
 	"time"
@@ -51,7 +50,7 @@ func InitRDBTrackers(conf *Config, state *AppState, dbID int, getSnapshot func()
 			defer tr.ticker.Stop()
 			for range tr.ticker.C {
 				if tr.keys >= tr.rdb.KeysChanged {
-					log.Printf("[..RDB..] Automatic saving triggered for DB %d", tr.dbID)
+					logger.Info("[..RDB..] Automatic saving triggered for DB %d", tr.dbID)
 					SaveRDB(state, tr.dbID, getSnapshot())
 				}
 				tr.keys = 0
@@ -66,9 +65,9 @@ func InitRDBTrackers(conf *Config, state *AppState, dbID int, getSnapshot func()
 // truncating the RDB file prematurely, the file is opened only after the
 // buffer is prepared.
 func SaveRDB(state *AppState, dbID int, data map[string]*Item) {
-	log.Printf("saving rdb file for DB %d", dbID)
+	logger.Info("saving rdb file for DB %d\n", dbID)
 
-	log.Println("copying data from DB to buffer....")
+	logger.Info("copying data from DB to buffer....\n")
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(&data); err != nil {
 		fmt.Println("error copying DB to buf", err)
@@ -83,7 +82,7 @@ func SaveRDB(state *AppState, dbID int, data map[string]*Item) {
 		gcm, _ := cipher.NewGCM(block)
 		nonce := make([]byte, gcm.NonceSize())
 		if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-			log.Println("failed to generate nonce:", err)
+			logger.Error("failed to generate nonce: %v\n", err)
 			return
 		}
 		encodedData = gcm.Seal(nonce, nonce, encodedData, nil)
@@ -92,7 +91,7 @@ func SaveRDB(state *AppState, dbID int, data map[string]*Item) {
 	// checksum of buffer data
 	bsum, err := Hash(bytes.NewReader(encodedData))
 	if err != nil {
-		log.Println("can't compute buf checksum bsum: ", err)
+		logger.Error("can't compute buf checksum bsum: %v\n", err)
 		return
 	}
 
@@ -106,23 +105,23 @@ func SaveRDB(state *AppState, dbID int, data map[string]*Item) {
 	}
 	defer f.Close()
 
-	log.Println("saveRDB: copying data from from buf to file")
+	logger.Info("saveRDB: copying data from from buf to file\n")
 	if _, err := f.Write(encodedData); err != nil {
 		fmt.Printf("error copying data from from buf to file")
 		return
 	}
 	if err := f.Sync(); err != nil {
-		log.Println("can't sync files and flush to disk: ", err)
+		logger.Error("can't sync files and flush to disk: %v\n", err)
 		return
 	}
 
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		log.Println("can't seek file to start:", err)
+		logger.Error("can't seek file to start: %v\n", err)
 		return
 	}
 	fsum, err := Hash(f)
 	if err != nil {
-		log.Println("can't compute file checksum fsum:", err)
+		logger.Error("can't compute file checksum fsum: %v\n", err)
 		return
 	}
 	if bsum != fsum {
@@ -132,7 +131,7 @@ func SaveRDB(state *AppState, dbID int, data map[string]*Item) {
 
 	state.RdbStats.RDBLastSavedTS = time.Now().Unix()
 	state.RdbStats.RDBSavesCount += 1
-	log.Println("saved rdb file")
+	logger.Info("saved rdb file\n")
 }
 
 // SyncRDB decodes the rdb file and returns the restored map for the caller
@@ -181,11 +180,11 @@ func SyncRDB(conf *Config, state *AppState, dbID int) (map[string]*Item, error) 
 	var restored map[string]*Item
 	dec := gob.NewDecoder(bytes.NewReader(content))
 	if err := dec.Decode(&restored); err != nil {
-		log.Println("error restoring rdb file using gob: ", err)
+		logger.Error("error restoring rdb file using gob: %v\n", err)
 		return nil, err
 	}
 
-	log.Println("restored rdb file")
+	logger.Info("restored rdb file\n")
 	return restored, nil
 }
 
@@ -193,10 +192,10 @@ func Hash(r io.Reader) (string, error) {
 	h := sha256.New()
 	_, err := io.Copy(h, r)
 	if err != nil {
-		log.Println("can't copy from reader to hash")
+		logger.Info("can't copy from reader to hash\n")
 		return "", err
 	}
 	hash := hex.EncodeToString(h.Sum(nil))
-	log.Printf("HASH = %s\n", hash)
+	logger.Info("HASH = %s\n", hash)
 	return hash, nil
 }

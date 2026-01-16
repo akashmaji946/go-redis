@@ -7,13 +7,14 @@ package database
 
 import (
 	"errors"
-	"log"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/akashmaji946/go-redis/internal/common"
 )
+
+var logger = common.NewLogger()
 
 // Database represents the main in-memory key-value store.
 // It provides thread-safe operations for storing, retrieving, and deleting key-value pairs.
@@ -177,7 +178,7 @@ func (DB *Database) Put(k string, v string, state *common.AppState) (err error) 
 		DB.IncrTrackers()
 	}
 
-	log.Printf("memory = %d\n", DB.Mem)
+	logger.Warn("memory = %d\n", DB.Mem)
 	if DB.Mem < 0 {
 		panic("DB memory went negative!")
 	}
@@ -269,7 +270,7 @@ func (DB *Database) Rem(k string) {
 		// Notify watchers that the key has been deleted
 		DB.Touch(k)
 	}
-	log.Printf("memory = %d\n", DB.Mem)
+	logger.Warn("memory = %d\n", DB.Mem)
 	if DB.Mem < 0 {
 		panic("DB memory went negative!")
 	}
@@ -307,7 +308,7 @@ func (DB *Database) RemIfExpired(k string, item *common.Item, state *common.AppS
 	}
 	if item.IsExpired() { // check if expired
 		if _, exists := DB.Store[k]; exists {
-			log.Println("Deleting expired key: ", k)
+			logger.Warn("Deleting expired key: ", k)
 			DB.Rem(k)
 			state.GenStats.TotalExpiredKeys += 1
 			return true
@@ -444,7 +445,7 @@ func (db *Database) EvictKeys(state *common.AppState, requiredMemBytes int64) (c
 			if enoughMemFreed() {
 				break
 			}
-			log.Printf("evicting key=%s\n", sample.key)
+			logger.Warn("evicting key=%s\n", sample.key)
 			DB.Rem(sample.key)
 			count += 1
 		}

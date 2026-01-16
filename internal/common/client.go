@@ -7,7 +7,6 @@ package common
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"time"
 )
@@ -128,7 +127,7 @@ func (client *Client) WriterMonitorLog(value *Value, executingClient *Client) {
 	executingClientIP := executingClient.Conn.RemoteAddr().String()
 	clientIP := client.Conn.RemoteAddr().String()
 
-	log.Printf("sending monitor log from=[%s] to=[%s]", executingClientIP, clientIP)
+	logger.Info("sending monitor log from=[%s] to=[%s]", executingClientIP, clientIP)
 
 	msg := fmt.Sprintf("%d [%s --> %s] ", time.Now().Unix(), executingClientIP, clientIP)
 	for _, v := range value.Arr {

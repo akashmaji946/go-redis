@@ -7,13 +7,13 @@ package handlers
 
 import (
 	"fmt"
-	"log"
-	"strings"
 
 	"github.com/akashmaji946/go-redis/internal/database"
 
 	"github.com/akashmaji946/go-redis/internal/common"
 )
+
+var logger = common.NewLogger()
 
 func init() {
 	Handlers["COMMANDS"] = Commands
@@ -205,14 +205,10 @@ func Handle(client *common.Client, v *common.Value, state *common.AppState) {
 	// the command is in the first entry of v.Arr
 	cmd := v.Arr[0].Blk
 
-	if !state.Config.Sensitive {
-		cmd = strings.ToUpper(cmd)
-	}
-
 	handler, ok := Handlers[cmd]
 
 	if !ok {
-		log.Println("common.ERROR: no such command:", cmd)
+		logger.Warn("ERROR: no such command: '%s'\n", cmd)
 		msg := fmt.Sprintf("ERR no such command '%s', use COMMANDS for help", cmd)
 		reply := common.NewErrorValue(msg)
 		if client != nil && client.Conn != nil {

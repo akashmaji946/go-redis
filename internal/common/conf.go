@@ -200,7 +200,7 @@ func ReadConf(filename string, dataDir string) *Config {
 
 	f, err := os.Open(filename)
 	if err != nil {
-		log.Printf("can't read file %s - using default config\n", filename)
+		logger.Warn("can't read file %s - using default config\n", filename)
 		return config
 	}
 	defer f.Close()
@@ -217,7 +217,7 @@ func ReadConf(filename string, dataDir string) *Config {
 	}
 
 	if err := s.Err(); err != nil {
-		log.Printf("error scanning config file %s", filename)
+		logger.Error("error scanning config file: %s\n", filename)
 		return config
 	}
 
@@ -227,11 +227,11 @@ func ReadConf(filename string, dataDir string) *Config {
 		// Convert to absolute path
 		absDataDir, err := filepath.Abs(dataDir)
 		if err != nil {
-			log.Printf("warning: Could not resolve absolute path for '%s', using as-is\n", dataDir)
+			logger.Warn("warning: could not resolve absolute path for '%s', using as-is\n", dataDir)
 			absDataDir = dataDir
 		}
 		config.Dir = absDataDir
-		log.Printf("using data directory from command line: %s\n", absDataDir)
+		logger.Info("using data directory from command line: %s\n", absDataDir)
 	}
 
 	// Ensure data directory exists
@@ -239,7 +239,7 @@ func ReadConf(filename string, dataDir string) *Config {
 		if err := os.MkdirAll(config.Dir, 0755); err != nil {
 			log.Fatalf("failed to create data directory '%s': %v\n", config.Dir, err)
 		}
-		log.Printf("data directory: %s\n", config.Dir)
+		logger.Info("data directory: %s\n", config.Dir)
 	}
 	return config
 }

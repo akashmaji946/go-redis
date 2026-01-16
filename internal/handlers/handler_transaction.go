@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"log"
-
 	"github.com/akashmaji946/go-redis/internal/common"
 	"github.com/akashmaji946/go-redis/internal/database"
 )
@@ -52,19 +50,19 @@ import (
 func Multi(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) != 0 {
-		log.Println("invalid use of MULTI")
+		logger.Warn("invalid use of MULTI\n")
 		return common.NewErrorValue("ERR invalid argument to MULTI")
 	}
 	// check if this client already has a Tx running
 	if c.InTx {
-		log.Println("MULTI calls can not be nested")
+		logger.Error("MULTI calls can not be nested\n")
 		return common.NewErrorValue("ERR MULTI calls can not be nested")
 	}
 
 	c.InTx = true
 	c.Tx = common.NewTransaction()
 
-	log.Println("Tx started")
+	logger.Info("Tx started")
 	return common.NewStringValue("Started")
 
 }
@@ -117,12 +115,12 @@ func Multi(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 func Exec(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) != 0 {
-		log.Println("invalid use of EXEC")
+		logger.Warn("invalid use of EXEC\n")
 		return common.NewErrorValue("ERR invalid argument to EXEC")
 	}
 	// check if some Tx running
 	if !c.InTx || c.Tx == nil {
-		log.Println("Tx already NOT running")
+		logger.Warn("Tx already NOT running\n")
 		return common.NewErrorValue("ERR Tx already NOT running")
 	}
 
@@ -175,12 +173,12 @@ func Exec(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 func Discard(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) != 0 {
-		log.Println("invalid use of DISCARD")
+		logger.Warn("invalid use of DISCARD\n")
 		return common.NewErrorValue("ERR invalid argument to DISCARD")
 	}
 	// check if some Tx running
 	if !c.InTx || c.Tx == nil {
-		log.Println("Tx already NOT running")
+		logger.Warn("Tx already NOT running\n")
 		return common.NewErrorValue("ERR Tx already NOT running")
 	}
 
@@ -188,7 +186,7 @@ func Discard(c *common.Client, v *common.Value, state *common.AppState) *common.
 	c.InTx = false
 	c.Tx = nil
 	unwatchClient(c)
-	log.Println("Tx discarded")
+	logger.Info("Tx discarded")
 
 	return common.NewStringValue("Discarded")
 }
@@ -271,7 +269,7 @@ func ExecuteTransaction(client *common.Client, state *common.AppState) *common.V
 	client.Tx = nil
 	unwatchClient(client)
 
-	log.Println("Tx executed")
+	logger.Info("Tx executed")
 	return &common.Value{
 		Typ: common.ARRAY,
 		Arr: replies,

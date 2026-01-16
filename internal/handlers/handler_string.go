@@ -7,7 +7,6 @@ package handlers
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 
 	"github.com/akashmaji946/go-redis/internal/common"
@@ -132,7 +131,7 @@ func Set(c *common.Client, v *common.Value, state *common.AppState) *common.Valu
 		state.Aof.W.Write(v)
 
 		if state.Config.AofFsync == common.Always {
-			log.Println("save AOF record on SET")
+			logger.Info("save AOF record on SET\n")
 			state.Aof.W.Flush()
 		}
 

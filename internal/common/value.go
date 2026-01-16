@@ -179,14 +179,14 @@ func (v *Value) ReadBulk(reader *bufio.Reader) (Value, error) {
 
 	line, err := ReadLine(reader) // line = $1123
 	if err != nil {
-		log.Println("error in ReadBulk:", err)
+		logger.Error("error in ReadBulk: %v\n", err)
 		return Value{
 			Typ: NULL,
 		}, err
 	}
 	if line[0] != '$' {
 		err := fmt.Errorf("must have $ with readbulk")
-		log.Println("error in ReadBulk:", err)
+		logger.Error("error in ReadBulk: %v\n", err)
 		return Value{
 			Typ: NULL,
 		}, err
@@ -202,7 +202,7 @@ func (v *Value) ReadBulk(reader *bufio.Reader) (Value, error) {
 	// read till filling the buffer
 	_, err = io.ReadFull(reader, bulkDataBuffer)
 	if err != nil {
-		log.Println("error in ReadBulk:", err)
+		logger.Error("error in ReadBulk: %v\n", err)
 		return Value{
 			Typ: NULL,
 		}, err
@@ -255,24 +255,24 @@ func (v *Value) ReadArray(reader *bufio.Reader) error {
 	// reader := bufio.NewReader(r) // creates problem with aof file sync
 	line, err := ReadLine(reader) // line = *123
 	if err != nil {
-		log.Println("error in ReadArray:", err)
+		logger.Error("error in ReadArray: %v\n", err)
 		return err
 	}
 	if line[0] != '*' {
-		log.Println("error in ReadArray:", err)
+		logger.Error("error in ReadArray: %v\n", err)
 		return fmt.Errorf("invalid input by user")
 	}
 
 	arrLen, err := strconv.Atoi(line[1:]) // pass "123"
 	if err != nil {
-		log.Println("can't convert to get array length")
+		logger.Error("can't convert to get array length: %v\n", err)
 		return err
 	}
 
 	for range arrLen {
 		bulk, err := v.ReadBulk(reader)
 		if err != nil {
-			log.Printf("can't proceed with readbulk")
+			logger.Warn("can't proceed with readbulk")
 			break
 		}
 		v.Arr = append(v.Arr, bulk)

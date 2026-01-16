@@ -13,7 +13,6 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"io"
-	"log"
 	"net"
 	"os"
 	"path"
@@ -200,7 +199,7 @@ func (s *AppState) LoadUsers() {
 			nonce, ciphertext := content[:nonceSize], content[nonceSize:]
 			content, err = gcm.Open(nil, nonce, ciphertext, nil)
 			if err != nil {
-				log.Println("failed to decrypt passwd.bin")
+				logger.Error("failed to decrypt passwd.bin\n")
 				return
 			}
 		}
