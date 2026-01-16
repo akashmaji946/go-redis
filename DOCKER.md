@@ -63,7 +63,6 @@ docker build -t go-redis:latest .
 Run it for TCP
 ```bash
 docker run -d -p 7379:7379 \
-  -v $(pwd)/config:/app/config \
   -v $(pwd)/data:/app/data \
   --name go-redis \
   go-redis:latest
@@ -84,9 +83,8 @@ docker images | grep go-redis
 
 ### Run with default config and data directory
 ```bash
-docker run -d \
+docker run -d -p 7379:7379 -p 7380:7380\
   --name go-redis \
-  -p 7379:7379 \
   -v $(pwd)/data:/app/data \
   go-redis:latest
 ```
@@ -109,6 +107,7 @@ docker run -d \
 ### Access container using using redis-cli from host
 ```bash
 redis-cli -p 7379
+redis-cli -p 7380 --tls --insecure
 ```
 
 ### See container running as:
@@ -128,5 +127,16 @@ docker stop go-redis
 
 ## Remove conatiner
 ```bash
-docker rm go-redis:latest
+docker rm go-redis
+```
+
+## Remove image
+```bash
+docker rmi go-redis:latest
+```
+
+## Optional
+```bash
+docker tag go-redis:latest akashmaji/go-redis:latest
+docker push akashmaji/go-redis:latest
 ```

@@ -83,6 +83,14 @@ func main() {
 	log.Printf("[INFO] data directory: %s\n", dataDirectoryPath)
 
 	conf := common.ReadConf(configFilePath, dataDirectoryPath)
+
+	// Check if running inside a container and override TLS paths
+	if os.Getenv("INSIDE_CONTAINER") == "true" {
+		log.Println("[INFO] Running inside container, using container TLS certificate paths")
+		conf.TlsCertFile = "/app/config/cert.pem"
+		conf.TlsKeyFile = "/app/config/key.pem"
+	}
+
 	state := common.NewAppState(conf)
 
 	// Initialize multiple databases based on config

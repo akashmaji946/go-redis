@@ -25,6 +25,14 @@ else
     echo -e "${YELLOW}[WARN] Data directory ./data does not exist.${NC}"
 fi
 
+# Clean .test directory
+if [ -d "./.test" ]; then
+    echo -e "${GREEN}[INFO] Removing files in ./.test...${NC}"
+    rm -rf ./.test/*
+else
+    echo -e "${YELLOW}[WARN] Test directory ./.test does not exist.${NC}"
+fi
+
 echo -e "${BLUE}Cleanup complete.${NC}"
 GREEN='\033[0;32m'
 RED='\033[0;31m'

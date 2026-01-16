@@ -1,41 +1,14 @@
-# Documentation Update TODO
+# TODO: Add INSIDE_CONTAINER flag for TLS certificate paths
 
-## README.md Updates
-- [x] Add HyperLogLog category with PFADD, PFCOUNT, PFDEBUG, PFMERGE commands
-- [x] Add missing ECHO command to Connection section
-- [x] Add missing HMGET command to Hash section
-- [x] Add missing FLUSHALL command to Server section
-- [x] Add missing USERDEL command to Connection section
+## Plan
+- [x] **Dockerfile** - Add environment variable `INSIDE_CONTAINER=true`
+- [x] **cmd/main.go** - Add logic to check `INSIDE_CONTAINER` env var and override TLS paths to `/app/config/cert.pem` and `/app/config/key.pem`
 
-## DOCS.md Updates
-- [x] Add HyperLogLog Operations section with detailed command table
-- [x] Add ECHO command to Server & Connection section
-- [x] Add HMGET command to Hash Operations section
-- [x] Add FLUSHALL command to Server & Connection section
-- [x] Add USERDEL command to User Management section
-- [x] Update command descriptions to match commands.json
+## Followup
+- [x] Rebuild Docker image (`go-redis:test`)
+- [x] Test TLS connection with `redis-cli -p 7380 --tls --insecure PING` - **SUCCESS: PONG**
 
-## Verification
-- [x] Verify all commands from commands.json are documented
-- [x] Verify consistency between README.md and DOCS.md
-
-## Summary of Changes
-
-### README.md
-- Added HyperLogLog section with 4 commands: PFADD, PFCOUNT, PFDEBUG, PFMERGE
-- Added ECHO to Connection section
-- Added USERDEL to Connection section
-- Added HMGET to Hash section
-- Added FLUSHALL to Server section
-- Reorganized commands alphabetically within sections
-- Renamed "ZSet" to "Sorted Set (ZSet)" for clarity
-
-### DOCS.md
-- Added new HyperLogLog Operations section with detailed command table
-- Added ECHO command to Server & Connection section
-- Added HMGET command to Hash Operations section
-- Added USERDEL command to User Management section
-- Added FLUSHALL and DROPDB (as separate entries) to Monitoring & Information section
-- Updated all command descriptions to be more comprehensive based on commands.json
-- Separated alias commands into their own rows for clarity (e.g., PUB, SUB, UNSUB, etc.)
-- Added information about admin privileges requirements where applicable
+## Test Results
+- Container logs show: `[INFO] Running inside container, using container TLS certificate paths`
+- TLS listener started successfully on port 7380
+- `redis-cli -p 7380 --tls --insecure PING` returns `PONG`

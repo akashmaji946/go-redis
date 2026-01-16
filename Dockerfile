@@ -57,6 +57,9 @@ RUN openssl req -x509 -newkey rsa:4096 \
   -subj "/CN=go-redis"
 
 
+# Set environment variable to indicate running inside container
+ENV INSIDE_CONTAINER=true
+
 # Expose Redis port
 EXPOSE 7379 7380
 

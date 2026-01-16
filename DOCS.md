@@ -186,14 +186,8 @@ docker pull akashmaji/go-redis:latest
 
 # 2. Run the container, mounting a volume for persistent data (with default config)
 docker run -d -p 7379:7379 \
-  -v $(pwd)/data:/app/data \
-  --name go-redis \
-  akashmaji/go-redis:latest
-
-# 3. Run the container, mounting a volume for persistent data (with custom config)
-docker run -d -p 7379:7379 \
-  -v $(pwd)/config/redis.conf:/app/config/redis.conf:ro \
-  -v $(pwd)/data:/app/data \
+  -v $(pwd)/.test:/app/data \
+  -v $(pwd)/.test/redis.conf:/app/config/redis.conf:ro \
   --name go-redis \
   akashmaji/go-redis:latest
 
@@ -211,15 +205,15 @@ docker build -t go-redis:latest .
 
 # 2. Run the container
 # This example mounts a custom config file and data directory
-docker run -d -p 7379:7379 \
-  -v $(pwd)/config/redis.conf:/app/config/redis.conf:ro \
-  -v $(pwd)/data:/app/data \
+docker run -d -p 7379:7379 -p 7380:7380 \
+  -v $(pwd)/.test:/app/data \
+  -v $(pwd)/.test/redis.conf:/app/config/redis.conf:ro \
   --name go-redis \
   go-redis:latest
 
 # 3.1 Connect from your host
 redis-cli -p 7379
-
+redis-cli -p 7380  --tls --insecure
 # 3. Check logs
 docker logs go-redis
 

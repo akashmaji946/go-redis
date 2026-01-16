@@ -4,6 +4,7 @@ deploy/
 *.aof
 *.rdb
 
+.test/
 
 WINDSURF.md
 GEMINI.md
