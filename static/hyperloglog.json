@@ -1,0 +1,22 @@
+{
+    "PFADD": {
+        "usage": "PFADD <key> <element> [element ...]",
+        "description": "Add one or more elements to a HyperLogLog probabilistic data structure stored at the specified key. HyperLogLog provides approximate cardinality (unique count) estimation using only ~12KB of memory regardless of the number of elements added. If the key does not exist, a new HyperLogLog is created using sparse representation for memory efficiency. Returns 1 if at least one internal register was altered (indicating the cardinality estimate may have changed), or 0 if no registers were altered (element was likely already counted). The standard error rate is approximately 0.81%. This operation is recorded to AOF if persistence is enabled.",
+        "category": "hyperloglog"
+    },
+    "PFCOUNT": {
+        "usage": "PFCOUNT <key> [key ...]",
+        "description": "Return the approximated cardinality (number of unique elements) observed by the HyperLogLog(s) at the specified key(s). When called with a single key, returns the cardinality estimate for that HyperLogLog. When called with multiple keys, returns the cardinality of the union of all specified HyperLogLogs (as if all elements were added to a single HyperLogLog). Non-existent keys are treated as empty HyperLogLogs contributing 0 to the count. The standard error rate is approximately 0.81%. Returns an error if any key exists but is not a HyperLogLog type. This operation is thread-safe and uses a read lock.",
+        "category": "hyperloglog"
+    },
+    "PFDEBUG": {
+        "usage": "PFDEBUG <key>",
+        "description": "Return internal debugging information about a HyperLogLog stored at the specified key. This is a diagnostic command useful for understanding the internal state of a HyperLogLog. Returns an array containing: encoding type ('sparse' or 'dense'), number of registers currently in use, and the estimated cardinality. Sparse encoding is used for small cardinalities to save memory, automatically converting to dense encoding when the threshold is exceeded. Returns NULL if the key does not exist. Returns an error if the key exists but is not a HyperLogLog type.",
+        "category": "hyperloglog"
+    },
+    "PFMERGE": {
+        "usage": "PFMERGE <destkey> <sourcekey> [sourcekey ...]",
+        "description": "Merge multiple HyperLogLog values into a single destination HyperLogLog. The merged HyperLogLog's cardinality estimate approximates the cardinality of the union of all source HyperLogLogs. The destination key is created if it does not exist, or overwritten if it does. The merge operation takes the maximum value of each register position across all sources. Non-existent source keys are treated as empty HyperLogLogs. The result is always stored in dense format. Returns 'OK' on success. Returns an error if any key exists but is not a HyperLogLog type. This operation is recorded to AOF if persistence is enabled.",
+        "category": "hyperloglog"
+    }
+}

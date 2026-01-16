@@ -1,0 +1,67 @@
+{
+    "HDEL": {
+        "usage": "HDEL <key> <field> [field ...]",
+        "description": "Delete one or more fields from a hash stored at the specified key. Fields that do not exist in the hash are silently ignored. Returns an integer representing the number of fields that were actually removed from the hash. Returns 0 if the key does not exist. Returns an error if the key exists but is not a hash type. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is thread-safe.",
+        "category": "hash"
+    },
+    "HDELALL": {
+        "usage": "HDELALL <key>",
+        "description": "Delete all fields from a hash stored at the specified key, effectively clearing the entire hash. Returns an integer representing the number of fields that were deleted. Returns 0 if the key does not exist or the hash is already empty. Returns an error if the key exists but is not a hash type. Unlike HDEL, this command removes all fields in a single operation. The operation updates memory tracking and is recorded to AOF if persistence is enabled.",
+        "category": "hash"
+    },
+    "HEXISTS": {
+        "usage": "HEXISTS <key> <field>",
+        "description": "Check if a specific field exists within a hash stored at the specified key. Returns 1 if the hash contains the specified field, or 0 if the field does not exist or the key does not exist. Returns an error if the key exists but is not a hash type. This operation is thread-safe and uses a read lock. Note that expired fields (if field-level expiration is set via HEXPIRE) are still reported as existing until they are lazily deleted.",
+        "category": "hash"
+    },
+    "HEXPIRE": {
+        "usage": "HEXPIRE <key> <field> <seconds>",
+        "description": "Set an expiration time on a specific field within a hash. After the timeout expires, the field will be automatically deleted using lazy expiration (deleted on next access). The timeout is specified in seconds as a positive integer. Returns 1 if the expiration was set successfully, or 0 if the key or field does not exist. Returns an error if the key exists but is not a hash type. This is a custom extension not available in standard Redis, allowing fine-grained expiration control at the field level.",
+        "category": "hash"
+    },
+    "HGET": {
+        "usage": "HGET <key> <field>",
+        "description": "Retrieve the value associated with a specific field in a hash stored at the specified key. Returns the field value as a bulk string if both the key and field exist. Returns NULL if the key does not exist, if the field does not exist within the hash, or if the field has expired. Returns an error if the key exists but is not a hash type. Expired fields are lazily deleted when accessed. This operation is thread-safe.",
+        "category": "hash"
+    },
+    "HGETALL": {
+        "usage": "HGETALL <key>",
+        "description": "Retrieve all fields and their values from a hash stored at the specified key. Returns an array containing alternating field names and values: [field1, value1, field2, value2, ...]. Returns an empty array if the key does not exist. Returns an error if the key exists but is not a hash type. Expired fields (if field-level expiration is set) are automatically skipped and not included in the result. This operation is thread-safe and uses a read lock.",
+        "category": "hash"
+    },
+    "HINCRBY": {
+        "usage": "HINCRBY <key> <field> <increment>",
+        "description": "Increment the integer value of a hash field by the specified amount. If the key does not exist, a new hash is created. If the field does not exist or has expired, it is initialized to 0 before the increment. The increment can be negative to perform a decrement. Returns the new value after the increment as an integer. Returns an error if the increment is not a valid integer, if the field value cannot be parsed as an integer, or if the key is not a hash type. This operation is atomic and thread-safe.",
+        "category": "hash"
+    },
+    "HKEYS": {
+        "usage": "HKEYS <key>",
+        "description": "Retrieve all field names from a hash stored at the specified key. Returns an array containing all field names in the hash. Returns an empty array if the key does not exist. Returns an error if the key exists but is not a hash type. Expired fields (if field-level expiration is set) are automatically skipped and not included in the result. The order of fields in the result is not guaranteed. This operation is thread-safe and uses a read lock.",
+        "category": "hash"
+    },
+    "HLEN": {
+        "usage": "HLEN <key>",
+        "description": "Return the number of fields contained in a hash stored at the specified key. Returns an integer representing the field count. Returns 0 if the key does not exist. Returns an error if the key exists but is not a hash type. Note that this count may include expired fields that have not yet been lazily deleted. This operation is thread-safe and uses a read lock.",
+        "category": "hash"
+    },
+    "HMGET": {
+        "usage": "HMGET <key> <field> [field ...]",
+        "description": "Retrieve the values associated with the specified fields in a hash stored at the specified key. Returns an array of values in the same order as the requested fields. For fields that do not exist or have expired, NULL is returned in their position. If the key does not exist, an array of NULL values is returned. Returns an error if the key exists but is not a hash type. This command is more efficient than multiple HGET calls when retrieving multiple fields. This operation is thread-safe and uses a read lock.",
+        "category": "hash"
+    },
+    "HMSET": {
+        "usage": "HMSET <key> <field> <value> [field value ...]",
+        "description": "Set multiple field-value pairs in a hash stored at the specified key. If the key does not exist, a new hash is created. If any specified fields already exist, their values are overwritten. This command is deprecated in favor of HSET which now supports multiple field-value pairs, but is kept for backward compatibility. Returns 'OK' on success. Returns an error if the number of arguments is not valid (must have an even number of field-value pairs after the key). This operation is atomic and thread-safe.",
+        "category": "hash"
+    },
+    "HSET": {
+        "usage": "HSET <key> <field> <value> [field value ...]",
+        "description": "Set one or more field-value pairs in a hash stored at the specified key. If the key does not exist, a new hash is created. If any specified fields already exist, their values are overwritten. Returns an integer representing the number of new fields that were added (not counting fields that were updated). Returns an error if the number of arguments is not valid (must have an odd number of arguments: key followed by field-value pairs). The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
+        "category": "hash"
+    },
+    "HVALS": {
+        "usage": "HVALS <key>",
+        "description": "Retrieve all values from a hash stored at the specified key. Returns an array containing all field values in the hash. Returns an empty array if the key does not exist. Returns an error if the key exists but is not a hash type. Expired fields (if field-level expiration is set) are automatically skipped and their values are not included in the result. The order of values in the result corresponds to the internal hash iteration order. This operation is thread-safe and uses a read lock.",
+        "category": "hash"
+    }
+}

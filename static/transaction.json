@@ -1,0 +1,27 @@
+{
+    "DISCARD": {
+        "usage": "DISCARD",
+        "description": "Abort the current transaction by discarding all commands that were queued after MULTI. This command can only be called when a transaction is active (after MULTI has been called). All queued commands are discarded without being executed, and no changes are made to the database. The client can start a new transaction with MULTI after discarding. Returns 'Discarded' on success, or an error if no transaction is currently running. Also clears any WATCH keys associated with the transaction.",
+        "category": "transaction"
+    },
+    "EXEC": {
+        "usage": "EXEC",
+        "description": "Execute all commands that were queued after MULTI as a single atomic transaction. All queued commands are executed sequentially in the order they were received. Returns an array containing the replies from each executed command in order. If any command fails, subsequent commands still execute (no automatic rollback). Returns an error if no transaction is currently running. If any watched keys (via WATCH) were modified by another client, the transaction is aborted and NULL is returned. After EXEC, the transaction state is cleared and watched keys are unwatched.",
+        "category": "transaction"
+    },
+    "MULTI": {
+        "usage": "MULTI",
+        "description": "Mark the start of a transaction block. After MULTI is called, all subsequent commands are queued instead of being executed immediately. The queued commands are executed atomically when EXEC is called, or discarded when DISCARD is called. Each queued command returns 'QUEUED' instead of its actual result. Only one transaction can be active per client connection. Returns 'Started' on success, or an error if a transaction is already running (MULTI calls cannot be nested). Use WATCH before MULTI to implement optimistic locking.",
+        "category": "transaction"
+    },
+    "UNWATCH": {
+        "usage": "UNWATCH",
+        "description": "Flush all previously watched keys for the current client connection. This command clears the list of keys being watched for optimistic locking without aborting any transaction. Returns 'OK' on success. After UNWATCH, modifications to previously watched keys will not cause a subsequent EXEC to fail. This command can be called at any time, whether or not a transaction is active. It is automatically called after EXEC or DISCARD.",
+        "category": "transaction"
+    },
+    "WATCH": {
+        "usage": "WATCH <key> [key ...]",
+        "description": "Mark one or more keys to be watched for optimistic locking in conjunction with MULTI/EXEC transactions. If any of the watched keys are modified by another client before EXEC is called, the entire transaction will be aborted and EXEC will return NULL. WATCH must be called before MULTI. Returns 'OK' on success. Returns an error if called inside a MULTI block (WATCH inside MULTI is not allowed). Multiple WATCH calls can be made to watch additional keys. All watched keys are automatically unwatched after EXEC or DISCARD.",
+        "category": "transaction"
+    }
+}

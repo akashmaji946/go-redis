@@ -1,0 +1,42 @@
+{
+    "AUTH": {
+        "usage": "AUTH <user> <password>",
+        "description": "Authenticate to the server with the specified username and password. This command is required when the server is configured with 'requirepass' enabled. Upon successful authentication, the client gains access to execute commands based on their user permissions. Returns 'OK' on success, or an error if the user is not found or the password is incorrect. The authenticated user's information is stored in the client connection state.",
+        "category": "connection"
+    },
+    "ECHO": {
+        "usage": "ECHO <message>",
+        "description": "Returns the same message that was sent to the server. This command is useful for testing connectivity and verifying that the server is properly receiving and responding to commands. The message is returned as a bulk string exactly as it was received. Returns an error if no message argument is provided or if more than one argument is given.",
+        "category": "connection"
+    },
+    "PASSWD": {
+        "usage": "PASSWD <user> <password>",
+        "description": "Change the password for a user account. Users can change their own password, and admin users can change any user's password. The new password must be alphanumeric (letters and numbers only). Returns 'OK' on success. Returns an error if: the password is not alphanumeric, the user does not have permission to change the target user's password, or the target user does not exist. The updated credentials are persisted to the users file. This command can be executed without authentication if the target is the current user.",
+        "category": "connection"
+    },
+    "PING": {
+        "usage": "PING [message]",
+        "description": "Test server connectivity and measure latency. When called without arguments, returns 'PONG'. When called with a message argument, returns that message. This command can be executed without authentication, making it useful for connection health checks. Returns an error if more than one argument is provided. This is one of the simplest commands and is commonly used by client libraries to verify the connection is alive.",
+        "category": "connection"
+    },
+    "USERADD": {
+        "usage": "USERADD <admin_flag 1/0> <user> <password>",
+        "description": "Create a new user account on the server. The admin_flag parameter specifies whether the new user should have admin privileges (1 for admin, 0 for regular user). The password must be alphanumeric (letters and numbers only). Returns 'OK' on success. Returns an error if: the current user is not an admin, the password is not alphanumeric, or if there are invalid arguments. The new user credentials are persisted to the users file. This command requires admin privileges.",
+        "category": "connection"
+    },
+    "USERDEL": {
+        "usage": "USERDEL <user>",
+        "description": "Delete a user account from the server. The specified user will be removed and will no longer be able to authenticate. Returns 'OK' on success. Returns an error if: the current user is not an admin, the target user does not exist, or if attempting to delete the 'root' user (which cannot be deleted). The updated user list is persisted to the users file. This command requires admin privileges.",
+        "category": "connection"
+    },
+    "USERS": {
+        "usage": "USERS [username]",
+        "description": "List all usernames or show details for a specific user. When called without arguments, returns an array of all usernames sorted alphabetically. When called with a username argument, returns detailed information about that user including: username, client IP (if connected), admin status, and full name. Returns an error if the specified user does not exist. This command requires admin privileges to view other users' details.",
+        "category": "connection"
+    },
+    "WHOAMI": {
+        "usage": "WHOAMI",
+        "description": "Display details of the currently authenticated user. Returns an array containing user information including: username, client IP address, admin status (true/false), and full name. Returns an error if the client is not authenticated. This command can be executed without special privileges - any authenticated user can view their own information. Useful for verifying the current authentication state.",
+        "category": "connection"
+    }
+}

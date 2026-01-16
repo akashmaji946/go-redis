@@ -1,0 +1,17 @@
+{
+    "BGREWRITEAOF": {
+        "usage": "BGREWRITEAOF",
+        "description": "Asynchronously rewrite the Append-Only File (AOF) in the background. This command triggers a background process that creates a new, optimized AOF file by reading the current dataset and writing the minimal set of commands needed to recreate it. The rewrite process runs in a separate goroutine to avoid blocking the main server. Returns 'Started.' immediately while the rewrite continues in the background. This command requires admin privileges. The rewrite helps reduce AOF file size and improve recovery time.",
+        "category": "persistence"
+    },
+    "BGSAVE": {
+        "usage": "BGSAVE",
+        "description": "Asynchronously save the current database state to disk as an RDB (Redis Database) snapshot file in the background. This command creates a point-in-time snapshot of the dataset without blocking client operations. The save process runs in a separate goroutine after copying the current database state. Returns 'OK' on success, or an error if a background save is already in progress. This command requires admin privileges. Use this instead of SAVE for production environments to avoid blocking.",
+        "category": "persistence"
+    },
+    "SAVE": {
+        "usage": "SAVE",
+        "description": "Synchronously save the current database state to disk as an RDB (Redis Database) snapshot file. This command blocks the server during the save operation, preventing any other commands from being processed. Returns 'OK' on success. This command requires admin privileges. For production environments, use BGSAVE instead to perform a non-blocking background save. The save creates a point-in-time snapshot that can be used for backup or recovery purposes.",
+        "category": "persistence"
+    }
+}

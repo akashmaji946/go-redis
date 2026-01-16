@@ -1,0 +1,47 @@
+{
+    "SADD": {
+        "usage": "SADD <key> <member> [member ...]",
+        "description": "Add one or more members to a set stored at the specified key. If the key does not exist, a new set is created. Members that are already present in the set are ignored. Returns an integer representing the number of members that were actually added to the set (not counting members already present). Returns an error if the key exists but is not a set type. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
+        "category": "set"
+    },
+    "SCARD": {
+        "usage": "SCARD <key>",
+        "description": "Return the cardinality (number of members) of a set stored at the specified key. Returns an integer representing the set size. Returns 0 if the key does not exist (treating a non-existent key as an empty set). Returns an error if the key exists but is not a set type. This operation is O(1) as the cardinality is tracked internally. This operation is thread-safe and uses a read lock.",
+        "category": "set"
+    },
+    "SDIFF": {
+        "usage": "SDIFF <key> [key ...]",
+        "description": "Return the members of the set resulting from the difference between the first set and all successive sets. The difference consists of members that exist in the first set but not in any of the other sets. Returns an array of members in the resulting set. Returns an empty array if the first key does not exist. Returns an error if any key exists but is not a set type. At least one key must be specified. This operation is thread-safe and uses a read lock.",
+        "category": "set"
+    },
+    "SINTER": {
+        "usage": "SINTER <key> [key ...]",
+        "description": "Return the members of the set resulting from the intersection of all specified sets. The intersection consists of members that exist in all of the specified sets. Returns an array of members in the resulting set. Returns an empty array if any key does not exist (since intersection with an empty set is empty). Returns an error if any key exists but is not a set type. The implementation optimizes by iterating over the smallest set first. This operation is thread-safe and uses a read lock.",
+        "category": "set"
+    },
+    "SISMEMBER": {
+        "usage": "SISMEMBER <key> <member>",
+        "description": "Determine if a given value is a member of the set stored at the specified key. Returns 1 if the member exists in the set. Returns 0 if the member does not exist in the set, or if the key does not exist. Returns an error if the key exists but is not a set type. This operation is O(1) due to the hash-based set implementation. This operation is thread-safe and uses a read lock.",
+        "category": "set"
+    },
+    "SMEMBERS": {
+        "usage": "SMEMBERS <key>",
+        "description": "Return all members of the set stored at the specified key. Returns an array containing all members of the set. Returns an empty array if the key does not exist. Returns an error if the key exists but is not a set type. The order of members in the result is not guaranteed and depends on the internal hash iteration order. This operation is thread-safe and uses a read lock. For large sets, consider using SSCAN for incremental iteration.",
+        "category": "set"
+    },
+    "SRANDMEMBER": {
+        "usage": "SRANDMEMBER <key> [count]",
+        "description": "Return one or more random members from a set stored at the specified key. When called without count, returns a single random member as a bulk string, or NULL if the key does not exist. When called with a positive count, returns an array of up to count distinct random members. When called with a negative count, returns an array of abs(count) members that may include duplicates. Returns an empty array if the key does not exist and count is specified. Returns an error if the key exists but is not a set type. This operation is thread-safe and uses a read lock.",
+        "category": "set"
+    },
+    "SREM": {
+        "usage": "SREM <key> <member> [member ...]",
+        "description": "Remove one or more members from a set stored at the specified key. Members that do not exist in the set are silently ignored. Returns an integer representing the number of members that were actually removed from the set. Returns 0 if the key does not exist. Returns an error if the key exists but is not a set type. If the set becomes empty after removal, the key is automatically deleted. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
+        "category": "set"
+    },
+    "SUNION": {
+        "usage": "SUNION <key> [key ...]",
+        "description": "Return the members of the set resulting from the union of all specified sets. The union consists of all members that exist in at least one of the specified sets. Returns an array of members in the resulting set. Keys that do not exist are treated as empty sets. Returns an error if any key exists but is not a set type. At least one key must be specified. This operation is thread-safe and uses a read lock.",
+        "category": "set"
+    }
+}

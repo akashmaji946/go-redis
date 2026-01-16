@@ -1,7 +1,7 @@
 /*
 author: akashmaji
 email: akashmaji@iisc.ac.in
-file: go-redis/main.go
+file: go-redis/cmd/main.go
 */
 package main
 
@@ -25,7 +25,7 @@ import (
 
 // Entry point of the Go-Redis-Server application.
 // It initializes the server, loads configuration, restores data from persistence,
-// and starts accepting client connections on port 6379.
+// and starts accepting client connections on port 7379(TCP) and 7380(TLS).
 //
 // Server Startup Sequence:
 //  1. Print server banner
@@ -34,7 +34,7 @@ import (
 //  4. Restore data from AOF if enabled (Synchronize)
 //  5. Restore data from RDB if configured (SyncRDB)
 //  6. Initialize RDB snapshot trackers if RDB is enabled
-//  7. Start TCP listener on port 6379
+//  7. Start TCP listener on port 7379 and TLS listener on port 7380
 //  8. Accept and handle client connections concurrently
 //
 // Persistence Restoration:
@@ -103,19 +103,6 @@ func main() {
 		handlers.BGSave(nil, nil, s)
 	}
 
-	// if aof
-	if conf.AofEnabled {
-		for i := 0; i < conf.Databases; i++ {
-			log.Printf("syncing records for DB %d", i)
-			database.DBS[i].Aof.Synchronize(state, func(client *common.Client, v *common.Value, appState *common.AppState) *common.Value {
-				client.DatabaseID = i
-				database.DB = database.DBS[i]
-				handlers.Handle(client, v, appState)
-				return nil
-			})
-		}
-	}
-
 	// if rdb
 	if len(conf.Rdb) > 0 {
 		for i := 0; i < conf.Databases; i++ {
@@ -137,6 +124,19 @@ func main() {
 				}
 				db.Mu.Unlock()
 			}
+		}
+	}
+
+	// if aof
+	if conf.AofEnabled {
+		for i := 0; i < conf.Databases; i++ {
+			log.Printf("syncing records for DB %d", i)
+			database.DBS[i].Aof.Synchronize(state, func(client *common.Client, v *common.Value, appState *common.AppState) *common.Value {
+				client.DatabaseID = i
+				database.DB = database.DBS[i]
+				handlers.Handle(client, v, appState)
+				return nil
+			})
 		}
 	}
 

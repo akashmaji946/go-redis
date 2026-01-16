@@ -1,0 +1,37 @@
+{
+    "GEOADD": {
+        "usage": "GEOADD <key> <longitude> <latitude> <member> [<longitude> <latitude> <member> ...]",
+        "description": "Add geospatial items to a sorted set. Each item consists of longitude, latitude coordinates and a member name. Coordinates must be valid floating-point numbers within the ranges -180 to 180 for longitude and -90 to 90 for latitude. The coordinates are encoded into a geohash and stored as the score in a sorted set. Returns an integer representing the number of new members added (not counting score updates). Returns an error if coordinates are invalid or if the key exists but is not a sorted set type. This operation is atomic and thread-safe.",
+        "category": "geo"
+    },
+    "GEOPOS": {
+        "usage": "GEOPOS <key> <member> [<member> ...]",
+        "description": "Return the positions (longitude, latitude) of all specified members in a geospatial index. For each member, returns an array containing [longitude, latitude] as floating-point numbers, or NULL if the member does not exist. Returns an array of position arrays in the same order as the requested members. Returns an error if the key exists but is not a sorted set type. This operation is thread-safe and uses a read lock.",
+        "category": "geo"
+    },
+    "GEODIST": {
+        "usage": "GEODIST <key> <member1> <member2> [m|km|ft|mi]",
+        "description": "Return the distance between two members in a geospatial index. The distance is calculated using the Haversine formula and returned as a floating-point number. The optional unit parameter specifies the unit of measurement: 'm' (meters, default), 'km' (kilometers), 'ft' (feet), or 'mi' (miles). Returns NULL if either member does not exist. Returns an error if the key exists but is not a sorted set type. This operation is thread-safe and uses a read lock.",
+        "category": "geo"
+    },
+    "GEOHASH": {
+        "usage": "GEOHASH <key> <member> [<member> ...]",
+        "description": "Return the geohash strings for the specified members in a geospatial index. For each member, returns the geohash representation of their coordinates, or NULL if the member does not exist. Returns an array of geohash strings in the same order as the requested members. Returns an error if the key exists but is not a sorted set type. This operation is thread-safe and uses a read lock.",
+        "category": "geo"
+    },
+    "GEORADIUS": {
+        "usage": "GEORADIUS <key> <longitude> <latitude> <radius> <unit> [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT <count>] [ASC|DESC]",
+        "description": "Query members within a radius of a given point in a geospatial index. The center point is specified by longitude and latitude coordinates. The radius is specified in the given unit (m, km, ft, mi). Optional modifiers: WITHCOORD returns coordinates, WITHDIST returns distances, WITHHASH returns geohash strings, COUNT limits results, ASC/DESC sorts by distance. Returns an array of members with optional additional information based on modifiers. Returns an error if coordinates are invalid or if the key exists but is not a sorted set type. This operation is thread-safe and uses a read lock.",
+        "category": "geo"
+    },
+    "GEOSEARCH": {
+        "usage": "GEOSEARCH <key> FROMMEMBER <member> RADIUS <radius> <unit> [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT <count>] [ASC|DESC] | GEOSEARCH <key> FROMLONLAT <longitude> <latitude> RADIUS <radius> <unit> [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT <count>] [ASC|DESC] | GEOSEARCH <key> FROMMEMBER <member> BYBOX <width> <height> <unit> [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT <count>] [ASC|DESC] | GEOSEARCH <key> FROMLONLAT <longitude> <latitude> BYBOX <width> <height> <unit> [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT <count>] [ASC|DESC]",
+        "description": "Search for members within a radius or rectangular box in a geospatial index. The search area can be specified by a center member (FROMMEMBER), center coordinates (FROMLONLAT), with either a radius (RADIUS) or box dimensions (BYBOX). Optional modifiers: WITHCOORD returns coordinates, WITHDIST returns distances, WITHHASH returns geohash strings, COUNT limits results, ASC/DESC sorts by distance. Returns an array of members with optional additional information based on modifiers. Returns an error if the key exists but is not a sorted set type. This operation is thread-safe and uses a read lock.",
+        "category": "geo"
+    },
+    "GEOSEARCHSTORE": {
+        "usage": "GEOSEARCHSTORE <destination> <source> FROMMEMBER <member> RADIUS <radius> <unit> [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT <count>] [ASC|DESC] [STOREDIST] | GEOSEARCHSTORE <destination> <source> FROMLONLAT <longitude> <latitude> RADIUS <radius> <unit> [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT <count>] [ASC|DESC] [STOREDIST] | GEOSEARCHSTORE <destination> <source> FROMMEMBER <member> BYBOX <width> <height> <unit> [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT <count>] [ASC|DESC] [STOREDIST] | GEOSEARCHSTORE <destination> <source> FROMLONLAT <longitude> <latitude> BYBOX <width> <height> <unit> [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT <count>] [ASC|DESC] [STOREDIST]",
+        "description": "Search for members within a radius or rectangular box and store the results in a destination key. The search area and options are the same as GEOSEARCH. The STOREDIST modifier stores distances as scores instead of geohash scores. The destination key is overwritten with the search results stored as a sorted set. Returns an integer representing the number of members stored in the destination key. Returns an error if the source key exists but is not a sorted set type. This operation is atomic and thread-safe.",
+        "category": "geo"
+    }
+}

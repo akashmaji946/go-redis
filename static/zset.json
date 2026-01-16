@@ -1,0 +1,37 @@
+{
+    "ZADD": {
+        "usage": "ZADD <key> <score> <member> [score member ...]",
+        "description": "Add one or more members with their scores to a sorted set stored at the specified key. If the key does not exist, a new sorted set is created. If a member already exists, its score is updated to the new value. Scores must be valid floating-point numbers. Returns an integer representing the number of new members added (not counting score updates). Returns an error if the key exists but is not a sorted set type, or if any score is not a valid float. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
+        "category": "zset"
+    },
+    "ZCARD": {
+        "usage": "ZCARD <key>",
+        "description": "Return the cardinality (number of members) of a sorted set stored at the specified key. Returns an integer representing the sorted set size. Returns 0 if the key does not exist (treating a non-existent key as an empty sorted set). Returns an error if the key exists but is not a sorted set type. This operation is O(1) as the cardinality is tracked internally. This operation is thread-safe and uses a read lock.",
+        "category": "zset"
+    },
+    "ZGET": {
+        "usage": "ZGET <key> [member]",
+        "description": "Retrieve the score of a specific member, or all members with their scores from a sorted set. When called with just a key, returns an array of all members and their scores sorted by score ascending: [member1, score1, member2, score2, ...]. When called with a member argument, returns just the score of that member as a bulk string, or NULL if the member does not exist. Returns an empty array if the key does not exist. Returns an error if the key exists but is not a sorted set type. This is a custom convenience command. This operation is thread-safe and uses a read lock.",
+        "category": "zset"
+    },
+    "ZRANGE": {
+        "usage": "ZRANGE <key> <start> <stop> [WITHSCORES]",
+        "description": "Return a range of members from a sorted set stored at the specified key, ordered by score from lowest to highest. The start and stop indices are zero-based and inclusive. Negative indices count from the end (-1 is the last element). When WITHSCORES is specified, the result includes scores: [member1, score1, member2, score2, ...]. Returns an array of members (or members with scores). Returns an empty array if the key does not exist or the range is invalid. Returns an error if the key exists but is not a sorted set type. This operation is thread-safe and uses a read lock.",
+        "category": "zset"
+    },
+    "ZREM": {
+        "usage": "ZREM <key> <member> [member ...]",
+        "description": "Remove one or more members from a sorted set stored at the specified key. Members that do not exist in the sorted set are silently ignored. Returns an integer representing the number of members that were actually removed. Returns 0 if the key does not exist. Returns an error if the key exists but is not a sorted set type. If the sorted set becomes empty after removal, the key is automatically deleted. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
+        "category": "zset"
+    },
+    "ZREVRANGE": {
+        "usage": "ZREVRANGE <key> <start> <stop> [WITHSCORES]",
+        "description": "Return a range of members from a sorted set stored at the specified key, ordered by score from highest to lowest (reverse order). The start and stop indices are zero-based and inclusive. Negative indices count from the end (-1 is the last element in reverse order, i.e., the highest scored member). When WITHSCORES is specified, the result includes scores: [member1, score1, member2, score2, ...]. Returns an array of members (or members with scores). Returns an empty array if the key does not exist or the range is invalid. Returns an error if the key exists but is not a sorted set type. This operation is thread-safe and uses a read lock.",
+        "category": "zset"
+    },
+    "ZSCORE": {
+        "usage": "ZSCORE <key> <member>",
+        "description": "Return the score of a member in a sorted set stored at the specified key. Returns the score as a bulk string (floating-point number represented as string). Returns NULL if the key does not exist or the member is not present in the sorted set. Returns an error if the key exists but is not a sorted set type. This operation is O(1). This operation is thread-safe and uses a read lock.",
+        "category": "zset"
+    }
+}

@@ -1,0 +1,57 @@
+{
+    "COMMAND": {
+        "usage": "COMMAND",
+        "description": "Returns 'OK' to indicate the server is ready to accept commands. This is a simple health check command that can be used to verify the server connection is working properly. Unlike the COMMANDS command, this does not return any command documentation or help information.",
+        "category": "server"
+    },
+    "COMMANDS": {
+        "usage": "COMMANDS [pattern | command_name]",
+        "description": "List available commands or get detailed help for a specific command. When called without arguments or with '*', returns an array of all available command names sorted alphabetically. When called with a specific command name, returns detailed information including usage syntax, description, and category. When called with a glob pattern (e.g., 'S*' for all commands starting with S), returns all matching command names. Returns an error if the specified command or pattern has no matches.",
+        "category": "server"
+    },
+    "DBSIZE": {
+        "usage": "DBSIZE",
+        "description": "Return the total number of keys currently stored in the selected database. This command provides a quick way to check how many keys exist without iterating through them. The count includes all key types (strings, lists, sets, hashes, sorted sets, HyperLogLogs). Returns an integer representing the key count. This operation is thread-safe and uses a read lock to ensure consistency.",
+        "category": "server"
+    },
+    "DROPDB": {
+        "usage": "DROPDB",
+        "description": "Remove all keys from the currently selected database. This is an alias for FLUSHDB with identical behavior. The operation replaces the internal store map for efficiency rather than iterating through keys. Returns 'OK' on success. This is a destructive operation that cannot be undone. The operation is thread-safe and uses a write lock. This command requires admin privileges.",
+        "category": "server"
+    },
+    "FLUSHALL": {
+        "usage": "FLUSHALL",
+        "description": "Remove all keys from all databases on the server. This is a destructive operation that clears the entire server state across all configured databases. Returns 'OK' on success. This command requires admin privileges and will return an error if executed by a non-admin user. The operation is irreversible - all data will be permanently lost. Use with extreme caution in production environments.",
+        "category": "server"
+    },
+    "FLUSHDB": {
+        "usage": "FLUSHDB",
+        "description": "Remove all keys from the currently selected database. This operation replaces the internal store map with a new empty map for efficiency, rather than iterating through and deleting individual keys. Returns 'OK' on success. This is a destructive operation that cannot be undone. All data types are removed (strings, lists, sets, hashes, sorted sets, HyperLogLogs). The operation is thread-safe and uses a write lock. Memory is freed immediately. This command requires admin privileges.",
+        "category": "server"
+    },
+    "INFO": {
+        "usage": "INFO [key]",
+        "description": "Get server information and statistics, or per-key metadata. When called without arguments, returns comprehensive server information organized into categories: Server (version, process ID, uptime, paths), Clients (connected count), Memory (used, peak, total, eviction policy), Persistence (RDB/AOF status, save counts, timestamps), and General (total connections, commands executed, transactions, keys expired/evicted). When called with a key argument, returns metadata for that specific key including: type, length/size, TTL, memory usage in bytes, and access count. Returns an error if called with more than one argument or if the specified key does not exist.",
+        "category": "server"
+    },
+    "MONITOR": {
+        "usage": "MONITOR",
+        "description": "Enable real-time monitoring mode for the current client connection. Once enabled, all commands executed by other clients are streamed to this client in real-time. Each monitored command is sent with a timestamp and client information in the format: '<timestamp> [<client_ip>] \"<command>\" \"<arg1>\" ...'. The monitoring client does not receive its own commands. Multiple clients can be in monitoring mode simultaneously. Monitoring continues until the client disconnects. Returns 'OK' on success. This is useful for debugging and understanding command flow. Note: Monitoring can generate significant output on busy servers.",
+        "category": "server"
+    },
+    "SELECT": {
+        "usage": "SELECT <db_index>",
+        "description": "Select the database with the specified zero-based numeric index for the current connection. All subsequent commands will operate on the selected database. The database index must be within the range of configured databases (default is 16 databases, indices 0-15). Returns 'OK' on success. Returns an error if the index is invalid or out of range. Each client connection maintains its own selected database, defaulting to database 0.",
+        "category": "server"
+    },
+    "SEL": {
+        "usage": "SEL <db_index>",
+        "description": "Select the database with the specified zero-based numeric index for the current connection. This is an alias for SELECT with identical behavior. All subsequent commands will operate on the selected database. Returns 'OK' on success. Returns an error if the index is invalid or out of range.",
+        "category": "server"
+    },
+    "SIZE": {
+        "usage": "SIZE [db_index]",
+        "description": "Return the number of configured databases on the server, or the number of keys in a specific database. When called without arguments, returns the total number of databases configured. When called with a database index, returns the number of keys in that specific database (equivalent to DBSIZE for that database). Returns an error if the database index is invalid or out of range. This operation is thread-safe.",
+        "category": "server"
+    }
+}

@@ -1,0 +1,42 @@
+{
+    "LGET": {
+        "usage": "LGET <key>",
+        "description": "Retrieve all elements from a list stored at the specified key. This is a custom convenience command equivalent to 'LRANGE key 0 -1'. Returns an array containing all elements in the list from head to tail. Returns an empty array if the key does not exist. Returns an error if the key exists but is not a list type. This operation is thread-safe and uses a read lock. For large lists, consider using LRANGE with specific indices to retrieve subsets.",
+        "category": "list"
+    },
+    "LINDEX": {
+        "usage": "LINDEX <key> <index>",
+        "description": "Retrieve the element at the specified index in a list stored at the specified key. The index is zero-based, where 0 is the first element (head) and -1 is the last element (tail). Negative indices count from the end of the list. Returns the element as a bulk string if found. Returns NULL if the key does not exist or if the index is out of range. Returns an error if the key exists but is not a list type. This operation is thread-safe and uses a read lock.",
+        "category": "list"
+    },
+    "LLEN": {
+        "usage": "LLEN <key>",
+        "description": "Return the length (number of elements) of a list stored at the specified key. Returns an integer representing the list length. Returns 0 if the key does not exist (treating a non-existent key as an empty list). Returns an error if the key exists but is not a list type. This operation is O(1) as the length is tracked internally. This operation is thread-safe and uses a read lock.",
+        "category": "list"
+    },
+    "LPOP": {
+        "usage": "LPOP <key>",
+        "description": "Remove and return the first element (head) of a list stored at the specified key. Returns the removed element as a bulk string. Returns NULL if the key does not exist or the list is empty. Returns an error if the key exists but is not a list type. If the list becomes empty after the pop, the key is automatically deleted from the database. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
+        "category": "list"
+    },
+    "LPUSH": {
+        "usage": "LPUSH <key> <value> [value ...]",
+        "description": "Insert one or more values at the head (left side) of a list stored at the specified key. If the key does not exist, a new list is created. Multiple values are inserted in left-to-right order, so 'LPUSH mylist a b c' results in 'c' being the first element. Returns an integer representing the length of the list after the push operations. Returns an error if the key exists but is not a list type. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
+        "category": "list"
+    },
+    "LRANGE": {
+        "usage": "LRANGE <key> <start> <stop>",
+        "description": "Retrieve a range of elements from a list stored at the specified key. The start and stop indices are zero-based and inclusive. Negative indices count from the end (-1 is the last element, -2 is second to last, etc.). Out-of-range indices are automatically clamped to valid values. Returns an array of elements in the specified range. Returns an empty array if the key does not exist, if start is greater than stop after normalization, or if the range is completely outside the list bounds. Returns an error if the key exists but is not a list type. This operation is thread-safe and uses a read lock.",
+        "category": "list"
+    },
+    "RPOP": {
+        "usage": "RPOP <key>",
+        "description": "Remove and return the last element (tail) of a list stored at the specified key. Returns the removed element as a bulk string. Returns NULL if the key does not exist or the list is empty. Returns an error if the key exists but is not a list type. If the list becomes empty after the pop, the key is automatically deleted from the database. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
+        "category": "list"
+    },
+    "RPUSH": {
+        "usage": "RPUSH <key> <value> [value ...]",
+        "description": "Append one or more values to the tail (right side) of a list stored at the specified key. If the key does not exist, a new list is created. Multiple values are appended in left-to-right order, so 'RPUSH mylist a b c' results in 'c' being the last element. Returns an integer representing the length of the list after the push operations. Returns an error if the key exists but is not a list type. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
+        "category": "list"
+    }
+}

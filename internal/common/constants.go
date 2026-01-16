@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -47,19 +48,62 @@ type CommandInfo struct {
 var CommandDetails map[string]CommandInfo
 
 func init() {
+
+	log.Println(">>>> Go-Redis Server v1.0 <<<<")
+
 	CommandDetails = make(map[string]CommandInfo)
+	staticDir := "./static"
+	excludeFile := "commands.json"
 
-	jsonPath := "./static/commands.json"
-
-	data, err := os.ReadFile(jsonPath)
+	// 1. Read all entries in the static directory
+	files, err := os.ReadDir(staticDir)
 	if err != nil {
-		log.Fatalf("failed to read commands.json: %v", err)
+		log.Fatalf("failed to read directory %s: %v", staticDir, err)
 	}
 
-	if err := json.Unmarshal(data, &CommandDetails); err != nil {
-		log.Fatalf("failed to parse commands.json: %v", err)
+	for _, file := range files {
+		// 2. Skip directories, the excluded file, and non-JSON files
+		if file.IsDir() || file.Name() == excludeFile || filepath.Ext(file.Name()) != ".json" {
+			continue
+		}
+
+		// 3. Construct full path and read the file
+		path := filepath.Join(staticDir, file.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			log.Printf("warning: failed to read %s: %v", path, err)
+			continue
+		}
+
+		// 4. Unmarshal into a temporary map
+		var tempDetails map[string]CommandInfo
+		if err := json.Unmarshal(data, &tempDetails); err != nil {
+			log.Fatalf("failed to parse %s: %v", path, err)
+		}
+
+		// 5. Merge temporary map into the main CommandDetails map
+		for k, v := range tempDetails {
+			CommandDetails[k] = v
+		}
+
+		log.Printf("[INFO] successfully loaded commands from %s", file.Name())
 	}
 }
+
+// func init() {
+// 	CommandDetails = make(map[string]CommandInfo)
+
+// 	jsonPath := "./static/commands.json"
+
+// 	data, err := os.ReadFile(jsonPath)
+// 	if err != nil {
+// 		log.Fatalf("failed to read commands.json: %v", err)
+// 	}
+
+// 	if err := json.Unmarshal(data, &CommandDetails); err != nil {
+// 		log.Fatalf("failed to parse commands.json: %v", err)
+// 	}
+// }
 
 // var CommandDetailsOld = map[string]CommandInfo{
 // 	"AUTH": {

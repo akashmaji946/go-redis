@@ -1,0 +1,52 @@
+{
+    "PSUBSCRIBE": {
+        "usage": "PSUBSCRIBE <pattern> [pattern ...]",
+        "description": "Subscribe the client to one or more channel patterns for receiving published messages. Patterns use glob-style matching where '*' matches any sequence of characters and '?' matches any single character. When a message is published to a channel matching a subscribed pattern, the client receives a 'pmessage' notification containing the pattern, channel name, and message. Returns a subscription confirmation for each pattern containing: 'psubscribe', the pattern, and the total number of pattern subscriptions. Multiple patterns can be subscribed in a single command. The client remains subscribed until PUNSUBSCRIBE is called or the connection is closed.",
+        "category": "pubsub"
+    },
+    "PSUB": {
+        "usage": "PSUB <pattern> [pattern ...]",
+        "description": "Subscribe the client to one or more channel patterns for receiving published messages. This is an alias for PSUBSCRIBE with identical behavior. Patterns use glob-style matching where '*' matches any sequence of characters and '?' matches any single character. Returns a subscription confirmation for each pattern. The client remains subscribed until PUNSUB/PUNSUBSCRIBE is called or the connection is closed.",
+        "category": "pubsub"
+    },
+    "PUB": {
+        "usage": "PUB <channel> <message>",
+        "description": "Post a message to a channel for delivery to all subscribers. This is an alias for PUBLISH with identical behavior. The message is delivered to all clients subscribed to the exact channel name (via SUBSCRIBE/SUB) and to all clients subscribed to patterns matching the channel name (via PSUBSCRIBE/PSUB). Returns an integer representing the total number of clients that received the message (both direct and pattern subscribers combined).",
+        "category": "pubsub"
+    },
+    "PUBLISH": {
+        "usage": "PUBLISH <channel> <message>",
+        "description": "Post a message to a channel for delivery to all subscribers. The message is delivered to all clients subscribed to the exact channel name (via SUBSCRIBE) and to all clients subscribed to patterns matching the channel name (via PSUBSCRIBE). Subscribers receive the message as an array: ['message', channel, message] for direct subscriptions or ['pmessage', pattern, channel, message] for pattern subscriptions. Returns an integer representing the total number of clients that received the message. Returns 0 if no clients are subscribed to the channel or matching patterns.",
+        "category": "pubsub"
+    },
+    "PUNSUBSCRIBE": {
+        "usage": "PUNSUBSCRIBE [pattern ...]",
+        "description": "Unsubscribe the client from one or more channel patterns. If patterns are specified, the client is unsubscribed from those specific patterns. The client receives an unsubscription confirmation for each pattern containing: 'punsubscribe', the pattern, and the remaining number of pattern subscriptions. Returns an error if no patterns are specified. After unsubscribing from all patterns, the client exits pub/sub mode and can execute regular commands again.",
+        "category": "pubsub"
+    },
+    "PUNSUB": {
+        "usage": "PUNSUB [pattern ...]",
+        "description": "Unsubscribe the client from one or more channel patterns. This is an alias for PUNSUBSCRIBE with identical behavior. If patterns are specified, the client is unsubscribed from those specific patterns. Returns an unsubscription confirmation for each pattern. After unsubscribing from all patterns, the client exits pub/sub mode.",
+        "category": "pubsub"
+    },
+    "SUB": {
+        "usage": "SUB <channel> [channel ...]",
+        "description": "Subscribe the client to one or more channels for receiving published messages. This is an alias for SUBSCRIBE with identical behavior. When a message is published to a subscribed channel, the client receives a 'message' notification containing the channel name and message. Returns a subscription confirmation for each channel. The client remains subscribed until UNSUB/UNSUBSCRIBE is called or the connection is closed.",
+        "category": "pubsub"
+    },
+    "SUBSCRIBE": {
+        "usage": "SUBSCRIBE <channel> [channel ...]",
+        "description": "Subscribe the client to one or more channels for receiving published messages. When a message is published to a subscribed channel, the client receives a 'message' notification containing the channel name and message. Returns a subscription confirmation for each channel containing: 'subscribe', the channel name, and the total number of channel subscriptions. Multiple channels can be subscribed in a single command. The client remains subscribed until UNSUBSCRIBE is called or the connection is closed. While subscribed, the client can only execute SUBSCRIBE, UNSUBSCRIBE, PSUBSCRIBE, PUNSUBSCRIBE, PING, and QUIT commands.",
+        "category": "pubsub"
+    },
+    "UNSUBSCRIBE": {
+        "usage": "UNSUBSCRIBE [channel ...]",
+        "description": "Unsubscribe the client from one or more channels. If channels are specified, the client is unsubscribed from those specific channels. The client receives an unsubscription confirmation for each channel containing: 'unsubscribe', the channel name, and the remaining number of channel subscriptions. Returns an error if no channels are specified. After unsubscribing from all channels and patterns, the client exits pub/sub mode and can execute regular commands again.",
+        "category": "pubsub"
+    },
+    "UNSUB": {
+        "usage": "UNSUB [channel ...]",
+        "description": "Unsubscribe the client from one or more channels. This is an alias for UNSUBSCRIBE with identical behavior. If channels are specified, the client is unsubscribed from those specific channels. Returns an unsubscription confirmation for each channel. After unsubscribing from all channels and patterns, the client exits pub/sub mode.",
+        "category": "pubsub"
+    }
+}

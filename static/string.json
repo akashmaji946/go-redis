@@ -1,0 +1,47 @@
+{
+    "DECR": {
+        "usage": "DECR <key>",
+        "description": "Decrement the integer value stored at the specified key by one. If the key does not exist, it is initialized to 0 before performing the decrement operation, resulting in -1. Returns the new value after the decrement as an integer. Returns an error if the key exists but contains a value that cannot be parsed as an integer, or if the key holds a non-string data type. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled.",
+        "category": "string"
+    },
+    "DECRBY": {
+        "usage": "DECRBY <key> <decrement>",
+        "description": "Decrement the integer value stored at the specified key by the given decrement amount. If the key does not exist, it is initialized to 0 before performing the decrement. The decrement value must be a valid integer. Returns the new value after the decrement as an integer. Returns an error if the decrement is not a valid integer, if the stored value cannot be parsed as an integer, or if the key holds a non-string data type. This operation is atomic and thread-safe.",
+        "category": "string"
+    },
+    "GET": {
+        "usage": "GET <key>",
+        "description": "Retrieve the string value stored at the specified key. Returns the value as a bulk string if the key exists and contains a string value. Returns NULL if the key does not exist. If the key exists but has expired, it is automatically deleted and NULL is returned. Returns an error if the key exists but holds a non-string data type (list, set, hash, sorted set, or HyperLogLog). This operation is thread-safe and uses a read lock.",
+        "category": "string"
+    },
+    "INCR": {
+        "usage": "INCR <key>",
+        "description": "Increment the integer value stored at the specified key by one. If the key does not exist, it is initialized to 0 before performing the increment operation, resulting in 1. Returns the new value after the increment as an integer. Returns an error if the key exists but contains a value that cannot be parsed as an integer, or if the key holds a non-string data type. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled and tracked for RDB saving.",
+        "category": "string"
+    },
+    "INCRBY": {
+        "usage": "INCRBY <key> <increment>",
+        "description": "Increment the integer value stored at the specified key by the given increment amount. If the key does not exist, it is initialized to 0 before performing the increment. The increment value must be a valid integer and can be negative to perform a decrement. Returns the new value after the increment as an integer. Returns an error if the increment is not a valid integer, if the stored value cannot be parsed as an integer, or if the key holds a non-string data type. This operation is atomic and thread-safe.",
+        "category": "string"
+    },
+    "MGET": {
+        "usage": "MGET <key> [key ...]",
+        "description": "Retrieve the values of multiple keys in a single operation. Returns an array of values in the same order as the requested keys. For keys that do not exist, are expired, or hold non-string types, NULL is returned in their position. This command is more efficient than multiple GET calls when retrieving multiple values. At least one key must be specified. This operation is thread-safe and uses a read lock. All keys are read atomically within the same lock acquisition.",
+        "category": "string"
+    },
+    "MSET": {
+        "usage": "MSET <key> <value> [key value ...]",
+        "description": "Set multiple key-value pairs in a single atomic operation. If any keys already exist, their values are overwritten. The number of arguments must be even (key-value pairs). Returns 'OK' on success. Returns an error if the number of arguments is not valid. Unlike individual SET commands, MSET is atomic - either all keys are set or none are (in case of error). The operation is recorded to AOF if persistence is enabled and tracked for RDB saving. This operation is thread-safe and uses a write lock for the entire operation.",
+        "category": "string"
+    },
+    "SET": {
+        "usage": "SET <key> <value>",
+        "description": "Set the string value of a key. If the key already exists, its value is overwritten regardless of its type. Any previous expiration is discarded. Returns 'OK' on success. If maxmemory is configured and would be exceeded, the server attempts to evict keys according to the eviction policy before returning an error if eviction fails. The operation updates memory tracking and is recorded to AOF if persistence is enabled. Changes are tracked for automatic RDB saving. This operation is atomic and thread-safe.",
+        "category": "string"
+    },
+    "STRLEN": {
+        "usage": "STRLEN <key>",
+        "description": "Return the length of the string value stored at the specified key. Returns an integer representing the string length in bytes. Returns 0 if the key does not exist or has expired. Returns an error if the key exists but holds a non-string data type. This operation is O(1) as the string length is tracked internally. This operation is thread-safe and uses a read lock.",
+        "category": "string"
+    }
+}
