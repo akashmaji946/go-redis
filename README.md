@@ -32,13 +32,21 @@ A Redis-compatible in-memory key-value store server written in Go. This implemen
 - **Transactions**: Basic `MULTI`, `EXEC`, `DISCARD` support.
 - **Eviction**: LRU/Random eviction policies when maxmemory is reached.
 
-## Quick Access:
+## Quick Try:
 Go to your terminal and access it here:
 ```bash
 # use redis-cli to access the hosted sever
 redis-cli -h go.akashmaji.me -p 7380 --tls
-# use pass `dsl` when connected
-# 
+
+# use user `root` and password `dsl` when connected
+# AUTH root dsl
+# OK
+
+# access commands with
+# COMMANDS
+
+# get help on a command
+# COMMANDS SET
 ```
 
 ## Prerequisites
@@ -186,7 +194,7 @@ The server accepts command-line arguments for configuration file and data direct
 - If the configuration file doesn't exist, the server will warn and use default settings
 - The data directory will be created automatically if it doesn't exist
 - If both command-line argument and config file specify a data directory, the command-line argument takes precedence
-- The server listens on port **6379** (default Redis port)
+- The server listens on port **7379** (default Redis port)
 
 ### Server Startup
 

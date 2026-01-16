@@ -239,6 +239,7 @@ docker push akashmaji/go-redis:latest
 Below is a categorized list of all supported commands.
 
 ### String Operations
+
 | Command | Description |
 |---|---|
 | `GET <key>` | Retrieve the string value stored at the specified key. Returns NULL if the key does not exist. Returns an error if the key holds a non-string data type. |
@@ -251,7 +252,9 @@ Below is a categorized list of all supported commands.
 | `MSET <key> <value> [key value ...]` | Set multiple key-value pairs in a single atomic operation. If any keys already exist, their values are overwritten. |
 | `STRLEN <key>` | Return the length of the string value stored at the specified key. Returns 0 if the key does not exist. |
 
+
 ### Key Management
+
 | Command | Description |
 |---|---|
 | `DEL <key> [key ...]` | Delete one or more keys from the database. Keys that do not exist are silently ignored. Returns the number of keys that were actually removed. |
@@ -264,7 +267,9 @@ Below is a categorized list of all supported commands.
 | `TTL <key>` | Return the remaining time to live (in seconds) of a key. Returns -1 if no expiration, -2 if key does not exist. |
 | `PERSIST <key>` | Remove the expiration timeout from a key, making it persistent (never expires). |
 
+
 ### List Operations
+
 | Command | Description |
 |---|---|
 | `LPUSH <key> <value> [value ...]` | Insert one or more values at the head (left side) of a list. If the key does not exist, a new list is created. Returns the length of the list after the push. |
@@ -276,7 +281,9 @@ Below is a categorized list of all supported commands.
 | `LINDEX <key> <index>` | Retrieve the element at the specified index in a list. Negative indices count from the end (-1 is the last element). |
 | `LGET <key>` | Retrieve all elements from a list. Equivalent to `LRANGE key 0 -1`. |
 
+
 ### Set Operations
+
 | Command | Description |
 |---|---|
 | `SADD <key> <member> [member ...]` | Add one or more members to a set. If the key does not exist, a new set is created. Returns the number of members actually added (not counting duplicates). |
@@ -289,7 +296,9 @@ Below is a categorized list of all supported commands.
 | `SUNION <key> [key ...]` | Return the members of the set resulting from the union of all specified sets. |
 | `SRANDMEMBER <key> [count]` | Return one or more random members from a set. With positive count, returns distinct members. With negative count, may include duplicates. |
 
+
 ### Hash Operations
+
 | Command | Description |
 |---|---|
 | `HSET <key> <field> <value> [field value ...]` | Set one or more field-value pairs in a hash. If the key does not exist, a new hash is created. Returns the number of new fields added. |
@@ -306,7 +315,9 @@ Below is a categorized list of all supported commands.
 | `HDELALL <key>` | Delete all fields from a hash, effectively clearing the entire hash. Returns the number of fields deleted. |
 | `HEXPIRE <key> <field> <seconds>` | Set an expiration time on a specific field within a hash. Custom extension for fine-grained expiration control. |
 
+
 ### Sorted Set Operations
+
 | Command | Description |
 |---|---|
 | `ZADD <key> <score> <member> [score member ...]` | Add one or more members with their scores to a sorted set. If a member already exists, its score is updated. Returns the number of new members added. |
@@ -317,7 +328,9 @@ Below is a categorized list of all supported commands.
 | `ZREVRANGE <key> <start> <stop> [WITHSCORES]` | Return a range of members from a sorted set, ordered by score from highest to lowest (reverse order). |
 | `ZGET <key> [member]` | Retrieve the score of a specific member, or all members with their scores from a sorted set. Custom convenience command. |
 
+
 ### HyperLogLog Operations
+
 | Command | Description |
 |---|---|
 | `PFADD <key> <element> [element ...]` | Add one or more elements to a HyperLogLog probabilistic data structure. HyperLogLog provides approximate cardinality estimation using only ~12KB of memory. Returns 1 if at least one internal register was altered. |
@@ -325,7 +338,9 @@ Below is a categorized list of all supported commands.
 | `PFDEBUG <key>` | Return internal debugging information about a HyperLogLog including encoding type (sparse/dense), number of registers, and estimated cardinality. |
 | `PFMERGE <destkey> <sourcekey> [sourcekey ...]` | Merge multiple HyperLogLog values into a single destination HyperLogLog. The merged result approximates the cardinality of the union of all sources. |
 
+
 ### Pub/Sub Operations
+
 | Command | Description |
 |---|---|
 | `PUBLISH <channel> <message>` | Post a message to a channel for delivery to all subscribers. Returns the number of clients that received the message. |
@@ -339,7 +354,9 @@ Below is a categorized list of all supported commands.
 | `PUNSUBSCRIBE [pattern ...]` | Unsubscribe from one or more channel patterns. |
 | `PUNSUB [pattern ...]` | Alias for PUNSUBSCRIBE. Unsubscribe from channel patterns. |
 
+
 ### Transactions
+
 | Command | Description |
 |---|---|
 | `MULTI` | Mark the start of a transaction block. After MULTI, all subsequent commands are queued instead of being executed immediately. |
@@ -348,7 +365,9 @@ Below is a categorized list of all supported commands.
 | `WATCH <key> [key ...]` | Mark one or more keys to be watched for optimistic locking. If any watched keys are modified before EXEC, the transaction is aborted. |
 | `UNWATCH` | Flush all previously watched keys for the current client connection. Automatically called after EXEC or DISCARD. |
 
+
 ### User Management
+
 | Command | Description |
 |---|---|
 | `USERADD <admin_flag 1/0> <user> <password>` | Create a new user account on the server. The admin_flag specifies admin privileges (1 for admin, 0 for regular user). Password must be alphanumeric. Requires admin privileges. |
@@ -357,14 +376,18 @@ Below is a categorized list of all supported commands.
 | `USERS [username]` | List all usernames or show details for a specific user. Without arguments, returns an array of all usernames. With a username, returns detailed information including admin status. |
 | `WHOAMI` | Display details of the currently authenticated user including username, client IP address, admin status, and full name. |
 
+
 ### Persistence Commands
+
 | Command | Description |
 |---|---|
 | `SAVE` | Synchronously save the current database state to disk as an RDB snapshot file. This command blocks the server during the save operation. Requires admin privileges. |
 | `BGSAVE` | Asynchronously save the current database state to disk as an RDB snapshot in the background. Returns 'OK' immediately while the save continues in the background. Requires admin privileges. |
 | `BGREWRITEAOF` | Asynchronously rewrite the Append-Only File (AOF) in the background. Creates a new, optimized AOF file by reading the current dataset. Requires admin privileges. |
 
+
 ### Server & Connection
+
 | Command | Description |
 |---|---|
 | `AUTH <user> <password>` | Authenticate to the server with the specified username and password. Required when the server is configured with 'requirepass' enabled. Returns 'OK' on success. |
@@ -376,7 +399,9 @@ Below is a categorized list of all supported commands.
 | `SEL <db_index>` | Alias for SELECT. Select the database with the specified index. |
 | `SIZE [db_index]` | Return the number of configured databases, or the number of keys in a specific database if an index is provided. |
 
+
 ### Monitoring & Information
+
 | Command | Description |
 |---|---|
 | `INFO [key]` | Get server information and statistics, or per-key metadata. Without arguments, returns comprehensive server info (Server, Clients, Memory, Persistence, General). With a key argument, returns metadata for that specific key. |
@@ -386,11 +411,12 @@ Below is a categorized list of all supported commands.
 | `DROPDB` | Alias for FLUSHDB. Remove all keys from the currently selected database. Requires admin privileges. |
 | `FLUSHALL` | Remove all keys from all databases on the server. This is a destructive operation that clears the entire server state. Requires admin privileges. Use with extreme caution. |
 
+
 ---
 
 ## 5. Internal Architecture
 
-This section details the internal design of Go-Redis for developers and contributors.
+This section details the internal design of Go-Redis-Server for developers and contributors.
 
 ### High-Level Diagram
 ```
