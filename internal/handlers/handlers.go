@@ -152,6 +152,15 @@ var Handlers = map[string]common.Handler{
 	"BITOP":    BitOp,
 	"BITPOS":   BitPos,
 	"BITFIELD": BitField,
+
+	// Geospatial commands
+	"GEOADD":         GeoAdd,
+	"GEOPOS":         GeoPos,
+	"GEODIST":        GeoDist,
+	"GEOHASH":        GeoHash,
+	"GEORADIUS":      GeoRadius,
+	"GEOSEARCH":      GeoSearch,
+	"GEOSEARCHSTORE": GeoSearchStore,
 }
 
 // Handler is a function type that processes Redis commands.

@@ -48,7 +48,7 @@ func (info *RedisInfo) Build(state *AppState, usedMem int64, usedMemPeak int64) 
 		exePath = ""
 	}
 	info.server = map[string]string{
-		"redis_version  ": "0.1",
+		"redis_version  ": "v1.0.0",
 		"author         ": "akashmaji(@iisc.ac.in)",
 		"process_id     ": strconv.Itoa(os.Getpid()),
 		"tcp_port       ": strconv.Itoa(state.Config.Port),
