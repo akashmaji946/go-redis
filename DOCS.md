@@ -15,45 +15,45 @@ This document provides a deep dive into the project's features, architecture, an
 
 ## Table of Contents
 
-1.  [**Overview & Features**](#1-overview--features)
-    -   [Design Goals](#design-goals)
-2.  [**Getting Started**](#2-getting-started)
-    -   [Prerequisites](#prerequisites)
-    -   [Building from Source](#building-from-source)
-    -   [Configuration](#configuration)
-    -   [Running the Server](#running-the-server)
-    -   [Connecting with `redis-cli`](#connecting-with-redis-cli)
-3.  [**Docker Deployment**](#3-docker-deployment)
-    -   [Using the Pre-built Image](#using-the-pre-built-image)
-    -   [Building a Custom Image](#building-a-custom-image)
-4.  [**Command Reference**](#4-command-reference)
-    -   [String Operations](#string-operations)
-    -   [Key Management](#key-management)
-    -   [List Operations](#list-operations)
-    -   [Set Operations](#set-operations)
-    -   [Hash Operations](#hash-operations)
-    -   [Sorted Set Operations](#sorted-set-operations)
-    -   [HyperLogLog Operations](#hyperloglog-operations)
-    -   [Bitmap Operations](#bitmap-operations)
-    -   [Geospatial Operations](#geospatial-operations)
-    -   [Pub/Sub Operations](#pubsub-operations)
-    -   [Expiration Commands](#expiration-commands)
-    -   [Transactions](#transactions)
-    -   [Persistence Commands](#persistence-commands)
-    -   [Server & Connection](#server--connection)
-    -   [Monitoring & Information](#monitoring--information)
-5.  [**Internal Architecture**](#5-internal-architecture)
-    -   [High-Level Diagram](#high-level-diagram)
-    -   [Project Structure & Core Components](#project-structure--core-components)
-    -   [Concurrency Model](#concurrency-model)
-    -   [Command Execution Pipeline](#command-execution-pipeline)
-    -   [Data Model](#data-model)
-    -   [RESP Protocol Support](#resp-protocol-support)
-6.  [**Core Subsystems Explained**](#6-core-subsystems-explained)
-    -   [Persistence: AOF vs. RDB](#persistence-aof-vs-rdb)
-    -   [Memory Management & Eviction](#memory-management--eviction)
-7.  [**Limitations**](#7-limitations)
-8.  [**Contact & Support**](#8-contact--support)
+1. [**Overview & Features**](#1-overview--features)
+    - [Design Goals](#design-goals)
+2. [**Getting Started**](#2-getting-started)
+    - [Prerequisites](#prerequisites)
+    - [Building from Source](#building-from-source)
+    - [Configuration](#configuration)
+    - [Running the Server](#running-the-server)
+    - [Connecting with `redis-cli`](#connecting-with-redis-cli)
+3. [**Docker Deployment**](#3-docker-deployment)
+    - [Using the Pre-built Image](#using-the-pre-built-image)
+    - [Building a Custom Image](#building-a-custom-image)
+4. [**Command Reference**](#4-command-reference)
+    - [String Operations](#string-operations)
+    - [Key Management](#key-management)
+    - [List Operations](#list-operations)
+    - [Set Operations](#set-operations)
+    - [Hash Operations](#hash-operations)
+    - [Sorted Set Operations](#sorted-set-operations)
+    - [HyperLogLog Operations](#hyperloglog-operations)
+    - [Bitmap Operations](#bitmap-operations)
+    - [Geospatial Operations](#geospatial-operations)
+    - [Pub/Sub Operations](#pubsub-operations)
+    - [Expiration Commands](#expiration-commands)
+    - [Transactions](#transactions)
+    - [Persistence Commands](#persistence-commands)
+    - [Server & Connection](#server--connection)
+    - [Monitoring & Information](#monitoring--information)
+5. [**Internal Architecture**](#5-internal-architecture)
+    - [High-Level Diagram](#high-level-diagram)
+    - [Project Structure & Core Components](#project-structure--core-components)
+    - [Concurrency Model](#concurrency-model)
+    - [Command Execution Pipeline](#command-execution-pipeline)
+    - [Data Model](#data-model)
+    - [RESP Protocol Support](#resp-protocol-support)
+6. [**Core Subsystems Explained**](#6-core-subsystems-explained)
+    - [Persistence: AOF vs. RDB](#persistence-aof-vs-rdb)
+    - [Memory Management & Eviction](#memory-management--eviction)
+7. [**Limitations**](#7-limitations)
+8. [**Contact & Support**](#8-contact--support)
 
 ---
 
@@ -61,27 +61,27 @@ This document provides a deep dive into the project's features, architecture, an
 
 Go-Redis is a Redis-compatible in-memory key-value store server written in Go. It is designed to be a learning tool for understanding how a database like Redis works under the hood, while also being a functional server for development and testing purposes.
 
--   **Broad Command Support**: Implements a rich subset of commands for Strings, Lists, Sets, Hashes, Sorted Sets, HyperLogLog, Bitmaps, and Geospatial data.
--   **Dual Persistence Model**: 
-    -   **AOF (Append-Only File)**: Logs every write operation with configurable `fsync` modes for high durability.
-    -   **RDB (Redis Database)**: Creates point-in-time snapshots for fast startups and backups.
-    -   **Encrypted Storage**: Optional AES-GCM encryption for all persistence files and user credentials.
--   **Key Expiration**: Supports `EXPIRE`, `TTL`, and `PERSIST` with lazy (on-access) key removal.
--   **Atomic Transactions**: Group commands in `MULTI`/`EXEC` blocks with `WATCH`/`UNWATCH` for optimistic locking.
--   **User Management**: Multi-user support with role-based access control (Admin/User).
--   **Introspection & Monitoring**: 
-    -   `INFO` provides a detailed look into server statistics.
-    -   `MONITOR` streams live command processing for debugging.
--   **Memory Management**: Allows setting a `maxmemory` limit and an eviction policy.
--   **Pub/Sub Messaging**: Decoupled real-time communication between publishers and subscribers.
--   **RESP Compatible**: Fully compatible with the Redis Serialization Protocol (RESP), allowing `redis-cli` and other standard clients to connect seamlessly.
--   **Thread-Safe by Design**: Handles multiple concurrent clients safely using a single database protected by read-write locks.
+- **Broad Command Support**: Implements a rich subset of commands for Strings, Lists, Sets, Hashes, Sorted Sets, HyperLogLog, Bitmaps, and Geospatial data.
+- **Dual Persistence Model**: 
+  - **AOF (Append-Only File)**: Logs every write operation with configurable `fsync` modes for high durability.
+    - **RDB (Redis Database)**: Creates point-in-time snapshots for fast startups and backups.
+    - **Encrypted Storage**: Optional AES-GCM encryption for all persistence files and user credentials.
+- **Key Expiration**: Supports `EXPIRE`, `TTL`, and `PERSIST` with lazy (on-access) key removal.
+- **Atomic Transactions**: Group commands in `MULTI`/`EXEC` blocks with `WATCH`/`UNWATCH` for optimistic locking.
+- **User Management**: Multi-user support with role-based access control (Admin/User).
+- **Introspection & Monitoring**: 
+  - `INFO` provides a detailed look into server statistics.
+  - `MONITOR` streams live command processing for debugging.
+- **Memory Management**: Allows setting a `maxmemory` limit and an eviction policy.
+- **Pub/Sub Messaging**: Decoupled real-time communication between publishers and subscribers.
+- **RESP Compatible**: Fully compatible with the Redis Serialization Protocol (RESP), allowing `redis-cli` and other standard clients to connect seamlessly.
+- **Thread-Safe by Design**: Handles multiple concurrent clients safely using a single database protected by read-write locks.
 
 ### Design Goals
 
--   **Educational**: To provide a clear, readable, and well-documented codebase for those learning about database internals, concurrency in Go, and network programming.
--   **Redis-Compatible**: To work out-of-the-box with `redis-cli`.
--   **Correctness over Performance**: To prioritize a simple, correct, and deterministic implementation over complex performance optimizations.
+- **Educational**: To provide a clear, readable, and well-documented codebase for those learning about database internals, concurrency in Go, and network programming.
+- **Redis-Compatible**: To work out-of-the-box with `redis-cli`.
+- **Correctness over Performance**: To prioritize a simple, correct, and deterministic implementation over complex performance optimizations.
 
 ---
 
@@ -89,15 +89,16 @@ Go-Redis is a Redis-compatible in-memory key-value store server written in Go. I
 
 ### Prerequisites
 
--   **Go**: Version 1.24.4 or later.
--   **`redis-cli`**: The standard Redis command-line tool.
--   **OS**: Tested on Linux/Unix environments.
+- **Go**: Version 1.24.4 or later.
+- **`redis-cli`**: The standard Redis command-line tool.
+- **OS**: Tested on Linux/Unix environments.
 
 > **Note**: Before starting, ensure no other Redis instance is running on port `6379`. You can stop a default Redis service using `sudo systemctl stop redis-server`.
 
 ### Building from Source
 
 Clone the repository and run the build command:
+
 ```bash
 go build
 ```
@@ -108,6 +109,7 @@ This creates a `go-redis` executable in your project directory.
 The server is configured using a `redis.conf` file. By default, it looks for `./config/redis.conf`.
 
 **Example `redis.conf`:**
+
 ```conf
 ## how many databases?
 databases 2
@@ -148,32 +150,40 @@ maxmemory-samples 50
 The server can be started with default paths or custom ones.
 
 **Syntax:**
+
 ```bash
 ./go-redis [config_file_path] [data_directory_path]
 ```
 
--   **With defaults:**
-    ```bash
-    ./go-redis
-    ```
--   **With custom paths:**
-    ```bash
-    ./go-redis ./my.conf ./my-data
-    ```
+- **With defaults:**
+
+```bash
+./go-redis
+```
+
+- **With custom paths:**
+
+```bash
+./go-redis ./my.conf ./my-data
+```
 
 The server will log its startup process and listen on port `7379`.
 
 ### Connecting with `redis-cli`
 
 Open a new terminal and connect:
+
 ```bash
 redis-cli -p 7379
 ```
+
 If you've set `requirepass`, authenticate your session:
-```
+
+```bash
 127.0.0.1:6379> AUTH user-name your-secret-password
 OK
 ```
+
 You're all set to run commands!
 
 ---
@@ -250,7 +260,6 @@ Below is a categorized list of all supported commands.
 | `MSET <key> <value> [key value ...]` | Set multiple key-value pairs in a single atomic operation. If any keys already exist, their values are overwritten. |
 | `STRLEN <key>` | Return the length of the string value stored at the specified key. Returns 0 if the key does not exist. |
 
-
 ### Key Management
 
 | Command | Description |
@@ -265,7 +274,6 @@ Below is a categorized list of all supported commands.
 | `TTL <key>` | Return the remaining time to live (in seconds) of a key. Returns -1 if no expiration, -2 if key does not exist. |
 | `PERSIST <key>` | Remove the expiration timeout from a key, making it persistent (never expires). |
 
-
 ### List Operations
 
 | Command | Description |
@@ -278,7 +286,6 @@ Below is a categorized list of all supported commands.
 | `LLEN <key>` | Return the length (number of elements) of a list. Returns 0 if the key does not exist. |
 | `LINDEX <key> <index>` | Retrieve the element at the specified index in a list. Negative indices count from the end (-1 is the last element). |
 | `LGET <key>` | Retrieve all elements from a list. Equivalent to `LRANGE key 0 -1`. |
-
 
 ### Set Operations
 
@@ -293,7 +300,6 @@ Below is a categorized list of all supported commands.
 | `SINTER <key> [key ...]` | Return the members of the set resulting from the intersection of all specified sets. |
 | `SUNION <key> [key ...]` | Return the members of the set resulting from the union of all specified sets. |
 | `SRANDMEMBER <key> [count]` | Return one or more random members from a set. With positive count, returns distinct members. With negative count, may include duplicates. |
-
 
 ### Hash Operations
 
@@ -313,7 +319,6 @@ Below is a categorized list of all supported commands.
 | `HDELALL <key>` | Delete all fields from a hash, effectively clearing the entire hash. Returns the number of fields deleted. |
 | `HEXPIRE <key> <field> <seconds>` | Set an expiration time on a specific field within a hash. Custom extension for fine-grained expiration control. |
 
-
 ### Sorted Set Operations
 
 | Command | Description |
@@ -326,7 +331,6 @@ Below is a categorized list of all supported commands.
 | `ZREVRANGE <key> <start> <stop> [WITHSCORES]` | Return a range of members from a sorted set, ordered by score from highest to lowest (reverse order). |
 | `ZGET <key> [member]` | Retrieve the score of a specific member, or all members with their scores from a sorted set. Custom convenience command. |
 
-
 ### HyperLogLog Operations
 
 | Command | Description |
@@ -335,7 +339,6 @@ Below is a categorized list of all supported commands.
 | `PFCOUNT <key> [key ...]` | Return the approximated cardinality (number of unique elements) observed by the HyperLogLog(s). When called with multiple keys, returns the cardinality of the union. Standard error rate is approximately 0.81%. |
 | `PFDEBUG <key>` | Return internal debugging information about a HyperLogLog including encoding type (sparse/dense), number of registers, and estimated cardinality. |
 | `PFMERGE <destkey> <sourcekey> [sourcekey ...]` | Merge multiple HyperLogLog values into a single destination HyperLogLog. The merged result approximates the cardinality of the union of all sources. |
-
 
 ### Bitmap Operations
 
@@ -348,7 +351,6 @@ Below is a categorized list of all supported commands.
 | `BITPOS <key> <bit> [start [end [BYTE\|BIT]]]` | Return the position of the first bit set to 1 or 0 in a string. The bit parameter must be 0 or 1. Optional start and end specify a range to search within (byte or bit indices). Returns -1 if the bit is not found. Time complexity: O(N) where N is the number of bytes in the range. |
 | `BITFIELD <key> [GET <encoding> <offset>] [SET <encoding> <offset> <value>] [INCRBY <encoding> <offset> <increment>] [OVERFLOW <WRAP\|SAT\|FAIL>]` | Perform arbitrary bitfield integer operations on strings. Encoding format: i<bits> for signed, u<bits> for unsigned (e.g., i8, u16). Offset format: absolute number or #N (multiplied by encoding size). OVERFLOW controls behavior: WRAP (default, wrap around), SAT (saturate at min/max), FAIL (return nil on overflow). Returns an array with one element per operation. Time complexity: O(1) for each subcommand. |
 
-
 ### Geospatial Operations
 
 | Command | Description |
@@ -360,7 +362,6 @@ Below is a categorized list of all supported commands.
 | `GEORADIUS <key> <longitude> <latitude> <radius> <unit> [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT <count>] [ASC\|DESC]` | Query members within a radius from a given longitude/latitude point. Unit can be m, km, ft, or mi. Options: WITHCOORD (include coordinates), WITHDIST (include distance), WITHHASH (include geohash), COUNT (limit results), ASC/DESC (sort by distance). Returns an array of matching members with optional metadata. Time complexity: O(N+log(M)) where N is the number of elements in the grid and M is the number of items inside the radius. |
 | `GEOSEARCH <key> FROMMEMBER <member> \| FROMLONLAT <longitude> <latitude> BYRADIUS <radius> <unit> \| BYBOX <width> <height> <unit> [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT <count>] [ASC\|DESC]` | Advanced geospatial search supporting both radius and box queries. Can search from a member's position (FROMMEMBER) or from coordinates (FROMLONLAT). Search area can be circular (BYRADIUS) or rectangular (BYBOX). Supports same options as GEORADIUS. Returns an array of matching members with optional metadata. Time complexity: O(N+log(M)) where N is the number of elements in the grid and M is the number of items in the search area. |
 | `GEOSEARCHSTORE <destination> <source> FROMMEMBER <member> \| FROMLONLAT <longitude> <latitude> BYRADIUS <radius> <unit> \| BYBOX <width> <height> <unit> [COUNT <count>] [ASC\|DESC] [STOREDIST]` | Perform a GEOSEARCH query and store the results in a destination sorted set. Same syntax as GEOSEARCH but stores results instead of returning them. The STOREDIST option stores distances as scores instead of geohash scores. Returns the number of elements in the resulting sorted set. Useful for caching search results. Time complexity: O(N+log(M)) where N is the number of elements in the grid and M is the number of items in the search area. |
-
 
 ### Pub/Sub Operations
 
@@ -377,7 +378,6 @@ Below is a categorized list of all supported commands.
 | `PUNSUBSCRIBE [pattern ...]` | Unsubscribe from one or more channel patterns. |
 | `PUNSUB [pattern ...]` | Alias for PUNSUBSCRIBE. Unsubscribe from channel patterns. |
 
-
 ### Transactions
 
 | Command | Description |
@@ -387,7 +387,6 @@ Below is a categorized list of all supported commands.
 | `DISCARD` | Abort the current transaction by discarding all commands that were queued after MULTI. Returns 'Discarded' on success. |
 | `WATCH <key> [key ...]` | Mark one or more keys to be watched for optimistic locking. If any watched keys are modified before EXEC, the transaction is aborted. |
 | `UNWATCH` | Flush all previously watched keys for the current client connection. Automatically called after EXEC or DISCARD. |
-
 
 ### User Management
 
@@ -399,7 +398,6 @@ Below is a categorized list of all supported commands.
 | `USERS [username]` | List all usernames or show details for a specific user. Without arguments, returns an array of all usernames. With a username, returns detailed information including admin status. |
 | `WHOAMI` | Display details of the currently authenticated user including username, client IP address, admin status, and full name. |
 
-
 ### Persistence Commands
 
 | Command | Description |
@@ -407,7 +405,6 @@ Below is a categorized list of all supported commands.
 | `SAVE` | Synchronously save the current database state to disk as an RDB snapshot file. This command blocks the server during the save operation. Requires admin privileges. |
 | `BGSAVE` | Asynchronously save the current database state to disk as an RDB snapshot in the background. Returns 'OK' immediately while the save continues in the background. Requires admin privileges. |
 | `BGREWRITEAOF` | Asynchronously rewrite the Append-Only File (AOF) in the background. Creates a new, optimized AOF file by reading the current dataset. Requires admin privileges. |
-
 
 ### Server & Connection
 
@@ -422,7 +419,6 @@ Below is a categorized list of all supported commands.
 | `SEL <db_index>` | Alias for SELECT. Select the database with the specified index. |
 | `SIZE [db_index]` | Return the number of configured databases, or the number of keys in a specific database if an index is provided. |
 
-
 ### Monitoring & Information
 
 | Command | Description |
@@ -434,7 +430,6 @@ Below is a categorized list of all supported commands.
 | `DROPDB` | Alias for FLUSHDB. Remove all keys from the currently selected database. Requires admin privileges. |
 | `FLUSHALL` | Remove all keys from all databases on the server. This is a destructive operation that clears the entire server state. Requires admin privileges. Use with extreme caution. |
 
-
 ---
 
 ## 5. Internal Architecture
@@ -442,7 +437,8 @@ Below is a categorized list of all supported commands.
 This section details the internal design of Go-Redis-Server for developers and contributors.
 
 ### High-Level Diagram
-```
+
+```mermaid
    Client (redis-cli)
            |
           TCP
@@ -465,6 +461,7 @@ This section details the internal design of Go-Redis-Server for developers and c
 ```
 
 ### Project Structure & Core Components
+
 ```bash
 .
 ├── bin
@@ -522,26 +519,27 @@ This section details the internal design of Go-Redis-Server for developers and c
 
 ### Concurrency Model
 
--   **One Goroutine Per Client**: The server spawns a new goroutine for each incoming connection, ensuring clients are handled in parallel.
--   **Centralized Data Store**: A single, shared database instance is used for all clients.
--   **Read/Write Locking**: Access to the database is synchronized using `sync.RWMutex`: 
-    -   **Read operations** (`GET`, `TTL`, etc.) use a read lock (`RLock`), allowing multiple readers to proceed concurrently.
-    -   **Write operations** (`SET`, `DEL`, etc.) use a write lock (`Lock`), ensuring exclusive access and data consistency.
+- **One Goroutine Per Client**: The server spawns a new goroutine for each incoming connection, ensuring clients are handled in parallel.
+- **Centralized Data Store**: A single, shared database instance is used for all clients.
+- **Read/Write Locking**: Access to the database is synchronized using `sync.RWMutex`: 
+  - **Read operations** (`GET`, `TTL`, etc.) use a read lock (`RLock`), allowing multiple readers to proceed concurrently.
+  - **Write operations** (`SET`, `DEL`, etc.) use a write lock (`Lock`), ensuring exclusive access and data consistency.
 
 ### Command Execution Pipeline
 
-1.  A client connection is accepted, and a new goroutine starts handling it.
-2.  The client's request is read from the TCP socket and parsed as a RESP message.
-3.  The command and its arguments are dispatched to the appropriate handler function.
-4.  If authentication is enabled, the client's authenticated status is checked.
-5.  The handler acquires the necessary lock (read or write) on the database.
-6.  The command logic is executed (e.g., reading/writing a value).
-7.  A RESP-formatted response is written back to the client.
-8.  For write commands, the operation is appended to the AOF buffer if enabled.
+1. A client connection is accepted, and a new goroutine starts handling it.
+2. The client's request is read from the TCP socket and parsed as a RESP message.
+3. The command and its arguments are dispatched to the appropriate handler function.
+4. If authentication is enabled, the client's authenticated status is checked.
+5. The handler acquires the necessary lock (read or write) on the database.
+6. The command logic is executed (e.g., reading/writing a value).
+7. A RESP-formatted response is written back to the client.
+8. For write commands, the operation is appended to the AOF buffer if enabled.
 
 ### Data Model
 
 Each key in the database maps to a `Value` struct, which contains:
+
 - The stored data itself (e.g., a string, list, or hash).
 - An optional expiration timestamp (as a `time.Time`).
 - Metadata for future eviction policies (e.g., access frequency).
@@ -549,6 +547,8 @@ Each key in the database maps to a `Value` struct, which contains:
 ### RESP Protocol Support
 
 Go-Redis supports all primary RESP data types, making it fully compatible with `redis-cli`:
+
+- `+OK` Simple Strings
 - `+` Simple Strings
 - `-` Errors
 - `:` Integers
@@ -569,20 +569,21 @@ Go-Redis supports all primary RESP data types, making it fully compatible with `
 | **Cons** | - Larger file size. <br> - Slower restarts on large datasets. | - Less durable (can lose data since last snapshot). |
 | **Use Case** | Maximum data safety. | Fast backups and disaster recovery. |
 
--   **AOF `fsync` Policies**: Controlled by `appendfsync` in `redis.conf`.
-    -   `always`: Safest but slowest. `fsync()` on every write.
-    -   `everysec`: Default. `fsync()` once per second. Good trade-off.
-    -   `no`: Fastest. Lets the OS decide when to `fsync()`.
--   **RDB Triggers**: Controlled by `save` rules in `redis.conf` or manually via `SAVE`/`BGSAVE`.
+- **AOF `fsync` Policies**: Controlled by `appendfsync` in `redis.conf`.
+  - `always`: Safest but slowest. `fsync()` on every write.
+  - `everysec`: Default. `fsync()` once per second. Good trade-off.
+  - `no`: Fastest. Lets the OS decide when to `fsync()`.
+- **RDB Triggers**: Controlled by `save` rules in `redis.conf` or manually via `SAVE`/`BGSAVE`.
 
 ### Memory Management & Eviction
 
--   **`maxmemory`**: This directive in `redis.conf` sets a hard limit on the memory Go-Redis can use.
--   **`maxmemory-policy`**: When the `maxmemory` limit is reached, this policy determines the eviction behavior.
-    -   `no-eviction`: (Default) Blocks write commands that would exceed the limit, returning an error.
-    -   `allkeys-random`: Randomly evicts keys to make space for new data.
-    -   `allkeys-lru`: Evicts the least recently used keys.
-    -   `allkeys-lfu`: Evicts the least frequently used keys.
+- **`maxmemory`**: This directive in `redis.conf` sets a hard limit on the memory Go-Redis can use.
+- **`maxmemory-policy`**: When the `maxmemory` limit is reached, this policy determines the eviction behavior.
+
+- `no-eviction`: (Default) Blocks write commands that would exceed the limit, returning an error.
+- `allkeys-random`: Randomly evicts keys to make space for new data.
+- `allkeys-lru`: Evicts the least recently used keys.
+- `allkeys-lfu`: Evicts the least frequently used keys.
 
 ---
 
@@ -590,13 +591,14 @@ Go-Redis supports all primary RESP data types, making it fully compatible with `
 
 Go-Redis is an educational project and intentionally omits certain advanced Redis features:
 
--   No replication or clustering.
--   No Lua scripting.
+- No replication or clustering.
+- No Lua scripting.
 
 ---
 
 ## 8. Contact & Support
 
 For bug reports, questions, or contributions, please contact:
--   **Author**: Akash Maji
--   **Email**: `akashmaji@iisc.ac.in`
+
+- **Author**: Akash Maji
+- **Email**: `akashmaji@iisc.ac.in`
