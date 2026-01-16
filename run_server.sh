@@ -95,7 +95,10 @@ echo -e "${GREEN}[INFO] Running go-redis...${NC}"
 "$BIN_DIR/go-redis" "$CONFIG_FILE" "$DATA_DIR" 2> "$RUN_ERROR_LOG"
 STATUS=${PIPESTATUS[0]}
 if [ $STATUS -ne 0 ]; then
-    echo -e "${RED}[ERROR] Go-Redis failed.${NC}"
+    echo -e "${RED}[ERROR] Go-Redis-Server run failed.${NC}"
+    # echo the last 10 lines of the run log for context
+    # echo -e "${YELLOW}Last 10 lines of 'run.log':${NC}"
+    tail -n 10 "$RUN_ERROR_LOG"
     exit 1
 fi
 # ensure the script's "$?" reflects the program exit code for the following check
