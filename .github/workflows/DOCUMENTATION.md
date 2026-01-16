@@ -5,7 +5,7 @@ title: Go-Redis-Server Documentation
 
 # Go-Redis-Server: The Complete Guide (v1.0)
 
-![Go-Redis-Server Logo](images/go-redis-logo.png)
+![Go-Redis-Server Logo](go-redis-logo.png)
 
 Welcome to the complete developer and user documentation for **Go-Redis**, a lightweight, multi-threaded, Redis-compatible server implemented in Go.
 
