@@ -92,15 +92,17 @@ func InitDBS(n int, conf *common.Config, state *common.AppState) {
 }
 
 // FlushAll clears all data from all logical databases.
+// Note: The caller must NOT hold DBMu lock as this function iterates over DBS directly.
+// The global DBMu is already held by handleOneConnection during command execution.
 func FlushAll(state *common.AppState) {
-	DBMu.Lock()
-	defer DBMu.Unlock()
 	for _, db := range DBS {
 		db.Mu.Lock()
 		db.Store = make(map[string]*common.Item)
 		db.Mem = 0
-		db.TouchAll()
 		db.Mu.Unlock()
+		// Call TouchAll after releasing db.Mu to avoid deadlock
+		// TouchAll acquires WatchersMu, and holding both locks can cause deadlock
+		db.TouchAll()
 	}
 }
 
