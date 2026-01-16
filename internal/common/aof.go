@@ -331,6 +331,37 @@ func (aof *Aof) Rewrite(cp map[string]*Item) {
 				fwriter.Write(&zaddCmd)
 			}
 
+		case HLL_TYPE:
+			// HyperLogLog: We need to reconstruct the HLL by writing PFADD commands
+			// Since HLL is probabilistic, we store a special marker and the raw registers
+			// For AOF, we use a custom internal command format that stores the raw state
+			// This is handled specially during replay
+			cmd := Value{Typ: BULK, Blk: "_HLLRESTORE"}
+			Arr := []Value{cmd, key}
+
+			// Serialize the HLL state
+			if item.HLLRegisters != nil {
+				// Dense format: store all registers as a single bulk string
+				Arr = append(Arr, Value{Typ: BULK, Blk: "dense"})
+				// Convert registers to string representation
+				regStr := ""
+				for _, r := range item.HLLRegisters {
+					regStr += string(rune(r + 32)) // Offset by 32 to make printable
+				}
+				Arr = append(Arr, Value{Typ: BULK, Blk: regStr})
+			} else if item.HLLSparse != nil {
+				// Sparse format: store index:value pairs
+				Arr = append(Arr, Value{Typ: BULK, Blk: "sparse"})
+				sparseStr := ""
+				for idx, val := range item.HLLSparse {
+					sparseStr += strconv.Itoa(int(idx)) + ":" + strconv.Itoa(int(val)) + ","
+				}
+				Arr = append(Arr, Value{Typ: BULK, Blk: sparseStr})
+			}
+
+			hllCmd := Value{Typ: ARRAY, Arr: Arr}
+			fwriter.Write(&hllCmd)
+
 		default:
 			log.Printf("Warning: Unknown type %s for key %s in AOF Rewrite\n", item.Type, k)
 		}

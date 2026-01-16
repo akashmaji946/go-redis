@@ -389,3 +389,26 @@ func Size(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 	numDBs := len(database.DBS)
 	return common.NewIntegerValue(int64(numDBs))
 }
+
+// Echo handles the ECHO command.
+// Returns the same message sent by the client.
+//
+// Syntax:
+//
+//	ECHO <message>
+//
+// Parameters:
+//   - message: The message string to echo back
+//
+// Returns:
+//
+//	Bulk string: The same message sent by the client
+
+func Echo(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) != 1 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'echo' command")
+	}
+	msg := args[0].Blk
+	return common.NewBulkValue(msg)
+}

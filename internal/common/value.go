@@ -62,7 +62,7 @@ const (
 //   - LastAccessed: The time when the key was last accessed
 //   - AccessCount: The number of times the key was accessed
 type Item struct {
-	Type string // Data type: "string", "int", "bool", "float", "hash", "list", "set", "zset"
+	Type string // Data type: "string", "int", "bool", "float", "hash", "list", "set", "zset", "hyperloglog"
 
 	Str   string  // String value
 	Int   int64   // Integer value
@@ -73,6 +73,14 @@ type Item struct {
 	List    []string           // List type (future)
 	ItemSet map[string]bool    // Set type (future)
 	ZSet    map[string]float64 // Sorted set type (future)
+
+	// HyperLogLog fields
+	// HLLRegisters stores the dense representation (16384 registers, 6 bits each)
+	// Each register stores the maximum number of leading zeros + 1 observed
+	HLLRegisters []uint8 // Dense representation: 16384 registers
+	// HLLSparse stores the sparse representation for small cardinalities
+	// Maps register index to its value, only storing non-zero registers
+	HLLSparse map[uint16]uint8 // Sparse representation: index -> value
 
 	Exp          time.Time
 	LastAccessed time.Time
@@ -329,6 +337,20 @@ func (item *Item) ApproxMemoryUsage(key string) int64 {
 			size += stringHeader + int64(len(k))
 			size += 8 // float64 value
 			size += avgMapEntryOverhead
+		}
+	}
+
+	// HyperLogLog type
+	if item.Type == HLL_TYPE {
+		if item.HLLRegisters != nil {
+			// Dense representation: 16384 bytes for registers + slice header
+			size += 24 + int64(len(item.HLLRegisters)) // slice header (24 bytes) + data
+		}
+		if item.HLLSparse != nil {
+			// Sparse representation: map overhead + entries
+			for range item.HLLSparse {
+				size += 2 + 1 + avgMapEntryOverhead // uint16 key + uint8 value + overhead
+			}
 		}
 	}
 

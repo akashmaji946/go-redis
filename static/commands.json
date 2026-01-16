@@ -423,5 +423,25 @@
     "usage": "ZSCORE <key> <member>",
     "description": "Get the score associated with the given member in a sorted set",
     "category": "zset"
+  },
+  "PFADD": {
+    "usage": "PFADD <key> <element> [element ...]",
+    "description": "Add elements to a HyperLogLog data structure. Returns 1 if any register was altered, 0 otherwise. HyperLogLog provides approximate cardinality counting with ~0.81% standard error using only ~12KB of memory regardless of the number of elements.",
+    "category": "hyperloglog"
+  },
+  "PFCOUNT": {
+    "usage": "PFCOUNT <key> [key ...]",
+    "description": "Return the approximated cardinality of the set(s) observed by the HyperLogLog(s). When called with multiple keys, returns the cardinality of the union of all HyperLogLogs (virtual merge). Standard error is ~0.81%.",
+    "category": "hyperloglog"
+  },
+  "PFMERGE": {
+    "usage": "PFMERGE <destkey> <sourcekey> [sourcekey ...]",
+    "description": "Merge multiple HyperLogLog values into a single one. The merged HyperLogLog's cardinality estimate is close to the cardinality of the union of all source HyperLogLogs. The destination key is created if it doesn't exist.",
+    "category": "hyperloglog"
+  },
+  "PFDEBUG": {
+    "usage": "PFDEBUG <key>",
+    "description": "Return internal debugging information about a HyperLogLog key, including encoding type (sparse/dense), number of registers used, and estimated cardinality.",
+    "category": "hyperloglog"
   }
 }

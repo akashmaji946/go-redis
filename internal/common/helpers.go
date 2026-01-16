@@ -11,6 +11,7 @@ const (
 	LIST_TYPE   = "list"
 	SET_TYPE    = "set"
 	ZSET_TYPE   = "zset"
+	HLL_TYPE    = "hyperloglog"
 )
 
 // ParseInt safely parses a string to int64
@@ -96,6 +97,10 @@ func (item *Item) IsZSet() bool {
 	return item.Type == ZSET_TYPE
 }
 
+func (item *Item) IsHLL() bool {
+	return item.Type == HLL_TYPE
+}
+
 // Type enforcement helpers
 func (item *Item) EnsureHash() error {
 	if item.Type != "" && item.Type != HASH_TYPE {
@@ -136,5 +141,21 @@ func NewHashFieldItem(value string) *Item {
 	return &Item{
 		Str:  value,
 		Type: STRING_TYPE,
+	}
+}
+
+// NewHLLItem creates a new HyperLogLog item with sparse representation
+func NewHLLItem() *Item {
+	return &Item{
+		Type:      HLL_TYPE,
+		HLLSparse: make(map[uint16]uint8),
+	}
+}
+
+// NewHLLItemDense creates a new HyperLogLog item with dense representation
+func NewHLLItemDense() *Item {
+	return &Item{
+		Type:         HLL_TYPE,
+		HLLRegisters: make([]uint8, 16384), // 2^14 registers
 	}
 }

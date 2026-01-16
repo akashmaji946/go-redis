@@ -25,6 +25,7 @@ var Handlers = map[string]common.Handler{
 	"COMMAND": Command,
 	"PING":    Ping,
 
+	// string commands
 	"GET": Get,
 	"SET": Set,
 	// "SETNX":  Setnx,
@@ -36,7 +37,7 @@ var Handlers = map[string]common.Handler{
 	"MSET":   Mset,
 	"STRLEN": Strlen,
 
-	// List commands
+	// list commands
 	"LPUSH":  Lpush,
 	"RPUSH":  Rpush,
 	"LPOP":   Lpop,
@@ -46,7 +47,7 @@ var Handlers = map[string]common.Handler{
 	"LINDEX": Lindex,
 	"LGET":   Lget,
 
-	// Set commands
+	// set commands
 	"SADD":        Sadd,
 	"SREM":        Srem,
 	"SMEMBERS":    Smembers,
@@ -57,7 +58,7 @@ var Handlers = map[string]common.Handler{
 	"SDIFF":       Sdiff,
 	"SRANDMEMBER": Srandmember,
 
-	// Sorted Set commands
+	// sorted set commands
 	"ZADD":      Zadd,
 	"ZREM":      Zrem,
 	"ZSCORE":    Zscore,
@@ -66,32 +67,18 @@ var Handlers = map[string]common.Handler{
 	"ZREVRANGE": Zrevrange,
 	"ZGET":      Zget,
 
-	"TYPE": Type,
-
-	"DELETE": Del,
-	"DEL":    Del,
-	"RENAME": Rename,
-
-	"EXISTS": Exists,
-
-	"KEYS": Keys,
-
-	"SAVE":         Save,
-	"BGSAVE":       BGSave,
-	"BGREWRITEAOF": BGRewriteAOF,
-
-	"FLUSHALL": FlushAll,
-	"FLUSHDB":  FlushDB,
-	"DROPDB":   FlushDB,
-	"DBSIZE":   DBSize,
-
-	"SIZE": Size,
-
+	// key commands
+	"TYPE":    Type,
+	"DELETE":  Del,
+	"DEL":     Del,
+	"RENAME":  Rename,
+	"EXISTS":  Exists,
+	"KEYS":    Keys,
 	"EXPIRE":  Expire,
 	"TTL":     Ttl,
 	"PERSIST": Persist,
 
-	// Hash commands
+	// hash commands
 	"HSET":    Hset,
 	"HGET":    Hget,
 	"HDEL":    Hdel,
@@ -121,28 +108,42 @@ var Handlers = map[string]common.Handler{
 	"WATCH":   Watch,
 	"UNWATCH": Unwatch,
 
-	"MONITOR": Monitor,
-	"INFO":    Info,
+	// server commands
+	"MONITOR":      Monitor,
+	"INFO":         Info,
+	"SAVE":         Save,
+	"BGSAVE":       BGSave,
+	"BGREWRITEAOF": BGRewriteAOF,
+	"FLUSHALL":     FlushAll,
+	"FLUSHDB":      FlushDB,
+	"DROPDB":       FlushDB,
+	"DBSIZE":       DBSize,
+	"SIZE":         Size,
 
 	// pubsub
-	"PUBLISH":     Publish,
-	"SUBSCRIBE":   Subscribe,
-	"UNSUBSCRIBE": Unsubscribe,
-	"PUB":         Publish,
-	"SUB":         Subscribe,
-	"UNSUB":       Unsubscribe,
-
+	"PUBLISH":      Publish,
+	"SUBSCRIBE":    Subscribe,
+	"UNSUBSCRIBE":  Unsubscribe,
+	"PUB":          Publish,
+	"SUB":          Subscribe,
+	"UNSUB":        Unsubscribe,
 	"PSUBSCRIBE":   Psubscribe,
 	"PUNSUBSCRIBE": Punsubscribe,
-
-	"PSUB":   Psubscribe,
-	"PUNSUB": Punsubscribe,
-	// "PUBSUB":       Pubsub,
-	// "ECHO":         Echo,
+	"PSUB":         Psubscribe,
+	"PUNSUB":       Punsubscribe,
+	"ECHO":         Echo,
 	// "QUIT":         Quit,
 
+	// db commands
 	"SELECT": Select,
 	"SEL":    Select,
+
+	// HyperLogLog commands
+	"PFADD":       PfAdd,
+	"PFCOUNT":     PfCount,
+	"PFMERGE":     PfMerge,
+	"PFDEBUG":     PfDebug,
+	"_HLLRESTORE": HLLRestore, // Internal command for AOF replay
 }
 
 // Handler is a function type that processes Redis commands.
