@@ -1,9 +1,9 @@
 ---
 layout: default
-title: Go-Redis Documentation
+title: Go-Redis-Server Documentation
 ---
 
-![Go-Redis Logo](go-redis-logo.png)
+![Go-Redis-Server Logo](go-redis-logo.png)
 
 # Go-Redis-Server: The Complete Guide (v1.0)
 
@@ -60,10 +60,11 @@ Go-Redis is a Redis-compatible in-memory key-value store server written in Go. I
 -   **Broad Command Support**: Implements a rich subset of commands for Strings, Lists, Sets, Hashes, and Sorted Sets.
 -   **Dual Persistence Model**: 
     -   **AOF (Append-Only File)**: Logs every write operation with configurable `fsync` modes for high durability.
-    -   **RDB (Redis Database)**: Creates point-in-time snapshots for fast startups and backups. Supports full AOF rewriting for all data types.
+    -   **RDB (Redis Database)**: Creates point-in-time snapshots for fast startups and backups.
+    -   **Encrypted Storage**: Optional AES-GCM encryption for all persistence files and user credentials.
 -   **Key Expiration**: Supports `EXPIRE`, `TTL`, and `PERSIST` with lazy (on-access) key removal.
 -   **Atomic Transactions**: Group commands in `MULTI`/`EXEC` blocks with `WATCH`/`UNWATCH` for optimistic locking.
--   **Server Security**: Built-in password authentication via the `AUTH` command.
+-   **User Management**: Multi-user support with role-based access control (Admin/User).
 -   **Introspection & Monitoring**: 
     -   `INFO` provides a detailed look into server statistics.
     -   `MONITOR` streams live command processing for debugging.
@@ -94,9 +95,7 @@ Go-Redis is a Redis-compatible in-memory key-value store server written in Go. I
 
 Clone the repository and run the build command:
 ```bash
-cd <project_directory>
-cd cmd
-go build -o go-redis .
+go build
 ```
 This creates a `go-redis` executable in your project directory.
 
@@ -106,26 +105,42 @@ The server is configured using a `redis.conf` file. By default, it looks for `./
 
 **Example `redis.conf`:**
 ```conf
-# Set the data directory for AOF and RDB files
+## how many databases?
+databases 2
+
+## encryption
+encrypt no
+nonce 1234567890
+
+### store data where? directory
 dir ./data
 
-# Enable AOF persistence and set fsync policy (always, everysec, no)
+### which persistence technique? AOF vs RDB
+## AOF parameters
 appendonly yes
-appendfsync everysec
+appendfilename aoffile 
+appendfsync always
+## RDB parameters
+# save 900 1 #if in 900 sec, 1 key chnages, save db
+# save 300 10 
+save 1 1
+dbfilename rdbfile
 
-# Configure RDB snapshotting: save if 3 changes occur within 5 seconds
-save 5 3
-dbfilename backup.rdb
+### auth
+requirepass dsl
 
-# Secure the server with a password
-requirepass your-secret-password
-
-# Set a 1GB memory limit and define eviction policy
-maxmemory 1073741824
-maxmemory-policy allkeys-random
+### memory and eviction management
+## default is bytes (example usage: 256, 256kb, 256mb)
+maxmemory 256mb
+# policies: default is no-eviction
+# no-eviction, allkeys-random, allkeys-lru, allkeys-lfu, 
+# volatile-lru, volatile-lfu, volatile-random
+maxmemory-policy allkeys-lru
+maxmemory-samples 50
 ```
 
 ### Running the Server
+
 The server can be started with default paths or custom ones.
 
 **Syntax:**
@@ -142,7 +157,7 @@ The server can be started with default paths or custom ones.
     ./go-redis ./my.conf ./my-data
     ```
 
-The server will log its startup process and listen on port `6379`.
+The server will log its startup process and listen on port `7379`.
 
 ### Connecting with `redis-cli`
 
@@ -152,7 +167,7 @@ redis-cli -p 7379
 ```
 If you've set `requirepass`, authenticate your session:
 ```
-127.0.0.1:7379> AUTH your-secret-password
+127.0.0.1:6379> AUTH user-name your-secret-password
 OK
 ```
 You're all set to run commands!
@@ -169,12 +184,20 @@ The quickest way to run Go-Redis is with the official Docker image.
 # 1. Pull the image from Docker Hub
 docker pull akashmaji/go-redis:latest
 
-# 2. Run the container, mounting a volume for persistent data
+# 2. Run the container, mounting a volume for persistent data (with default config)
 docker run -d -p 7379:7379 \
   -v $(pwd)/data:/app/data \
+  --name go-redis \
   akashmaji/go-redis:latest
 
-# 3. Connect from your host
+# 3. Run the container, mounting a volume for persistent data (with custom config)
+docker run -d -p 7379:7379 \
+  -v $(pwd)/config/redis.conf:/app/config/redis.conf:ro \
+  -v $(pwd)/data:/app/data \
+  --name go-redis \
+  akashmaji/go-redis:latest
+
+# 4. Connect from your host
 redis-cli -p 7379
 ```
 
@@ -191,7 +214,22 @@ docker build -t go-redis:latest .
 docker run -d -p 7379:7379 \
   -v $(pwd)/config/redis.conf:/app/config/redis.conf:ro \
   -v $(pwd)/data:/app/data \
+  --name go-redis \
   go-redis:latest
+
+# 3.1 Connect from your host
+redis-cli -p 7379
+
+# 3. Check logs
+docker logs go-redis
+
+# 4. Stop and remove the container
+docker stop go-redis
+docker rm go-redis
+
+# 5. Optionally tag and push to Docker Hub
+docker tag go-redis:latest akashmaji/go-redis:latest
+docker push akashmaji/go-redis:latest
 ```
 
 ---
@@ -201,142 +239,152 @@ docker run -d -p 7379:7379 \
 Below is a categorized list of all supported commands.
 
 ### String Operations
-
 | Command | Description |
 |---|---|
-| `GET <key>` | Get the value of a key |
-| `SET <key> <value>` | Set the string value of a key |
-| `INCR <key>` | Increment the integer value of a key by one |
-| `DECR <key>` | Decrement the integer value of a key by one |
-| `INCRBY <key> <increment>` | Increment the integer value of a key by the given amount |
-| `DECRBY <key> <decrement>` | Decrement the integer value of a key by the given amount |
-| `MGET <key> [key ...]` | Get the values of all the given keys |
-| `MSET <key> <value> [key <value> ...]` | Set multiple keys to multiple values |
-
+| `GET <key>` | Retrieve the string value stored at the specified key. Returns NULL if the key does not exist. Returns an error if the key holds a non-string data type. |
+| `SET <key> <value>` | Set the string value of a key. If the key already exists, its value is overwritten regardless of its type. Any previous expiration is discarded. |
+| `INCR <key>` | Increment the integer value stored at the specified key by one. If the key does not exist, it is initialized to 0 before performing the increment. |
+| `DECR <key>` | Decrement the integer value stored at the specified key by one. If the key does not exist, it is initialized to 0 before performing the decrement. |
+| `INCRBY <key> <increment>` | Increment the integer value stored at the specified key by the given increment amount. The increment can be negative to perform a decrement. |
+| `DECRBY <key> <decrement>` | Decrement the integer value stored at the specified key by the given decrement amount. |
+| `MGET <key> [key ...]` | Retrieve the values of multiple keys in a single operation. Returns an array of values in the same order as the requested keys. For keys that do not exist, NULL is returned. |
+| `MSET <key> <value> [key value ...]` | Set multiple key-value pairs in a single atomic operation. If any keys already exist, their values are overwritten. |
+| `STRLEN <key>` | Return the length of the string value stored at the specified key. Returns 0 if the key does not exist. |
 
 ### Key Management
-
 | Command | Description |
 |---|---|
-| `DEL <key> [key ...]` | Delete one or more keys |
-| `EXISTS <key> [key ...]` | Check if keys exist |
-| `KEYS <pattern>` | Find all keys matching the given pattern |
-| `RENAME <key> <newkey>` | Rename a key |
-| `TYPE <key>` | Determine the type stored at key |
-| `EXPIRE <key> <seconds>` | Set a key's time to live in seconds |
-| `TTL <key>` | Get the time to live for a key in seconds |
-| `PERSIST <key>` | Remove the expiration from a key |
-
+| `DEL <key> [key ...]` | Delete one or more keys from the database. Keys that do not exist are silently ignored. Returns the number of keys that were actually removed. |
+| `DELETE <key> [key ...]` | Alias for DEL. Delete one or more keys from the database. |
+| `EXISTS <key> [key ...]` | Check if one or more keys exist in the database. Returns an integer count of how many of the specified keys exist. |
+| `KEYS <pattern>` | Find all keys matching the specified glob-style pattern. Supports `*`, `?`, `[abc]`, and `[^abc]` patterns. |
+| `RENAME <key> <newkey>` | Rename a key to a new name. Returns 1 if successful, 0 if the source key does not exist or destination already exists. |
+| `TYPE <key>` | Return the data type of the value stored at the specified key. Returns STRING, LIST, SET, HASH, ZSET, HLL, or none. |
+| `EXPIRE <key> <seconds>` | Set a timeout on the specified key. After the timeout expires, the key will be automatically deleted. |
+| `TTL <key>` | Return the remaining time to live (in seconds) of a key. Returns -1 if no expiration, -2 if key does not exist. |
+| `PERSIST <key>` | Remove the expiration timeout from a key, making it persistent (never expires). |
 
 ### List Operations
-
 | Command | Description |
 |---|---|
-| `LPUSH <key> <value> [value ...]` | Prepend one or multiple values to a list |
-| `RPUSH <key> <value> [value ...]` | Append one or multiple values to a list |
-| `LPOP <key>` | Remove and get the first element in a list |
-| `RPOP <key>` | Remove and get the last element in a list |
-| `LRANGE <key> <start> <stop>` | Get a range of elements from a list |
-| `LLEN <key>` | Get the length of a list |
-| `LINDEX <key> <index>` | Get an element from a list by its index |
-| `LGET <key>` | Get all elements in a list |
-
+| `LPUSH <key> <value> [value ...]` | Insert one or more values at the head (left side) of a list. If the key does not exist, a new list is created. Returns the length of the list after the push. |
+| `RPUSH <key> <value> [value ...]` | Append one or more values to the tail (right side) of a list. If the key does not exist, a new list is created. Returns the length of the list after the push. |
+| `LPOP <key>` | Remove and return the first element (head) of a list. Returns NULL if the key does not exist. If the list becomes empty, the key is deleted. |
+| `RPOP <key>` | Remove and return the last element (tail) of a list. Returns NULL if the key does not exist. If the list becomes empty, the key is deleted. |
+| `LRANGE <key> <start> <stop>` | Retrieve a range of elements from a list. Indices are zero-based and inclusive. Negative indices count from the end. |
+| `LLEN <key>` | Return the length (number of elements) of a list. Returns 0 if the key does not exist. |
+| `LINDEX <key> <index>` | Retrieve the element at the specified index in a list. Negative indices count from the end (-1 is the last element). |
+| `LGET <key>` | Retrieve all elements from a list. Equivalent to `LRANGE key 0 -1`. |
 
 ### Set Operations
-
 | Command | Description |
 |---|---|
-| `SADD <key> <member> [member ...]` | Add one or more members to a set |
-| `SREM <key> <member> [member ...]` | Remove one or more members from a set |
-| `SMEMBERS <key>` | Get all the members in a set |
-| `SISMEMBER <key> <member>` | Determine if a given value is a member of a set |
-| `SCARD <key>` | Get the number of members in a set |
-| `SDIFF <key> [key ...]` | Subtract multiple sets |
-| `SINTER <key> [key ...]` | Intersect multiple sets |
-| `SUNION <key> [key ...]` | Add multiple sets |
-| `SRANDMEMBER <key> [count]` | Get one or multiple random members from a set |
-
+| `SADD <key> <member> [member ...]` | Add one or more members to a set. If the key does not exist, a new set is created. Returns the number of members actually added (not counting duplicates). |
+| `SREM <key> <member> [member ...]` | Remove one or more members from a set. Members that do not exist are silently ignored. Returns the number of members actually removed. |
+| `SMEMBERS <key>` | Return all members of the set stored at the specified key. Returns an empty array if the key does not exist. |
+| `SISMEMBER <key> <member>` | Determine if a given value is a member of the set. Returns 1 if the member exists, 0 otherwise. |
+| `SCARD <key>` | Return the cardinality (number of members) of a set. Returns 0 if the key does not exist. |
+| `SDIFF <key> [key ...]` | Return the members of the set resulting from the difference between the first set and all successive sets. |
+| `SINTER <key> [key ...]` | Return the members of the set resulting from the intersection of all specified sets. |
+| `SUNION <key> [key ...]` | Return the members of the set resulting from the union of all specified sets. |
+| `SRANDMEMBER <key> [count]` | Return one or more random members from a set. With positive count, returns distinct members. With negative count, may include duplicates. |
 
 ### Hash Operations
-
 | Command | Description |
 |---|---|
-| `HSET <key> <field> <value> [field <value> ...]` | Set the string value of a hash field |
-| `HGET <key> <field>` | Get the value of a hash field |
-| `HDEL <key> <field> [field ...]` | Delete one or more hash fields |
-| `HGETALL <key>` | Get all fields and values in a hash |
-| `HINCRBY <key> <field> <increment>` | Increment the integer value of a hash field by the given amount |
-| `HEXISTS <key> <field>` | Check if a hash field exists |
-| `HLEN <key>` | Get the number of fields in a hash |
-| `HKEYS <key>` | Get all field names in a hash |
-| `HVALS <key>` | Get all values in a hash |
-| `HMSET <key> <field> <value> [field <value> ...]` | Set multiple hash fields to multiple values |
-| `HDELALL <key>` | Delete all fields in a hash |
-| `HEXPIRE <key> <field> <seconds>` | Set expiration for a hash field |
-
+| `HSET <key> <field> <value> [field value ...]` | Set one or more field-value pairs in a hash. If the key does not exist, a new hash is created. Returns the number of new fields added. |
+| `HGET <key> <field>` | Retrieve the value associated with a specific field in a hash. Returns NULL if the key or field does not exist. |
+| `HDEL <key> <field> [field ...]` | Delete one or more fields from a hash. Fields that do not exist are silently ignored. Returns the number of fields actually removed. |
+| `HGETALL <key>` | Retrieve all fields and their values from a hash. Returns an array: [field1, value1, field2, value2, ...]. |
+| `HINCRBY <key> <field> <increment>` | Increment the integer value of a hash field by the specified amount. If the field does not exist, it is initialized to 0. |
+| `HEXISTS <key> <field>` | Check if a specific field exists within a hash. Returns 1 if exists, 0 otherwise. |
+| `HLEN <key>` | Return the number of fields contained in a hash. Returns 0 if the key does not exist. |
+| `HKEYS <key>` | Retrieve all field names from a hash. Returns an empty array if the key does not exist. |
+| `HVALS <key>` | Retrieve all values from a hash. Returns an empty array if the key does not exist. |
+| `HMGET <key> <field> [field ...]` | Retrieve the values associated with the specified fields in a hash. Returns NULL for fields that do not exist. |
+| `HMSET <key> <field> <value> [field value ...]` | Set multiple field-value pairs in a hash. Deprecated in favor of HSET but kept for backward compatibility. |
+| `HDELALL <key>` | Delete all fields from a hash, effectively clearing the entire hash. Returns the number of fields deleted. |
+| `HEXPIRE <key> <field> <seconds>` | Set an expiration time on a specific field within a hash. Custom extension for fine-grained expiration control. |
 
 ### Sorted Set Operations
-
 | Command | Description |
 |---|---|
-| `ZADD <key> <score> <member> [score <member> ...]` | Add one or more members to a sorted set, or update its score if it already exists |
-| `ZREM <key> <member> [member ...]` | Remove one or more members from a sorted set |
-| `ZSCORE <key> <member>` | Get the score associated with the given member in a sorted set |
-| `ZCARD <key>` | Get the number of members in a sorted set |
-| `ZRANGE <key> <start> <stop> [WITHSCORES]` | Return a range of members in a sorted set, by index |
-| `ZREVRANGE <key> <start> <stop> [WITHSCORES]` | Return a range of members in a sorted set, by index, with scores ordered from high to low |
-| `ZGET <key> [<member>]` | Get score of a member or all members with scores |
+| `ZADD <key> <score> <member> [score member ...]` | Add one or more members with their scores to a sorted set. If a member already exists, its score is updated. Returns the number of new members added. |
+| `ZREM <key> <member> [member ...]` | Remove one or more members from a sorted set. Members that do not exist are silently ignored. Returns the number of members actually removed. |
+| `ZSCORE <key> <member>` | Return the score of a member in a sorted set. Returns NULL if the key or member does not exist. |
+| `ZCARD <key>` | Return the cardinality (number of members) of a sorted set. Returns 0 if the key does not exist. |
+| `ZRANGE <key> <start> <stop> [WITHSCORES]` | Return a range of members from a sorted set, ordered by score from lowest to highest. With WITHSCORES, includes scores in the result. |
+| `ZREVRANGE <key> <start> <stop> [WITHSCORES]` | Return a range of members from a sorted set, ordered by score from highest to lowest (reverse order). |
+| `ZGET <key> [member]` | Retrieve the score of a specific member, or all members with their scores from a sorted set. Custom convenience command. |
 
+### HyperLogLog Operations
+| Command | Description |
+|---|---|
+| `PFADD <key> <element> [element ...]` | Add one or more elements to a HyperLogLog probabilistic data structure. HyperLogLog provides approximate cardinality estimation using only ~12KB of memory. Returns 1 if at least one internal register was altered. |
+| `PFCOUNT <key> [key ...]` | Return the approximated cardinality (number of unique elements) observed by the HyperLogLog(s). When called with multiple keys, returns the cardinality of the union. Standard error rate is approximately 0.81%. |
+| `PFDEBUG <key>` | Return internal debugging information about a HyperLogLog including encoding type (sparse/dense), number of registers, and estimated cardinality. |
+| `PFMERGE <destkey> <sourcekey> [sourcekey ...]` | Merge multiple HyperLogLog values into a single destination HyperLogLog. The merged result approximates the cardinality of the union of all sources. |
 
 ### Pub/Sub Operations
-
 | Command | Description |
 |---|---|
-| `PUBLISH <channel> <message>` | Post a message to a channel |
-| `SUBSCRIBE <channel> [channel ...]` | Listen for messages published to the given channels |
-| `UNSUBSCRIBE [channel ...]` | Stop listening for messages posted to the given channels |
-| `PSUBSCRIBE <pattern> [pattern ...]` | Listen for messages published to channels matching the given patterns |
-| `PUNSUBSCRIBE [pattern ...]` | Stop listening for messages posted to channels matching the given patterns |
-
+| `PUBLISH <channel> <message>` | Post a message to a channel for delivery to all subscribers. Returns the number of clients that received the message. |
+| `PUB <channel> <message>` | Alias for PUBLISH. Post a message to a channel. |
+| `SUBSCRIBE <channel> [channel ...]` | Subscribe the client to one or more channels for receiving published messages. Returns subscription confirmation for each channel. |
+| `SUB <channel> [channel ...]` | Alias for SUBSCRIBE. Subscribe to one or more channels. |
+| `UNSUBSCRIBE [channel ...]` | Unsubscribe the client from one or more channels. Returns unsubscription confirmation for each channel. |
+| `UNSUB [channel ...]` | Alias for UNSUBSCRIBE. Unsubscribe from one or more channels. |
+| `PSUBSCRIBE <pattern> [pattern ...]` | Subscribe to one or more channel patterns using glob-style matching (`*` and `?`). |
+| `PSUB <pattern> [pattern ...]` | Alias for PSUBSCRIBE. Subscribe to channel patterns. |
+| `PUNSUBSCRIBE [pattern ...]` | Unsubscribe from one or more channel patterns. |
+| `PUNSUB [pattern ...]` | Alias for PUNSUBSCRIBE. Unsubscribe from channel patterns. |
 
 ### Transactions
-
 | Command | Description |
 |---|---|
-| `MULTI` | Mark the start of a transaction block. |
-| `EXEC` | Execute all commands queued in a transaction. |
-| `DISCARD`| Discard all commands issued after `MULTI`. |
-| `WATCH <key> [key ...]` | Watch the given keys to determine execution of the MULTI/EXEC block |
-| `UNWATCH` | Forget about all watched keys |
+| `MULTI` | Mark the start of a transaction block. After MULTI, all subsequent commands are queued instead of being executed immediately. |
+| `EXEC` | Execute all commands that were queued after MULTI as a single atomic transaction. Returns an array containing the replies from each executed command. |
+| `DISCARD` | Abort the current transaction by discarding all commands that were queued after MULTI. Returns 'Discarded' on success. |
+| `WATCH <key> [key ...]` | Mark one or more keys to be watched for optimistic locking. If any watched keys are modified before EXEC, the transaction is aborted. |
+| `UNWATCH` | Flush all previously watched keys for the current client connection. Automatically called after EXEC or DISCARD. |
 
+### User Management
+| Command | Description |
+|---|---|
+| `USERADD <admin_flag 1/0> <user> <password>` | Create a new user account on the server. The admin_flag specifies admin privileges (1 for admin, 0 for regular user). Password must be alphanumeric. Requires admin privileges. |
+| `USERDEL <user>` | Delete a user account from the server. The specified user will be removed and will no longer be able to authenticate. Cannot delete the 'root' user. Requires admin privileges. |
+| `PASSWD <user> <password>` | Change the password for a user account. Users can change their own password, and admin users can change any user's password. Password must be alphanumeric. |
+| `USERS [username]` | List all usernames or show details for a specific user. Without arguments, returns an array of all usernames. With a username, returns detailed information including admin status. |
+| `WHOAMI` | Display details of the currently authenticated user including username, client IP address, admin status, and full name. |
 
 ### Persistence Commands
-
 | Command | Description |
 |---|---|
-| `SAVE` | Synchronously save the database to disk |
-| `BGSAVE` | Asynchronously save the database to disk |
-| `BGREWRITEAOF` | Asynchronously rewrite the Append-Only File |
-
+| `SAVE` | Synchronously save the current database state to disk as an RDB snapshot file. This command blocks the server during the save operation. Requires admin privileges. |
+| `BGSAVE` | Asynchronously save the current database state to disk as an RDB snapshot in the background. Returns 'OK' immediately while the save continues in the background. Requires admin privileges. |
+| `BGREWRITEAOF` | Asynchronously rewrite the Append-Only File (AOF) in the background. Creates a new, optimized AOF file by reading the current dataset. Requires admin privileges. |
 
 ### Server & Connection
-
 | Command | Description |
 |---|---|
-| `AUTH <password>` | Authenticate to the server |
-| `PING [message]` | Ping the server |
-| `COMMAND` | Get help about Redis commands |
-| `COMMANDS [pattern]` | List available commands or get help for a specific command |
-
+| `AUTH <user> <password>` | Authenticate to the server with the specified username and password. Required when the server is configured with 'requirepass' enabled. Returns 'OK' on success. |
+| `ECHO <message>` | Returns the same message that was sent to the server. Useful for testing connectivity and verifying the server is properly receiving commands. |
+| `PING [message]` | Test server connectivity and measure latency. Without arguments, returns 'PONG'. With a message argument, returns that message. Can be executed without authentication. |
+| `COMMAND` | Returns 'OK' to indicate the server is ready to accept commands. Simple health check command. |
+| `COMMANDS [pattern \| command_name]` | List available commands or get detailed help for a specific command. With '*' or no args, returns all command names. With a command name, returns detailed information. |
+| `SELECT <db_index>` | Select the database with the specified zero-based numeric index for the current connection. Default is 16 databases (indices 0-15). |
+| `SEL <db_index>` | Alias for SELECT. Select the database with the specified index. |
+| `SIZE [db_index]` | Return the number of configured databases, or the number of keys in a specific database if an index is provided. |
 
 ### Monitoring & Information
-
 | Command | Description |
 |---|---|
-| `INFO [key]` | Get server information and statistics or per-key metadata |
-| `MONITOR` | Listen for all requests received by the server in real time |
-| `DBSIZE` | Return the number of keys in the database |
-| `FLUSHDB` | Remove all keys from the database |
+| `INFO [key]` | Get server information and statistics, or per-key metadata. Without arguments, returns comprehensive server info (Server, Clients, Memory, Persistence, General). With a key argument, returns metadata for that specific key. |
+| `MONITOR` | Enable real-time monitoring mode for the current client connection. All commands executed by other clients are streamed in real-time with timestamps and client information. |
+| `DBSIZE` | Return the total number of keys currently stored in the selected database. Includes all key types (strings, lists, sets, hashes, sorted sets, HyperLogLogs). |
+| `FLUSHDB` | Remove all keys from the currently selected database. This is a destructive operation that cannot be undone. Requires admin privileges. |
+| `DROPDB` | Alias for FLUSHDB. Remove all keys from the currently selected database. Requires admin privileges. |
+| `FLUSHALL` | Remove all keys from all databases on the server. This is a destructive operation that clears the entire server state. Requires admin privileges. Use with extreme caution. |
 
 ---
 
@@ -369,23 +417,16 @@ This section details the internal design of Go-Redis for developers and contribu
 
 ### Project Structure & Core Components
 ```bash
-tree .
-├── bench
-│   └── benchmark.txt
+.
+├── bin
 ├── cmd
 │   ├── go-redis.service
-│   └── main.go
+│   ├── main.go
+│   └── test.go
 ├── config
-│   ├── akashmaji.me
-│   ├── cert_gen.sh
-│   ├── cert.pem
-│   ├── go-redis.service
-│   ├── key.pem
 │   └── redis.conf
 ├── data
 ├── Dockerfile
-├── DOCKER.md
-├── DOCS.md
 ├── go.mod
 ├── go-redis.code-workspace
 ├── go.sum
@@ -393,6 +434,7 @@ tree .
 │   ├── go-redis-logo.png
 │   └── go-redis.png
 ├── internal
+│   ├── cluster
 │   ├── common
 │   │   ├── aof.go
 │   │   ├── appstate.go
@@ -412,6 +454,7 @@ tree .
 │   │   ├── handler_connection.go
 │   │   ├── handler_generic.go
 │   │   ├── handler_hash.go
+│   │   ├── handler_hyperloglog.go
 │   │   ├── handler_key.go
 │   │   ├── handler_list.go
 │   │   ├── handler_persistence.go
@@ -423,16 +466,9 @@ tree .
 │   │   └── handler_zset.go
 │   └── info
 ├── LICENSE
-├── README.md
 ├── run_clean.sh
 ├── run_client.sh
 ├── run_server.sh
-├── static
-│   ├── commands.json
-│   └── notes.txt
-└── VSCODE.md
-
-12 directories, 50 files
 ```
 
 ### Concurrency Model
@@ -505,7 +541,6 @@ Go-Redis supports all primary RESP data types, making it fully compatible with `
 
 Go-Redis is an educational project and intentionally omits certain advanced Redis features:
 
--   Single database only (no `SELECT` command).
 -   No replication or clustering.
 -   No Lua scripting.
 

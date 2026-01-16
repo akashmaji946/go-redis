@@ -247,13 +247,13 @@ redis-cli -p <port_number>
 ## Available Commands
 
 **Connection**
-`AUTH`, `USERADD`, `PASSWD`, `USERS`, `WHOAMI`, `PING`, `SELECT`, `SEL`
+`AUTH`, `ECHO`, `PASSWD`, `PING`, `SELECT`, `SEL`, `USERADD`, `USERDEL`, `USERS`, `WHOAMI`
 
 **Persistence**
 `BGREWRITEAOF`, `BGSAVE`, `SAVE`
 
 **Server**
-`COMMAND`, `COMMANDS`, `DBSIZE`, `FLUSHDB`, `DROPDB`, `INFO`, `MONITOR`, `SIZE`
+`COMMAND`, `COMMANDS`, `DBSIZE`, `DROPDB`, `FLUSHALL`, `FLUSHDB`, `INFO`, `MONITOR`, `SIZE`
 
 **String**
 `DECR`, `DECRBY`, `GET`, `INCR`, `INCRBY`, `MGET`, `MSET`, `SET`, `STRLEN`
@@ -265,19 +265,22 @@ redis-cli -p <port_number>
 `DISCARD`, `EXEC`, `MULTI`, `UNWATCH`, `WATCH`
 
 **Hash**
-`HDEL`, `HDELALL`, `HEXISTS`, `HEXPIRE`, `HGET`, `HGETALL`, `HINCRBY`, `HKEYS`, `HLEN`, `HMSET`, `HSET`, `HVALS`
+`HDEL`, `HDELALL`, `HEXISTS`, `HEXPIRE`, `HGET`, `HGETALL`, `HINCRBY`, `HKEYS`, `HLEN`, `HMGET`, `HMSET`, `HSET`, `HVALS`
 
 **List**
 `LGET`, `LINDEX`, `LLEN`, `LPOP`, `LPUSH`, `LRANGE`, `RPOP`, `RPUSH`
 
 **PubSub**
-`PSUBSCRIBE`, `PSUB`, `PUBLISH`, `PUB`, `PUNSUBSCRIBE`, `PUNSUB`, `SUBSCRIBE`, `SUB`, `UNSUBSCRIBE`, `UNSUB`
+`PSUBSCRIBE`, `PSUB`, `PUB`, `PUBLISH`, `PUNSUBSCRIBE`, `PUNSUB`, `SUB`, `SUBSCRIBE`, `UNSUB`, `UNSUBSCRIBE`
 
 **Set**
 `SADD`, `SCARD`, `SDIFF`, `SINTER`, `SISMEMBER`, `SMEMBERS`, `SRANDMEMBER`, `SREM`, `SUNION`
 
-**ZSet**
+**Sorted Set (ZSet)**
 `ZADD`, `ZCARD`, `ZGET`, `ZRANGE`, `ZREM`, `ZREVRANGE`, `ZSCORE`
+
+**HyperLogLog**
+`PFADD`, `PFCOUNT`, `PFDEBUG`, `PFMERGE`
 
 #### For more details:
 - Refer to our docs for full guide on usage and description of commands.
@@ -343,22 +346,15 @@ redis-cli -p <port_number>
 ```bash
 >> tree .
 .
-├── bench
-│   └── benchmark.txt
+├── bin
 ├── cmd
 │   ├── go-redis.service
-│   └── main.go
+│   ├── main.go
+│   └── test.go
 ├── config
-│   ├── akashmaji.me
-│   ├── cert_gen.sh
-│   ├── cert.pem
-│   ├── go-redis.service
-│   ├── key.pem
 │   └── redis.conf
 ├── data
 ├── Dockerfile
-├── DOCKER.md
-├── DOCS.md
 ├── go.mod
 ├── go-redis.code-workspace
 ├── go.sum
@@ -366,6 +362,7 @@ redis-cli -p <port_number>
 │   ├── go-redis-logo.png
 │   └── go-redis.png
 ├── internal
+│   ├── cluster
 │   ├── common
 │   │   ├── aof.go
 │   │   ├── appstate.go
@@ -385,6 +382,7 @@ redis-cli -p <port_number>
 │   │   ├── handler_connection.go
 │   │   ├── handler_generic.go
 │   │   ├── handler_hash.go
+│   │   ├── handler_hyperloglog.go
 │   │   ├── handler_key.go
 │   │   ├── handler_list.go
 │   │   ├── handler_persistence.go
@@ -396,16 +394,9 @@ redis-cli -p <port_number>
 │   │   └── handler_zset.go
 │   └── info
 ├── LICENSE
-├── README.md
 ├── run_clean.sh
 ├── run_client.sh
 ├── run_server.sh
-├── static
-│   ├── commands.json
-│   └── notes.txt
-└── VSCODE.md
-
-12 directories, 50 files
 ```
 
 ## Protocol

@@ -1,447 +1,482 @@
 {
   "AUTH": {
     "usage": "AUTH <user> <password>",
-    "description": "Authenticate to the server",
+    "description": "Authenticate to the server with the specified username and password. This command is required when the server is configured with 'requirepass' enabled. Upon successful authentication, the client gains access to execute commands based on their user permissions. Returns 'OK' on success, or an error if the user is not found or the password is incorrect. The authenticated user's information is stored in the client connection state.",
     "category": "connection"
   },
   "BGREWRITEAOF": {
     "usage": "BGREWRITEAOF",
-    "description": "Asynchronously rewrite the Append-Only File",
+    "description": "Asynchronously rewrite the Append-Only File (AOF) in the background. This command triggers a background process that creates a new, optimized AOF file by reading the current dataset and writing the minimal set of commands needed to recreate it. The rewrite process runs in a separate goroutine to avoid blocking the main server. Returns 'Started.' immediately while the rewrite continues in the background. This command requires admin privileges. The rewrite helps reduce AOF file size and improve recovery time.",
     "category": "persistence"
   },
   "BGSAVE": {
     "usage": "BGSAVE",
-    "description": "Asynchronously save the database to disk",
+    "description": "Asynchronously save the current database state to disk as an RDB (Redis Database) snapshot file in the background. This command creates a point-in-time snapshot of the dataset without blocking client operations. The save process runs in a separate goroutine after copying the current database state. Returns 'OK' on success, or an error if a background save is already in progress. This command requires admin privileges. Use this instead of SAVE for production environments to avoid blocking.",
     "category": "persistence"
   },
   "COMMAND": {
     "usage": "COMMAND",
-    "description": "Get help about Redis commands",
+    "description": "Returns 'OK' to indicate the server is ready to accept commands. This is a simple health check command that can be used to verify the server connection is working properly. Unlike the COMMANDS command, this does not return any command documentation or help information.",
     "category": "server"
   },
   "COMMANDS": {
-    "usage": "COMMANDS [pattern]",
-    "description": "List available commands or get help for a specific command",
+    "usage": "COMMANDS [pattern | command_name]",
+    "description": "List available commands or get detailed help for a specific command. When called without arguments or with '*', returns an array of all available command names sorted alphabetically. When called with a specific command name, returns detailed information including usage syntax, description, and category. When called with a glob pattern (e.g., 'S*' for all commands starting with S), returns all matching command names. Returns an error if the specified command or pattern has no matches.",
     "category": "server"
   },
   "DBSIZE": {
     "usage": "DBSIZE",
-    "description": "Return the number of keys in the database",
+    "description": "Return the total number of keys currently stored in the selected database. This command provides a quick way to check how many keys exist without iterating through them. The count includes all key types (strings, lists, sets, hashes, sorted sets, HyperLogLogs). Returns an integer representing the key count. This operation is thread-safe and uses a read lock to ensure consistency.",
     "category": "server"
   },
   "DECR": {
     "usage": "DECR <key>",
-    "description": "Decrement the integer value of a key by one",
+    "description": "Decrement the integer value stored at the specified key by one. If the key does not exist, it is initialized to 0 before performing the decrement operation, resulting in -1. Returns the new value after the decrement as an integer. Returns an error if the key exists but contains a value that cannot be parsed as an integer, or if the key holds a non-string data type. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled.",
     "category": "string"
   },
   "DECRBY": {
     "usage": "DECRBY <key> <decrement>",
-    "description": "Decrement the integer value of a key by the given amount",
+    "description": "Decrement the integer value stored at the specified key by the given decrement amount. If the key does not exist, it is initialized to 0 before performing the decrement. The decrement value must be a valid integer. Returns the new value after the decrement as an integer. Returns an error if the decrement is not a valid integer, if the stored value cannot be parsed as an integer, or if the key holds a non-string data type. This operation is atomic and thread-safe.",
     "category": "string"
   },
   "DEL": {
     "usage": "DEL <key> [key ...]",
-    "description": "Delete one or more keys",
+    "description": "Delete one or more keys from the database. Keys that do not exist are silently ignored and not counted. Returns an integer representing the number of keys that were actually removed. This command works with any data type (strings, lists, sets, hashes, sorted sets, HyperLogLogs). The operation is atomic and thread-safe, using a write lock to ensure consistency. Memory is freed immediately upon deletion. Changes are tracked for automatic RDB saving if configured.",
     "category": "key"
   },
   "DELETE": {
     "usage": "DELETE <key> [key ...]",
-    "description": "Delete one or more keys",
+    "description": "Delete one or more keys from the database. This is an alias for the DEL command with identical behavior. Keys that do not exist are silently ignored and not counted. Returns an integer representing the number of keys that were actually removed. This command works with any data type. The operation is atomic and thread-safe.",
     "category": "key"
   },
   "DISCARD": {
     "usage": "DISCARD",
-    "description": "Discard all commands issued after MULTI",
+    "description": "Abort the current transaction by discarding all commands that were queued after MULTI. This command can only be called when a transaction is active (after MULTI has been called). All queued commands are discarded without being executed, and no changes are made to the database. The client can start a new transaction with MULTI after discarding. Returns 'Discarded' on success, or an error if no transaction is currently running. Also clears any WATCH keys associated with the transaction.",
     "category": "transaction"
   },
   "DROPDB": {
     "usage": "DROPDB",
-    "description": "Remove all keys from the database",
+    "description": "Remove all keys from the currently selected database. This is an alias for FLUSHDB with identical behavior. The operation replaces the internal store map for efficiency rather than iterating through keys. Returns 'OK' on success. This is a destructive operation that cannot be undone. The operation is thread-safe and uses a write lock. This command requires admin privileges.",
     "category": "server"
+  },
+  "ECHO": {
+    "usage": "ECHO <message>",
+    "description": "Returns the same message that was sent to the server. This command is useful for testing connectivity and verifying that the server is properly receiving and responding to commands. The message is returned as a bulk string exactly as it was received. Returns an error if no message argument is provided or if more than one argument is given.",
+    "category": "connection"
   },
   "EXEC": {
     "usage": "EXEC",
-    "description": "Execute all commands issued after MULTI",
+    "description": "Execute all commands that were queued after MULTI as a single atomic transaction. All queued commands are executed sequentially in the order they were received. Returns an array containing the replies from each executed command in order. If any command fails, subsequent commands still execute (no automatic rollback). Returns an error if no transaction is currently running. If any watched keys (via WATCH) were modified by another client, the transaction is aborted and NULL is returned. After EXEC, the transaction state is cleared and watched keys are unwatched.",
     "category": "transaction"
   },
   "EXISTS": {
     "usage": "EXISTS <key> [key ...]",
-    "description": "Check if keys exist",
+    "description": "Check if one or more keys exist in the database. Returns an integer count of how many of the specified keys exist. If the same key is specified multiple times, it will be counted multiple times if it exists. This command does not distinguish between different data types - it only checks for key existence. The operation is thread-safe and uses a read lock. Expired keys are not counted as existing.",
     "category": "key"
   },
   "EXPIRE": {
     "usage": "EXPIRE <key> <seconds>",
-    "description": "Set a key's time to live in seconds",
+    "description": "Set a timeout on the specified key. After the timeout expires, the key will be automatically deleted using lazy expiration (deleted on next access). The timeout is specified in seconds as a positive integer. Returns 1 if the timeout was set successfully, or 0 if the key does not exist. The expiration is stored as an absolute timestamp internally. Use PERSIST to remove the expiration. Use TTL to check remaining time. Changes are tracked for automatic RDB saving if configured.",
     "category": "key"
+  },
+  "FLUSHALL": {
+    "usage": "FLUSHALL",
+    "description": "Remove all keys from all databases on the server. This is a destructive operation that clears the entire server state across all configured databases. Returns 'OK' on success. This command requires admin privileges and will return an error if executed by a non-admin user. The operation is irreversible - all data will be permanently lost. Use with extreme caution in production environments.",
+    "category": "server"
   },
   "FLUSHDB": {
     "usage": "FLUSHDB",
-    "description": "Remove all keys from the database",
+    "description": "Remove all keys from the currently selected database. This operation replaces the internal store map with a new empty map for efficiency, rather than iterating through and deleting individual keys. Returns 'OK' on success. This is a destructive operation that cannot be undone. All data types are removed (strings, lists, sets, hashes, sorted sets, HyperLogLogs). The operation is thread-safe and uses a write lock. Memory is freed immediately. This command requires admin privileges.",
     "category": "server"
   },
   "GET": {
     "usage": "GET <key>",
-    "description": "Get the value of a key",
+    "description": "Retrieve the string value stored at the specified key. Returns the value as a bulk string if the key exists and contains a string value. Returns NULL if the key does not exist. If the key exists but has expired, it is automatically deleted and NULL is returned. Returns an error if the key exists but holds a non-string data type (list, set, hash, sorted set, or HyperLogLog). This operation is thread-safe and uses a read lock.",
     "category": "string"
   },
   "HDEL": {
     "usage": "HDEL <key> <field> [field ...]",
-    "description": "Delete one or more hash fields",
+    "description": "Delete one or more fields from a hash stored at the specified key. Fields that do not exist in the hash are silently ignored. Returns an integer representing the number of fields that were actually removed from the hash. Returns 0 if the key does not exist. Returns an error if the key exists but is not a hash type. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is thread-safe.",
     "category": "hash"
   },
   "HDELALL": {
     "usage": "HDELALL <key>",
-    "description": "Delete all fields in a hash",
+    "description": "Delete all fields from a hash stored at the specified key, effectively clearing the entire hash. Returns an integer representing the number of fields that were deleted. Returns 0 if the key does not exist or the hash is already empty. Returns an error if the key exists but is not a hash type. Unlike HDEL, this command removes all fields in a single operation. The operation updates memory tracking and is recorded to AOF if persistence is enabled.",
     "category": "hash"
   },
   "HEXISTS": {
     "usage": "HEXISTS <key> <field>",
-    "description": "Check if a hash field exists",
+    "description": "Check if a specific field exists within a hash stored at the specified key. Returns 1 if the hash contains the specified field, or 0 if the field does not exist or the key does not exist. Returns an error if the key exists but is not a hash type. This operation is thread-safe and uses a read lock. Note that expired fields (if field-level expiration is set via HEXPIRE) are still reported as existing until they are lazily deleted.",
     "category": "hash"
   },
   "HEXPIRE": {
     "usage": "HEXPIRE <key> <field> <seconds>",
-    "description": "Set expiration for a hash field",
+    "description": "Set an expiration time on a specific field within a hash. After the timeout expires, the field will be automatically deleted using lazy expiration (deleted on next access). The timeout is specified in seconds as a positive integer. Returns 1 if the expiration was set successfully, or 0 if the key or field does not exist. Returns an error if the key exists but is not a hash type. This is a custom extension not available in standard Redis, allowing fine-grained expiration control at the field level.",
     "category": "hash"
   },
   "HGET": {
     "usage": "HGET <key> <field>",
-    "description": "Get the value of a hash field",
+    "description": "Retrieve the value associated with a specific field in a hash stored at the specified key. Returns the field value as a bulk string if both the key and field exist. Returns NULL if the key does not exist, if the field does not exist within the hash, or if the field has expired. Returns an error if the key exists but is not a hash type. Expired fields are lazily deleted when accessed. This operation is thread-safe.",
     "category": "hash"
   },
   "HGETALL": {
     "usage": "HGETALL <key>",
-    "description": "Get all fields and values in a hash",
+    "description": "Retrieve all fields and their values from a hash stored at the specified key. Returns an array containing alternating field names and values: [field1, value1, field2, value2, ...]. Returns an empty array if the key does not exist. Returns an error if the key exists but is not a hash type. Expired fields (if field-level expiration is set) are automatically skipped and not included in the result. This operation is thread-safe and uses a read lock.",
     "category": "hash"
   },
   "HINCRBY": {
     "usage": "HINCRBY <key> <field> <increment>",
-    "description": "Increment the integer value of a hash field by the given amount",
+    "description": "Increment the integer value of a hash field by the specified amount. If the key does not exist, a new hash is created. If the field does not exist or has expired, it is initialized to 0 before the increment. The increment can be negative to perform a decrement. Returns the new value after the increment as an integer. Returns an error if the increment is not a valid integer, if the field value cannot be parsed as an integer, or if the key is not a hash type. This operation is atomic and thread-safe.",
     "category": "hash"
   },
   "HKEYS": {
     "usage": "HKEYS <key>",
-    "description": "Get all field names in a hash",
+    "description": "Retrieve all field names from a hash stored at the specified key. Returns an array containing all field names in the hash. Returns an empty array if the key does not exist. Returns an error if the key exists but is not a hash type. Expired fields (if field-level expiration is set) are automatically skipped and not included in the result. The order of fields in the result is not guaranteed. This operation is thread-safe and uses a read lock.",
     "category": "hash"
   },
   "HLEN": {
     "usage": "HLEN <key>",
-    "description": "Get the number of fields in a hash",
+    "description": "Return the number of fields contained in a hash stored at the specified key. Returns an integer representing the field count. Returns 0 if the key does not exist. Returns an error if the key exists but is not a hash type. Note that this count may include expired fields that have not yet been lazily deleted. This operation is thread-safe and uses a read lock.",
+    "category": "hash"
+  },
+  "HMGET": {
+    "usage": "HMGET <key> <field> [field ...]",
+    "description": "Retrieve the values associated with the specified fields in a hash stored at the specified key. Returns an array of values in the same order as the requested fields. For fields that do not exist or have expired, NULL is returned in their position. If the key does not exist, an array of NULL values is returned. Returns an error if the key exists but is not a hash type. This command is more efficient than multiple HGET calls when retrieving multiple fields. This operation is thread-safe and uses a read lock.",
     "category": "hash"
   },
   "HMSET": {
-    "usage": "HMSET <key> <field> <value> [field <value> ...]",
-    "description": "Set multiple hash fields to multiple values",
+    "usage": "HMSET <key> <field> <value> [field value ...]",
+    "description": "Set multiple field-value pairs in a hash stored at the specified key. If the key does not exist, a new hash is created. If any specified fields already exist, their values are overwritten. This command is deprecated in favor of HSET which now supports multiple field-value pairs, but is kept for backward compatibility. Returns 'OK' on success. Returns an error if the number of arguments is not valid (must have an even number of field-value pairs after the key). This operation is atomic and thread-safe.",
     "category": "hash"
   },
   "HSET": {
-    "usage": "HSET <key> <field> <value> [field <value> ...]",
-    "description": "Set the string value of a hash field",
+    "usage": "HSET <key> <field> <value> [field value ...]",
+    "description": "Set one or more field-value pairs in a hash stored at the specified key. If the key does not exist, a new hash is created. If any specified fields already exist, their values are overwritten. Returns an integer representing the number of new fields that were added (not counting fields that were updated). Returns an error if the number of arguments is not valid (must have an odd number of arguments: key followed by field-value pairs). The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
     "category": "hash"
   },
   "HVALS": {
     "usage": "HVALS <key>",
-    "description": "Get all values in a hash",
+    "description": "Retrieve all values from a hash stored at the specified key. Returns an array containing all field values in the hash. Returns an empty array if the key does not exist. Returns an error if the key exists but is not a hash type. Expired fields (if field-level expiration is set) are automatically skipped and their values are not included in the result. The order of values in the result corresponds to the internal hash iteration order. This operation is thread-safe and uses a read lock.",
     "category": "hash"
   },
   "INCR": {
     "usage": "INCR <key>",
-    "description": "Increment the integer value of a key by one",
+    "description": "Increment the integer value stored at the specified key by one. If the key does not exist, it is initialized to 0 before performing the increment operation, resulting in 1. Returns the new value after the increment as an integer. Returns an error if the key exists but contains a value that cannot be parsed as an integer, or if the key holds a non-string data type. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled and tracked for RDB saving.",
     "category": "string"
   },
   "INCRBY": {
     "usage": "INCRBY <key> <increment>",
-    "description": "Increment the integer value of a key by the given amount",
+    "description": "Increment the integer value stored at the specified key by the given increment amount. If the key does not exist, it is initialized to 0 before performing the increment. The increment value must be a valid integer and can be negative to perform a decrement. Returns the new value after the increment as an integer. Returns an error if the increment is not a valid integer, if the stored value cannot be parsed as an integer, or if the key holds a non-string data type. This operation is atomic and thread-safe.",
     "category": "string"
   },
   "INFO": {
     "usage": "INFO [key]",
-    "description": "Get server information and statistics or per-key metadata",
+    "description": "Get server information and statistics, or per-key metadata. When called without arguments, returns comprehensive server information organized into categories: Server (version, process ID, uptime, paths), Clients (connected count), Memory (used, peak, total, eviction policy), Persistence (RDB/AOF status, save counts, timestamps), and General (total connections, commands executed, transactions, keys expired/evicted). When called with a key argument, returns metadata for that specific key including: type, length/size, TTL, memory usage in bytes, and access count. Returns an error if called with more than one argument or if the specified key does not exist.",
     "category": "server"
   },
   "KEYS": {
     "usage": "KEYS <pattern>",
-    "description": "Find all keys matching the given pattern",
+    "description": "Find all keys matching the specified glob-style pattern. The pattern supports: '*' to match any sequence of characters, '?' to match any single character, '[abc]' to match any character in the brackets, and '[^abc]' or '[!abc]' to match any character not in the brackets. Returns an array of matching key names. Returns an empty array if no keys match. Warning: This command can be slow on large databases as it scans all keys. Consider using SCAN for production environments with many keys. This operation is thread-safe and uses a read lock.",
     "category": "key"
   },
   "LGET": {
     "usage": "LGET <key>",
-    "description": "Get all elements in a list",
+    "description": "Retrieve all elements from a list stored at the specified key. This is a custom convenience command equivalent to 'LRANGE key 0 -1'. Returns an array containing all elements in the list from head to tail. Returns an empty array if the key does not exist. Returns an error if the key exists but is not a list type. This operation is thread-safe and uses a read lock. For large lists, consider using LRANGE with specific indices to retrieve subsets.",
     "category": "list"
   },
   "LINDEX": {
     "usage": "LINDEX <key> <index>",
-    "description": "Get an element from a list by its index",
+    "description": "Retrieve the element at the specified index in a list stored at the specified key. The index is zero-based, where 0 is the first element (head) and -1 is the last element (tail). Negative indices count from the end of the list. Returns the element as a bulk string if found. Returns NULL if the key does not exist or if the index is out of range. Returns an error if the key exists but is not a list type. This operation is thread-safe and uses a read lock.",
     "category": "list"
   },
   "LLEN": {
     "usage": "LLEN <key>",
-    "description": "Get the length of a list",
+    "description": "Return the length (number of elements) of a list stored at the specified key. Returns an integer representing the list length. Returns 0 if the key does not exist (treating a non-existent key as an empty list). Returns an error if the key exists but is not a list type. This operation is O(1) as the length is tracked internally. This operation is thread-safe and uses a read lock.",
     "category": "list"
   },
   "LPOP": {
     "usage": "LPOP <key>",
-    "description": "Remove and get the first element in a list",
+    "description": "Remove and return the first element (head) of a list stored at the specified key. Returns the removed element as a bulk string. Returns NULL if the key does not exist or the list is empty. Returns an error if the key exists but is not a list type. If the list becomes empty after the pop, the key is automatically deleted from the database. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
     "category": "list"
   },
   "LPUSH": {
     "usage": "LPUSH <key> <value> [value ...]",
-    "description": "Prepend one or multiple values to a list",
+    "description": "Insert one or more values at the head (left side) of a list stored at the specified key. If the key does not exist, a new list is created. Multiple values are inserted in left-to-right order, so 'LPUSH mylist a b c' results in 'c' being the first element. Returns an integer representing the length of the list after the push operations. Returns an error if the key exists but is not a list type. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
     "category": "list"
   },
   "LRANGE": {
     "usage": "LRANGE <key> <start> <stop>",
-    "description": "Get a range of elements from a list",
+    "description": "Retrieve a range of elements from a list stored at the specified key. The start and stop indices are zero-based and inclusive. Negative indices count from the end (-1 is the last element, -2 is second to last, etc.). Out-of-range indices are automatically clamped to valid values. Returns an array of elements in the specified range. Returns an empty array if the key does not exist, if start is greater than stop after normalization, or if the range is completely outside the list bounds. Returns an error if the key exists but is not a list type. This operation is thread-safe and uses a read lock.",
     "category": "list"
   },
   "MGET": {
     "usage": "MGET <key> [key ...]",
-    "description": "Get the values of all the given keys",
+    "description": "Retrieve the values of multiple keys in a single operation. Returns an array of values in the same order as the requested keys. For keys that do not exist, are expired, or hold non-string types, NULL is returned in their position. This command is more efficient than multiple GET calls when retrieving multiple values. At least one key must be specified. This operation is thread-safe and uses a read lock. All keys are read atomically within the same lock acquisition.",
     "category": "string"
   },
   "MONITOR": {
     "usage": "MONITOR",
-    "description": "Listen for all requests received by the server in real time",
+    "description": "Enable real-time monitoring mode for the current client connection. Once enabled, all commands executed by other clients are streamed to this client in real-time. Each monitored command is sent with a timestamp and client information in the format: '<timestamp> [<client_ip>] \"<command>\" \"<arg1>\" ...'. The monitoring client does not receive its own commands. Multiple clients can be in monitoring mode simultaneously. Monitoring continues until the client disconnects. Returns 'OK' on success. This is useful for debugging and understanding command flow. Note: Monitoring can generate significant output on busy servers.",
     "category": "server"
   },
   "MSET": {
-    "usage": "MSET <key> <value> [key <value> ...]",
-    "description": "Set multiple keys to multiple values",
+    "usage": "MSET <key> <value> [key value ...]",
+    "description": "Set multiple key-value pairs in a single atomic operation. If any keys already exist, their values are overwritten. The number of arguments must be even (key-value pairs). Returns 'OK' on success. Returns an error if the number of arguments is not valid. Unlike individual SET commands, MSET is atomic - either all keys are set or none are (in case of error). The operation is recorded to AOF if persistence is enabled and tracked for RDB saving. This operation is thread-safe and uses a write lock for the entire operation.",
     "category": "string"
   },
   "MULTI": {
     "usage": "MULTI",
-    "description": "Mark the start of a transaction block",
+    "description": "Mark the start of a transaction block. After MULTI is called, all subsequent commands are queued instead of being executed immediately. The queued commands are executed atomically when EXEC is called, or discarded when DISCARD is called. Each queued command returns 'QUEUED' instead of its actual result. Only one transaction can be active per client connection. Returns 'Started' on success, or an error if a transaction is already running (MULTI calls cannot be nested). Use WATCH before MULTI to implement optimistic locking.",
     "category": "transaction"
   },
   "PASSWD": {
     "usage": "PASSWD <user> <password>",
-    "description": "Change a user's password",
+    "description": "Change the password for a user account. Users can change their own password, and admin users can change any user's password. The new password must be alphanumeric (letters and numbers only). Returns 'OK' on success. Returns an error if: the password is not alphanumeric, the user does not have permission to change the target user's password, or the target user does not exist. The updated credentials are persisted to the users file. This command can be executed without authentication if the target is the current user.",
     "category": "connection"
   },
   "PERSIST": {
     "usage": "PERSIST <key>",
-    "description": "Remove the expiration from a key",
+    "description": "Remove the expiration timeout from a key, making it persistent (never expires). Returns 1 if the timeout was successfully removed. Returns 0 if the key does not exist, if the key has already expired (and was deleted), or if the key exists but has no associated timeout. Returns an error if the wrong number of arguments is provided. This operation is the opposite of EXPIRE. Changes are tracked for automatic RDB saving if configured. This operation is thread-safe.",
     "category": "key"
-  },
-  "PING": {
-    "usage": "PING [message]",
-    "description": "Ping the server",
-    "category": "connection"
-  },
-  "PSUBSCRIBE": {
-    "usage": "PSUBSCRIBE <pattern> [pattern ...]",
-    "description": "Listen for messages published to channels matching the given patterns",
-    "category": "pubsub"
-  },
-  "PSUB": {
-    "usage": "PSUBSCRIBE <pattern> [pattern ...]",
-    "description": "Listen for messages published to channels matching the given patterns",
-    "category": "pubsub"
-  },
-  "PUBLISH": {
-    "usage": "PUBLISH <channel> <message>",
-    "description": "Post a message to a channel",
-    "category": "pubsub"
-  },
-  "PUB": {
-    "usage": "PUB <channel> <message>",
-    "description": "Post a message to a channel",
-    "category": "pubsub"
-  },
-  "PUNSUBSCRIBE": {
-    "usage": "PUNSUBSCRIBE [pattern ...]",
-    "description": "Stop listening for messages posted to channels matching the given patterns",
-    "category": "pubsub"
-  },
-  "PUNSUB": {
-    "usage": "PUNSUB [pattern ...]",
-    "description": "Stop listening for messages posted to channels matching the given patterns",
-    "category": "pubsub"
-  },
-  "RENAME": {
-    "usage": "RENAME <key> <newkey>",
-    "description": "Rename a key",
-    "category": "key"
-  },
-  "RPOP": {
-    "usage": "RPOP <key>",
-    "description": "Remove and get the last element in a list",
-    "category": "list"
-  },
-  "RPUSH": {
-    "usage": "RPUSH <key> <value> [value ...]",
-    "description": "Append one or multiple values to a list",
-    "category": "list"
-  },
-  "SADD": {
-    "usage": "SADD <key> <member> [member ...]",
-    "description": "Add one or more members to a set",
-    "category": "set"
-  },
-  "SAVE": {
-    "usage": "SAVE",
-    "description": "Synchronously save the database to disk",
-    "category": "persistence"
-  },
-  "SCARD": {
-    "usage": "SCARD <key>",
-    "description": "Get the number of members in a set",
-    "category": "set"
-  },
-  "SDIFF": {
-    "usage": "SDIFF <key> [key ...]",
-    "description": "Subtract multiple sets",
-    "category": "set"
-  },
-  "SET": {
-    "usage": "SET <key> <value>",
-    "description": "Set the string value of a key",
-    "category": "string"
-  },
-  "SINTER": {
-    "usage": "SINTER <key> [key ...]",
-    "description": "Intersect multiple sets",
-    "category": "set"
-  },
-  "SISMEMBER": {
-    "usage": "SISMEMBER <key> <member>",
-    "description": "Determine if a given value is a member of a set",
-    "category": "set"
-  },
-  "SIZE": {
-    "usage": "SIZE [idx]",
-    "description": "Get the size of server, i.e, number of databases, else DBSIZE of specified db idx",
-    "category": "server"
-  },
-  "SMEMBERS": {
-    "usage": "SMEMBERS <key>",
-    "description": "Get all the members in a set",
-    "category": "set"
-  },
-  "SRANDMEMBER": {
-    "usage": "SRANDMEMBER <key> [count]",
-    "description": "Get one or multiple random members from a set",
-    "category": "set"
-  },
-  "SREM": {
-    "usage": "SREM <key> <member> [member ...]",
-    "description": "Remove one or more members from a set",
-    "category": "set"
-  },
-  "STRLEN": {
-    "usage": "STRLEN <key>",
-    "description": "Get the length of the value stored in a key",
-    "category": "string"
-  },
-  "SUBSCRIBE": {
-    "usage": "SUBSCRIBE <channel> [channel ...]",
-    "description": "Listen for messages published to the given channels",
-    "category": "pubsub"
-  },
-  "SUNION": {
-    "usage": "SUNION <key> [key ...]",
-    "description": "Add multiple sets",
-    "category": "set"
-  },
-  "TTL": {
-    "usage": "TTL <key>",
-    "description": "Get the time to live for a key in seconds",
-    "category": "key"
-  },
-  "TYPE": {
-    "usage": "TYPE <key>",
-    "description": "Determine the type stored at key",
-    "category": "key"
-  },
-  "UNSUBSCRIBE": {
-    "usage": "UNSUBSCRIBE [channel ...]",
-    "description": "Stop listening for messages posted to the given channels",
-    "category": "pubsub"
-  },
-  "UNSUB": {
-    "usage": "UNSUBSCRIBE [channel ...]",
-    "description": "Stop listening for messages posted to the given channels",
-    "category": "pubsub"
-  },
-  "UNWATCH": {
-    "usage": "UNWATCH",
-    "description": "Forget about all watched keys",
-    "category": "transaction"
-  },
-  "USERADD": {
-    "usage": "USERADD <admin_flag 1/0> <user> <password>",
-    "description": "Create a new user (Admin only)",
-    "category": "connection"
-  },
-  "USERS": {
-    "usage": "USERS [username]",
-    "description": "List all usernames or show specific user details (Admin only)",
-    "category": "connection"
-  },
-  "WATCH": {
-    "usage": "WATCH <key> [key ...]",
-    "description": "Watch the given keys to determine execution of the MULTI/EXEC block",
-    "category": "transaction"
-  },
-  "WHOAMI": {
-    "usage": "WHOAMI",
-    "description": "Display details of the currently authenticated user",
-    "category": "connection"
-  },
-  "ZADD": {
-    "usage": "ZADD <key> <score> <member> [score <member> ...]",
-    "description": "Add one or more members to a sorted set, or update its score if it already exists",
-    "category": "zset"
-  },
-  "ZCARD": {
-    "usage": "ZCARD <key>",
-    "description": "Get the number of members in a sorted set",
-    "category": "zset"
-  },
-  "ZGET": {
-    "usage": "ZGET <key> [<member>]",
-    "description": "Get score of a member or all members with scores",
-    "category": "zset"
-  },
-  "ZRANGE": {
-    "usage": "ZRANGE <key> <start> <stop> [WITHSCORES]",
-    "description": "Return a range of members in a sorted set, by index",
-    "category": "zset"
-  },
-  "ZREM": {
-    "usage": "ZREM <key> <member> [member ...]",
-    "description": "Remove one or more members from a sorted set",
-    "category": "zset"
-  },
-  "ZREVRANGE": {
-    "usage": "ZREVRANGE <key> <start> <stop> [WITHSCORES]",
-    "description": "Return a range of members in a sorted set, by index, with scores ordered from high to low",
-    "category": "zset"
-  },
-  "ZSCORE": {
-    "usage": "ZSCORE <key> <member>",
-    "description": "Get the score associated with the given member in a sorted set",
-    "category": "zset"
   },
   "PFADD": {
     "usage": "PFADD <key> <element> [element ...]",
-    "description": "Add elements to a HyperLogLog data structure. Returns 1 if any register was altered, 0 otherwise. HyperLogLog provides approximate cardinality counting with ~0.81% standard error using only ~12KB of memory regardless of the number of elements.",
+    "description": "Add one or more elements to a HyperLogLog probabilistic data structure stored at the specified key. HyperLogLog provides approximate cardinality (unique count) estimation using only ~12KB of memory regardless of the number of elements added. If the key does not exist, a new HyperLogLog is created using sparse representation for memory efficiency. Returns 1 if at least one internal register was altered (indicating the cardinality estimate may have changed), or 0 if no registers were altered (element was likely already counted). The standard error rate is approximately 0.81%. This operation is recorded to AOF if persistence is enabled.",
     "category": "hyperloglog"
   },
   "PFCOUNT": {
     "usage": "PFCOUNT <key> [key ...]",
-    "description": "Return the approximated cardinality of the set(s) observed by the HyperLogLog(s). When called with multiple keys, returns the cardinality of the union of all HyperLogLogs (virtual merge). Standard error is ~0.81%.",
-    "category": "hyperloglog"
-  },
-  "PFMERGE": {
-    "usage": "PFMERGE <destkey> <sourcekey> [sourcekey ...]",
-    "description": "Merge multiple HyperLogLog values into a single one. The merged HyperLogLog's cardinality estimate is close to the cardinality of the union of all source HyperLogLogs. The destination key is created if it doesn't exist.",
+    "description": "Return the approximated cardinality (number of unique elements) observed by the HyperLogLog(s) at the specified key(s). When called with a single key, returns the cardinality estimate for that HyperLogLog. When called with multiple keys, returns the cardinality of the union of all specified HyperLogLogs (as if all elements were added to a single HyperLogLog). Non-existent keys are treated as empty HyperLogLogs contributing 0 to the count. The standard error rate is approximately 0.81%. Returns an error if any key exists but is not a HyperLogLog type. This operation is thread-safe and uses a read lock.",
     "category": "hyperloglog"
   },
   "PFDEBUG": {
     "usage": "PFDEBUG <key>",
-    "description": "Return internal debugging information about a HyperLogLog key, including encoding type (sparse/dense), number of registers used, and estimated cardinality.",
+    "description": "Return internal debugging information about a HyperLogLog stored at the specified key. This is a diagnostic command useful for understanding the internal state of a HyperLogLog. Returns an array containing: encoding type ('sparse' or 'dense'), number of registers currently in use, and the estimated cardinality. Sparse encoding is used for small cardinalities to save memory, automatically converting to dense encoding when the threshold is exceeded. Returns NULL if the key does not exist. Returns an error if the key exists but is not a HyperLogLog type.",
     "category": "hyperloglog"
+  },
+  "PFMERGE": {
+    "usage": "PFMERGE <destkey> <sourcekey> [sourcekey ...]",
+    "description": "Merge multiple HyperLogLog values into a single destination HyperLogLog. The merged HyperLogLog's cardinality estimate approximates the cardinality of the union of all source HyperLogLogs. The destination key is created if it does not exist, or overwritten if it does. The merge operation takes the maximum value of each register position across all sources. Non-existent source keys are treated as empty HyperLogLogs. The result is always stored in dense format. Returns 'OK' on success. Returns an error if any key exists but is not a HyperLogLog type. This operation is recorded to AOF if persistence is enabled.",
+    "category": "hyperloglog"
+  },
+  "PING": {
+    "usage": "PING [message]",
+    "description": "Test server connectivity and measure latency. When called without arguments, returns 'PONG'. When called with a message argument, returns that message. This command can be executed without authentication, making it useful for connection health checks. Returns an error if more than one argument is provided. This is one of the simplest commands and is commonly used by client libraries to verify the connection is alive.",
+    "category": "connection"
+  },
+  "PSUBSCRIBE": {
+    "usage": "PSUBSCRIBE <pattern> [pattern ...]",
+    "description": "Subscribe the client to one or more channel patterns for receiving published messages. Patterns use glob-style matching where '*' matches any sequence of characters and '?' matches any single character. When a message is published to a channel matching a subscribed pattern, the client receives a 'pmessage' notification containing the pattern, channel name, and message. Returns a subscription confirmation for each pattern containing: 'psubscribe', the pattern, and the total number of pattern subscriptions. Multiple patterns can be subscribed in a single command. The client remains subscribed until PUNSUBSCRIBE is called or the connection is closed.",
+    "category": "pubsub"
+  },
+  "PSUB": {
+    "usage": "PSUB <pattern> [pattern ...]",
+    "description": "Subscribe the client to one or more channel patterns for receiving published messages. This is an alias for PSUBSCRIBE with identical behavior. Patterns use glob-style matching where '*' matches any sequence of characters and '?' matches any single character. Returns a subscription confirmation for each pattern. The client remains subscribed until PUNSUB/PUNSUBSCRIBE is called or the connection is closed.",
+    "category": "pubsub"
+  },
+  "PUB": {
+    "usage": "PUB <channel> <message>",
+    "description": "Post a message to a channel for delivery to all subscribers. This is an alias for PUBLISH with identical behavior. The message is delivered to all clients subscribed to the exact channel name (via SUBSCRIBE/SUB) and to all clients subscribed to patterns matching the channel name (via PSUBSCRIBE/PSUB). Returns an integer representing the total number of clients that received the message (both direct and pattern subscribers combined).",
+    "category": "pubsub"
+  },
+  "PUBLISH": {
+    "usage": "PUBLISH <channel> <message>",
+    "description": "Post a message to a channel for delivery to all subscribers. The message is delivered to all clients subscribed to the exact channel name (via SUBSCRIBE) and to all clients subscribed to patterns matching the channel name (via PSUBSCRIBE). Subscribers receive the message as an array: ['message', channel, message] for direct subscriptions or ['pmessage', pattern, channel, message] for pattern subscriptions. Returns an integer representing the total number of clients that received the message. Returns 0 if no clients are subscribed to the channel or matching patterns.",
+    "category": "pubsub"
+  },
+  "PUNSUBSCRIBE": {
+    "usage": "PUNSUBSCRIBE [pattern ...]",
+    "description": "Unsubscribe the client from one or more channel patterns. If patterns are specified, the client is unsubscribed from those specific patterns. The client receives an unsubscription confirmation for each pattern containing: 'punsubscribe', the pattern, and the remaining number of pattern subscriptions. Returns an error if no patterns are specified. After unsubscribing from all patterns, the client exits pub/sub mode and can execute regular commands again.",
+    "category": "pubsub"
+  },
+  "PUNSUB": {
+    "usage": "PUNSUB [pattern ...]",
+    "description": "Unsubscribe the client from one or more channel patterns. This is an alias for PUNSUBSCRIBE with identical behavior. If patterns are specified, the client is unsubscribed from those specific patterns. Returns an unsubscription confirmation for each pattern. After unsubscribing from all patterns, the client exits pub/sub mode.",
+    "category": "pubsub"
+  },
+  "RENAME": {
+    "usage": "RENAME <key> <newkey>",
+    "description": "Rename a key to a new name. If the source and destination keys are the same, returns 1 without making changes. Returns 1 if the key was successfully renamed. Returns 0 if the source key does not exist, if the source key has expired, or if the destination key already exists (to prevent accidental overwrites). The operation preserves the value, type, and expiration of the original key. Memory tracking is updated to reflect the key name change. The operation is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
+    "category": "key"
+  },
+  "RPOP": {
+    "usage": "RPOP <key>",
+    "description": "Remove and return the last element (tail) of a list stored at the specified key. Returns the removed element as a bulk string. Returns NULL if the key does not exist or the list is empty. Returns an error if the key exists but is not a list type. If the list becomes empty after the pop, the key is automatically deleted from the database. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
+    "category": "list"
+  },
+  "RPUSH": {
+    "usage": "RPUSH <key> <value> [value ...]",
+    "description": "Append one or more values to the tail (right side) of a list stored at the specified key. If the key does not exist, a new list is created. Multiple values are appended in left-to-right order, so 'RPUSH mylist a b c' results in 'c' being the last element. Returns an integer representing the length of the list after the push operations. Returns an error if the key exists but is not a list type. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
+    "category": "list"
+  },
+  "SADD": {
+    "usage": "SADD <key> <member> [member ...]",
+    "description": "Add one or more members to a set stored at the specified key. If the key does not exist, a new set is created. Members that are already present in the set are ignored. Returns an integer representing the number of members that were actually added to the set (not counting members already present). Returns an error if the key exists but is not a set type. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
+    "category": "set"
+  },
+  "SAVE": {
+    "usage": "SAVE",
+    "description": "Synchronously save the current database state to disk as an RDB (Redis Database) snapshot file. This command blocks the server during the save operation, preventing any other commands from being processed. Returns 'OK' on success. This command requires admin privileges. For production environments, use BGSAVE instead to perform a non-blocking background save. The save creates a point-in-time snapshot that can be used for backup or recovery purposes.",
+    "category": "persistence"
+  },
+  "SCARD": {
+    "usage": "SCARD <key>",
+    "description": "Return the cardinality (number of members) of a set stored at the specified key. Returns an integer representing the set size. Returns 0 if the key does not exist (treating a non-existent key as an empty set). Returns an error if the key exists but is not a set type. This operation is O(1) as the cardinality is tracked internally. This operation is thread-safe and uses a read lock.",
+    "category": "set"
+  },
+  "SDIFF": {
+    "usage": "SDIFF <key> [key ...]",
+    "description": "Return the members of the set resulting from the difference between the first set and all successive sets. The difference consists of members that exist in the first set but not in any of the other sets. Returns an array of members in the resulting set. Returns an empty array if the first key does not exist. Returns an error if any key exists but is not a set type. At least one key must be specified. This operation is thread-safe and uses a read lock.",
+    "category": "set"
+  },
+  "SELECT": {
+    "usage": "SELECT <db_index>",
+    "description": "Select the database with the specified zero-based numeric index for the current connection. All subsequent commands will operate on the selected database. The database index must be within the range of configured databases (default is 16 databases, indices 0-15). Returns 'OK' on success. Returns an error if the index is invalid or out of range. Each client connection maintains its own selected database, defaulting to database 0.",
+    "category": "server"
+  },
+  "SEL": {
+    "usage": "SEL <db_index>",
+    "description": "Select the database with the specified zero-based numeric index for the current connection. This is an alias for SELECT with identical behavior. All subsequent commands will operate on the selected database. Returns 'OK' on success. Returns an error if the index is invalid or out of range.",
+    "category": "server"
+  },
+  "SET": {
+    "usage": "SET <key> <value>",
+    "description": "Set the string value of a key. If the key already exists, its value is overwritten regardless of its type. Any previous expiration is discarded. Returns 'OK' on success. If maxmemory is configured and would be exceeded, the server attempts to evict keys according to the eviction policy before returning an error if eviction fails. The operation updates memory tracking and is recorded to AOF if persistence is enabled. Changes are tracked for automatic RDB saving. This operation is atomic and thread-safe.",
+    "category": "string"
+  },
+  "SINTER": {
+    "usage": "SINTER <key> [key ...]",
+    "description": "Return the members of the set resulting from the intersection of all specified sets. The intersection consists of members that exist in all of the specified sets. Returns an array of members in the resulting set. Returns an empty array if any key does not exist (since intersection with an empty set is empty). Returns an error if any key exists but is not a set type. The implementation optimizes by iterating over the smallest set first. This operation is thread-safe and uses a read lock.",
+    "category": "set"
+  },
+  "SISMEMBER": {
+    "usage": "SISMEMBER <key> <member>",
+    "description": "Determine if a given value is a member of the set stored at the specified key. Returns 1 if the member exists in the set. Returns 0 if the member does not exist in the set, or if the key does not exist. Returns an error if the key exists but is not a set type. This operation is O(1) due to the hash-based set implementation. This operation is thread-safe and uses a read lock.",
+    "category": "set"
+  },
+  "SIZE": {
+    "usage": "SIZE [db_index]",
+    "description": "Return the number of configured databases on the server, or the number of keys in a specific database. When called without arguments, returns the total number of databases configured. When called with a database index, returns the number of keys in that specific database (equivalent to DBSIZE for that database). Returns an error if the database index is invalid or out of range. This operation is thread-safe.",
+    "category": "server"
+  },
+  "SMEMBERS": {
+    "usage": "SMEMBERS <key>",
+    "description": "Return all members of the set stored at the specified key. Returns an array containing all members of the set. Returns an empty array if the key does not exist. Returns an error if the key exists but is not a set type. The order of members in the result is not guaranteed and depends on the internal hash iteration order. This operation is thread-safe and uses a read lock. For large sets, consider using SSCAN for incremental iteration.",
+    "category": "set"
+  },
+  "SRANDMEMBER": {
+    "usage": "SRANDMEMBER <key> [count]",
+    "description": "Return one or more random members from a set stored at the specified key. When called without count, returns a single random member as a bulk string, or NULL if the key does not exist. When called with a positive count, returns an array of up to count distinct random members. When called with a negative count, returns an array of abs(count) members that may include duplicates. Returns an empty array if the key does not exist and count is specified. Returns an error if the key exists but is not a set type. This operation is thread-safe and uses a read lock.",
+    "category": "set"
+  },
+  "SREM": {
+    "usage": "SREM <key> <member> [member ...]",
+    "description": "Remove one or more members from a set stored at the specified key. Members that do not exist in the set are silently ignored. Returns an integer representing the number of members that were actually removed from the set. Returns 0 if the key does not exist. Returns an error if the key exists but is not a set type. If the set becomes empty after removal, the key is automatically deleted. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
+    "category": "set"
+  },
+  "STRLEN": {
+    "usage": "STRLEN <key>",
+    "description": "Return the length of the string value stored at the specified key. Returns an integer representing the string length in bytes. Returns 0 if the key does not exist or has expired. Returns an error if the key exists but holds a non-string data type. This operation is O(1) as the string length is tracked internally. This operation is thread-safe and uses a read lock.",
+    "category": "string"
+  },
+  "SUB": {
+    "usage": "SUB <channel> [channel ...]",
+    "description": "Subscribe the client to one or more channels for receiving published messages. This is an alias for SUBSCRIBE with identical behavior. When a message is published to a subscribed channel, the client receives a 'message' notification containing the channel name and message. Returns a subscription confirmation for each channel. The client remains subscribed until UNSUB/UNSUBSCRIBE is called or the connection is closed.",
+    "category": "pubsub"
+  },
+  "SUBSCRIBE": {
+    "usage": "SUBSCRIBE <channel> [channel ...]",
+    "description": "Subscribe the client to one or more channels for receiving published messages. When a message is published to a subscribed channel, the client receives a 'message' notification containing the channel name and message. Returns a subscription confirmation for each channel containing: 'subscribe', the channel name, and the total number of channel subscriptions. Multiple channels can be subscribed in a single command. The client remains subscribed until UNSUBSCRIBE is called or the connection is closed. While subscribed, the client can only execute SUBSCRIBE, UNSUBSCRIBE, PSUBSCRIBE, PUNSUBSCRIBE, PING, and QUIT commands.",
+    "category": "pubsub"
+  },
+  "SUNION": {
+    "usage": "SUNION <key> [key ...]",
+    "description": "Return the members of the set resulting from the union of all specified sets. The union consists of all members that exist in at least one of the specified sets. Returns an array of members in the resulting set. Keys that do not exist are treated as empty sets. Returns an error if any key exists but is not a set type. At least one key must be specified. This operation is thread-safe and uses a read lock.",
+    "category": "set"
+  },
+  "TTL": {
+    "usage": "TTL <key>",
+    "description": "Return the remaining time to live (in seconds) of a key that has an expiration set. Returns a positive integer representing the remaining seconds until expiration. Returns -1 if the key exists but has no associated expiration (persistent key). Returns -2 if the key does not exist or has already expired (and was deleted). If the key has expired but not yet been lazily deleted, it is deleted and -2 is returned. This operation is thread-safe.",
+    "category": "key"
+  },
+  "TYPE": {
+    "usage": "TYPE <key>",
+    "description": "Return the data type of the value stored at the specified key. Returns one of the following strings: 'STRING' for string values, 'LIST' for list values, 'SET' for set values, 'HASH' for hash values, 'ZSET' for sorted set values, 'HLL' for HyperLogLog values, or 'none' if the key does not exist. The type is returned in uppercase. This operation is thread-safe and uses a read lock.",
+    "category": "key"
+  },
+  "UNSUBSCRIBE": {
+    "usage": "UNSUBSCRIBE [channel ...]",
+    "description": "Unsubscribe the client from one or more channels. If channels are specified, the client is unsubscribed from those specific channels. The client receives an unsubscription confirmation for each channel containing: 'unsubscribe', the channel name, and the remaining number of channel subscriptions. Returns an error if no channels are specified. After unsubscribing from all channels and patterns, the client exits pub/sub mode and can execute regular commands again.",
+    "category": "pubsub"
+  },
+  "UNSUB": {
+    "usage": "UNSUB [channel ...]",
+    "description": "Unsubscribe the client from one or more channels. This is an alias for UNSUBSCRIBE with identical behavior. If channels are specified, the client is unsubscribed from those specific channels. Returns an unsubscription confirmation for each channel. After unsubscribing from all channels and patterns, the client exits pub/sub mode.",
+    "category": "pubsub"
+  },
+  "UNWATCH": {
+    "usage": "UNWATCH",
+    "description": "Flush all previously watched keys for the current client connection. This command clears the list of keys being watched for optimistic locking without aborting any transaction. Returns 'OK' on success. After UNWATCH, modifications to previously watched keys will not cause a subsequent EXEC to fail. This command can be called at any time, whether or not a transaction is active. It is automatically called after EXEC or DISCARD.",
+    "category": "transaction"
+  },
+  "USERADD": {
+    "usage": "USERADD <admin_flag 1/0> <user> <password>",
+    "description": "Create a new user account on the server. The admin_flag parameter specifies whether the new user should have admin privileges (1 for admin, 0 for regular user). The password must be alphanumeric (letters and numbers only). Returns 'OK' on success. Returns an error if: the current user is not an admin, the password is not alphanumeric, or if there are invalid arguments. The new user credentials are persisted to the users file. This command requires admin privileges.",
+    "category": "connection"
+  },
+  "USERDEL": {
+    "usage": "USERDEL <user>",
+    "description": "Delete a user account from the server. The specified user will be removed and will no longer be able to authenticate. Returns 'OK' on success. Returns an error if: the current user is not an admin, the target user does not exist, or if attempting to delete the 'root' user (which cannot be deleted). The updated user list is persisted to the users file. This command requires admin privileges.",
+    "category": "connection"
+  },
+  "USERS": {
+    "usage": "USERS [username]",
+    "description": "List all usernames or show details for a specific user. When called without arguments, returns an array of all usernames sorted alphabetically. When called with a username argument, returns detailed information about that user including: username, client IP (if connected), admin status, and full name. Returns an error if the specified user does not exist. This command requires admin privileges to view other users' details.",
+    "category": "connection"
+  },
+  "WATCH": {
+    "usage": "WATCH <key> [key ...]",
+    "description": "Mark one or more keys to be watched for optimistic locking in conjunction with MULTI/EXEC transactions. If any of the watched keys are modified by another client before EXEC is called, the entire transaction will be aborted and EXEC will return NULL. WATCH must be called before MULTI. Returns 'OK' on success. Returns an error if called inside a MULTI block (WATCH inside MULTI is not allowed). Multiple WATCH calls can be made to watch additional keys. All watched keys are automatically unwatched after EXEC or DISCARD.",
+    "category": "transaction"
+  },
+  "WHOAMI": {
+    "usage": "WHOAMI",
+    "description": "Display details of the currently authenticated user. Returns an array containing user information including: username, client IP address, admin status (true/false), and full name. Returns an error if the client is not authenticated. This command can be executed without special privileges - any authenticated user can view their own information. Useful for verifying the current authentication state.",
+    "category": "connection"
+  },
+  "ZADD": {
+    "usage": "ZADD <key> <score> <member> [score member ...]",
+    "description": "Add one or more members with their scores to a sorted set stored at the specified key. If the key does not exist, a new sorted set is created. If a member already exists, its score is updated to the new value. Scores must be valid floating-point numbers. Returns an integer representing the number of new members added (not counting score updates). Returns an error if the key exists but is not a sorted set type, or if any score is not a valid float. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
+    "category": "zset"
+  },
+  "ZCARD": {
+    "usage": "ZCARD <key>",
+    "description": "Return the cardinality (number of members) of a sorted set stored at the specified key. Returns an integer representing the sorted set size. Returns 0 if the key does not exist (treating a non-existent key as an empty sorted set). Returns an error if the key exists but is not a sorted set type. This operation is O(1) as the cardinality is tracked internally. This operation is thread-safe and uses a read lock.",
+    "category": "zset"
+  },
+  "ZGET": {
+    "usage": "ZGET <key> [member]",
+    "description": "Retrieve the score of a specific member, or all members with their scores from a sorted set. When called with just a key, returns an array of all members and their scores sorted by score ascending: [member1, score1, member2, score2, ...]. When called with a member argument, returns just the score of that member as a bulk string, or NULL if the member does not exist. Returns an empty array if the key does not exist. Returns an error if the key exists but is not a sorted set type. This is a custom convenience command. This operation is thread-safe and uses a read lock.",
+    "category": "zset"
+  },
+  "ZRANGE": {
+    "usage": "ZRANGE <key> <start> <stop> [WITHSCORES]",
+    "description": "Return a range of members from a sorted set stored at the specified key, ordered by score from lowest to highest. The start and stop indices are zero-based and inclusive. Negative indices count from the end (-1 is the last element). When WITHSCORES is specified, the result includes scores: [member1, score1, member2, score2, ...]. Returns an array of members (or members with scores). Returns an empty array if the key does not exist or the range is invalid. Returns an error if the key exists but is not a sorted set type. This operation is thread-safe and uses a read lock.",
+    "category": "zset"
+  },
+  "ZREM": {
+    "usage": "ZREM <key> <member> [member ...]",
+    "description": "Remove one or more members from a sorted set stored at the specified key. Members that do not exist in the sorted set are silently ignored. Returns an integer representing the number of members that were actually removed. Returns 0 if the key does not exist. Returns an error if the key exists but is not a sorted set type. If the sorted set becomes empty after removal, the key is automatically deleted. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
+    "category": "zset"
+  },
+  "ZREVRANGE": {
+    "usage": "ZREVRANGE <key> <start> <stop> [WITHSCORES]",
+    "description": "Return a range of members from a sorted set stored at the specified key, ordered by score from highest to lowest (reverse order). The start and stop indices are zero-based and inclusive. Negative indices count from the end (-1 is the last element in reverse order, i.e., the highest scored member). When WITHSCORES is specified, the result includes scores: [member1, score1, member2, score2, ...]. Returns an array of members (or members with scores). Returns an empty array if the key does not exist or the range is invalid. Returns an error if the key exists but is not a sorted set type. This operation is thread-safe and uses a read lock.",
+    "category": "zset"
+  },
+  "ZSCORE": {
+    "usage": "ZSCORE <key> <member>",
+    "description": "Return the score of a member in a sorted set stored at the specified key. Returns the score as a bulk string (floating-point number represented as string). Returns NULL if the key does not exist or the member is not present in the sorted set. Returns an error if the key exists but is not a sorted set type. This operation is O(1). This operation is thread-safe and uses a read lock.",
+    "category": "zset"
   }
 }
