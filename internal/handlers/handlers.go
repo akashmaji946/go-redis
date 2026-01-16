@@ -144,6 +144,14 @@ var Handlers = map[string]common.Handler{
 	"PFMERGE":     PfMerge,
 	"PFDEBUG":     PfDebug,
 	"_HLLRESTORE": HLLRestore, // Internal command for AOF replay
+
+	// Bitmap commands
+	"SETBIT":   SetBit,
+	"GETBIT":   GetBit,
+	"BITCOUNT": BitCount,
+	"BITOP":    BitOp,
+	"BITPOS":   BitPos,
+	"BITFIELD": BitField,
 }
 
 // Handler is a function type that processes Redis commands.
