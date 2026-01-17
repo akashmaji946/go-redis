@@ -7,7 +7,10 @@ package handlers
 
 import (
 	"fmt"
+	"math/rand"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,15 +20,27 @@ import (
 
 // KeyHandlers is the map of key command names to their handler functions.
 var KeyHandlers = map[string]common.Handler{
-	"TYPE":    Type,
-	"DELETE":  Del,
-	"DEL":     Del,
-	"RENAME":  Rename,
-	"EXISTS":  Exists,
-	"KEYS":    Keys,
-	"EXPIRE":  Expire,
-	"TTL":     Ttl,
-	"PERSIST": Persist,
+	"TYPE":        Type,
+	"DELETE":      Del,
+	"DEL":         Del,
+	"RENAME":      Rename,
+	"EXISTS":      Exists,
+	"KEYS":        Keys,
+	"EXPIRE":      Expire,
+	"TTL":         Ttl,
+	"PERSIST":     Persist,
+	"EXPIREAT":    ExpireAt,
+	"PEXPIRE":     PExpire,
+	"PEXPIREAT":   PExpireAt,
+	"PTTL":        PTtl,
+	"EXPIRETIME":  ExpireTime,
+	"PEXPIRETIME": PExpireTime,
+	"COPY":        Copy,
+	"RENAMENX":    RenameNx,
+	"TOUCH":       Touch,
+	"UNLINK":      Unlink,
+	"RANDOMKEY":   RandomKey,
+	"SORT":        Sort,
 }
 
 // Del handles the DEL command.
@@ -397,4 +412,583 @@ func Rename(c *common.Client, v *common.Value, state *common.AppState) *common.V
 	}
 
 	return common.NewIntegerValue(1)
+}
+
+// ExpireAt handles the EXPIREAT command.
+// Sets expiration time on a key to an absolute Unix timestamp (seconds).
+//
+// Syntax:
+//
+//	EXPIREAT <key> <timestamp>
+//
+// Returns:
+//
+//	1 if expiration set
+//	0 if key does not exist
+//
+// Notes:
+//   - Timestamp is in seconds since epoch
+//   - If timestamp <= current time, key is deleted immediately
+func ExpireAt(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) != 2 {
+		return common.NewErrorValue("ERR invalid args for EXPIREAT")
+	}
+	k := args[0].Blk
+	tsStr := args[1].Blk
+	ts, err := strconv.ParseInt(tsStr, 10, 64)
+	if err != nil {
+		return common.NewErrorValue("ERR invalid timestamp for EXPIREAT")
+	}
+
+	database.DB.Mu.Lock()
+	defer database.DB.Mu.Unlock()
+
+	item, ok := database.DB.Store[k]
+	if !ok {
+		return common.NewIntegerValue(0)
+	}
+
+	if item.IsExpired() {
+		database.DB.Rem(k)
+		return common.NewIntegerValue(0)
+	}
+
+	expTime := time.Unix(ts, 0)
+	if expTime.Before(time.Now()) {
+		database.DB.Rem(k)
+		database.DB.Touch(k)
+		if len(state.Config.Rdb) > 0 {
+			database.DB.IncrTrackers()
+		}
+		return common.NewIntegerValue(0)
+	}
+
+	item.Exp = expTime
+	database.DB.Touch(k)
+
+	if len(state.Config.Rdb) > 0 {
+		database.DB.IncrTrackers()
+	}
+
+	return common.NewIntegerValue(1)
+}
+
+// PExpire handles the PEXPIRE command.
+// Sets expiration time on a key relative to now, in milliseconds.
+//
+// Syntax:
+//
+//	PEXPIRE <key> <milliseconds>
+//
+// Returns:
+//
+//	1 if expiration set
+//	0 if key does not exist
+func PExpire(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) != 2 {
+		return common.NewErrorValue("ERR invalid args for PEXPIRE")
+	}
+	k := args[0].Blk
+	msStr := args[1].Blk
+	ms, err := strconv.ParseInt(msStr, 10, 64)
+	if err != nil {
+		return common.NewErrorValue("ERR invalid milliseconds for PEXPIRE")
+	}
+
+	database.DB.Mu.Lock()
+	defer database.DB.Mu.Unlock()
+
+	item, ok := database.DB.Store[k]
+	if !ok {
+		return common.NewIntegerValue(0)
+	}
+
+	if item.IsExpired() {
+		database.DB.Rem(k)
+		return common.NewIntegerValue(0)
+	}
+
+	item.Exp = time.Now().Add(time.Duration(ms) * time.Millisecond)
+	database.DB.Touch(k)
+
+	if len(state.Config.Rdb) > 0 {
+		database.DB.IncrTrackers()
+	}
+
+	return common.NewIntegerValue(1)
+}
+
+// PExpireAt handles the PEXPIREAT command.
+// Sets expiration time on a key to an absolute Unix timestamp (milliseconds).
+//
+// Syntax:
+//
+//	PEXPIREAT <key> <timestamp_ms>
+//
+// Returns:
+//
+//	1 if expiration set
+//	0 if key does not exist
+func PExpireAt(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) != 2 {
+		return common.NewErrorValue("ERR invalid args for PEXPIREAT")
+	}
+	k := args[0].Blk
+	tsStr := args[1].Blk
+	ts, err := strconv.ParseInt(tsStr, 10, 64)
+	if err != nil {
+		return common.NewErrorValue("ERR invalid timestamp for PEXPIREAT")
+	}
+
+	database.DB.Mu.Lock()
+	defer database.DB.Mu.Unlock()
+
+	item, ok := database.DB.Store[k]
+	if !ok {
+		return common.NewIntegerValue(0)
+	}
+
+	if item.IsExpired() {
+		database.DB.Rem(k)
+		return common.NewIntegerValue(0)
+	}
+
+	expTime := time.Unix(0, ts*int64(time.Millisecond))
+	if expTime.Before(time.Now()) {
+		database.DB.Rem(k)
+		database.DB.Touch(k)
+		if len(state.Config.Rdb) > 0 {
+			database.DB.IncrTrackers()
+		}
+		return common.NewIntegerValue(0)
+	}
+
+	item.Exp = expTime
+	database.DB.Touch(k)
+
+	if len(state.Config.Rdb) > 0 {
+		database.DB.IncrTrackers()
+	}
+
+	return common.NewIntegerValue(1)
+}
+
+// PTtl handles the PTTL command.
+// Returns remaining time-to-live for a key in milliseconds.
+//
+// Syntax:
+//
+//	PTTL <key>
+//
+// Returns:
+//
+//	>0  remaining milliseconds
+//	-1  key exists but no expiration
+//	-2  key does not exist or expired
+func PTtl(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) != 1 {
+		return common.NewErrorValue("ERR invalid arg for PTTL")
+	}
+
+	k := args[0].Blk
+
+	database.DB.Mu.RLock()
+	item, ok := database.DB.Store[k]
+	if !ok {
+		database.DB.Mu.RUnlock()
+		return common.NewIntegerValue(-2)
+	}
+	exp := item.Exp
+	database.DB.Mu.RUnlock()
+
+	if exp.IsZero() {
+		return common.NewIntegerValue(-1)
+	}
+
+	expired := database.DB.RemIfExpired(k, item, state)
+	if expired {
+		return common.NewIntegerValue(-2)
+	}
+
+	msToExpire := time.Until(exp).Milliseconds()
+	return common.NewIntegerValue(msToExpire)
+}
+
+// ExpireTime handles the EXPIRETIME command.
+// Returns the absolute expiration time as Unix timestamp (seconds).
+//
+// Syntax:
+//
+//	EXPIRETIME <key>
+//
+// Returns:
+//
+//	Unix timestamp (seconds)
+//	-1 if key exists but no expiration
+//	-2 if key does not exist or expired
+func ExpireTime(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) != 1 {
+		return common.NewErrorValue("ERR invalid arg for EXPIRETIME")
+	}
+
+	k := args[0].Blk
+
+	database.DB.Mu.RLock()
+	item, ok := database.DB.Store[k]
+	if !ok {
+		database.DB.Mu.RUnlock()
+		return common.NewIntegerValue(-2)
+	}
+	exp := item.Exp
+	database.DB.Mu.RUnlock()
+
+	if exp.IsZero() {
+		return common.NewIntegerValue(-1)
+	}
+
+	expired := database.DB.RemIfExpired(k, item, state)
+	if expired {
+		return common.NewIntegerValue(-2)
+	}
+
+	return common.NewIntegerValue(exp.Unix())
+}
+
+// PExpireTime handles the PEXPIRETIME command.
+// Returns the absolute expiration time as Unix timestamp (milliseconds).
+//
+// Syntax:
+//
+//	PEXPIRETIME <key>
+//
+// Returns:
+//
+//	Unix timestamp (milliseconds)
+//	-1 if key exists but no expiration
+//	-2 if key does not exist or expired
+func PExpireTime(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) != 1 {
+		return common.NewErrorValue("ERR invalid arg for PEXPIRETIME")
+	}
+
+	k := args[0].Blk
+
+	database.DB.Mu.RLock()
+	item, ok := database.DB.Store[k]
+	if !ok {
+		database.DB.Mu.RUnlock()
+		return common.NewIntegerValue(-2)
+	}
+	exp := item.Exp
+	database.DB.Mu.RUnlock()
+
+	if exp.IsZero() {
+		return common.NewIntegerValue(-1)
+	}
+
+	expired := database.DB.RemIfExpired(k, item, state)
+	if expired {
+		return common.NewIntegerValue(-2)
+	}
+
+	return common.NewIntegerValue(exp.UnixNano() / int64(time.Millisecond))
+}
+
+// Copy handles the COPY command.
+// Copies a key to another name.
+//
+// Syntax:
+//
+//	COPY <src> <dst> [REPLACE]
+//
+// Returns:
+//
+//	1 on success
+//	0 on failure (src doesn't exist or dst exists and no REPLACE)
+func Copy(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) < 2 || len(args) > 3 {
+		return common.NewErrorValue("ERR invalid args for COPY")
+	}
+	src := args[0].Blk
+	dst := args[1].Blk
+	replace := len(args) == 3 && strings.ToUpper(args[2].Blk) == "REPLACE"
+
+	database.DB.Mu.Lock()
+	defer database.DB.Mu.Unlock()
+
+	item, ok := database.DB.Store[src]
+	if !ok {
+		return common.NewIntegerValue(0)
+	}
+
+	if item.IsExpired() {
+		database.DB.Rem(src)
+		return common.NewIntegerValue(0)
+	}
+
+	if _, exists := database.DB.Store[dst]; exists && !replace {
+		return common.NewIntegerValue(0)
+	}
+
+	// Create a copy of the item
+	newItem := *item // shallow copy
+	newItem.LastAccessed = time.Now()
+	newItem.AccessCount = 0
+
+	// If dst exists, remove it first
+	if _, exists := database.DB.Store[dst]; exists {
+		oldMem := database.DB.Store[dst].ApproxMemoryUsage(dst)
+		delete(database.DB.Store, dst)
+		database.DB.Mem -= oldMem
+	}
+
+	database.DB.Store[dst] = &newItem
+	newMem := newItem.ApproxMemoryUsage(dst)
+	database.DB.Mem += newMem
+	if database.DB.Mem > database.DB.Mempeak {
+		database.DB.Mempeak = database.DB.Mem
+	}
+
+	database.DB.Touch(src)
+	database.DB.Touch(dst)
+
+	if len(state.Config.Rdb) > 0 {
+		database.DB.IncrTrackers()
+	}
+
+	return common.NewIntegerValue(1)
+}
+
+// RenameNx handles the RENAMENX command.
+// Renames a key only if the destination does not exist.
+//
+// Syntax:
+//
+//	RENAMENX <oldkey> <newkey>
+//
+// Returns:
+//
+//	1 if renamed
+//	0 otherwise
+func RenameNx(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) != 2 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'renamenx' command")
+	}
+
+	oldKey := args[0].Blk
+	newKey := args[1].Blk
+
+	if oldKey == newKey {
+		return common.NewIntegerValue(1)
+	}
+
+	database.DB.Mu.Lock()
+	defer database.DB.Mu.Unlock()
+
+	// Check if source exists
+	item, ok := database.DB.Store[oldKey]
+	if !ok {
+		return common.NewIntegerValue(0)
+	}
+
+	if item.IsExpired() {
+		database.DB.Rem(oldKey)
+		return common.NewIntegerValue(0)
+	}
+
+	// Check if target exists
+	if _, ok := database.DB.Store[newKey]; ok {
+		return common.NewIntegerValue(0)
+	}
+
+	// Move logic
+	oldMem := item.ApproxMemoryUsage(oldKey)
+	delete(database.DB.Store, oldKey)
+	database.DB.Mem -= oldMem
+
+	database.DB.Touch(oldKey)
+	database.DB.Touch(newKey)
+
+	database.DB.Store[newKey] = item
+	newMem := item.ApproxMemoryUsage(newKey)
+	database.DB.Mem += newMem
+	if database.DB.Mem > database.DB.Mempeak {
+		database.DB.Mempeak = database.DB.Mem
+	}
+
+	if state.Config.AofEnabled {
+		state.Aof.W.Write(v)
+		if state.Config.AofFsync == common.Always {
+			state.Aof.W.Flush()
+		}
+	}
+	if len(state.Config.Rdb) > 0 {
+		database.DB.IncrTrackers()
+	}
+
+	return common.NewIntegerValue(1)
+}
+
+// Touch handles the TOUCH command.
+// Updates the last access time for keys.
+//
+// Syntax:
+//
+//	TOUCH <key> [key ...]
+//
+// Returns:
+//
+//	Number of keys touched
+func Touch(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) == 0 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'touch' command")
+	}
+
+	database.DB.Mu.Lock()
+	count := 0
+	for _, arg := range args {
+		key := arg.Blk
+		if _, ok := database.DB.Store[key]; ok {
+			database.DB.Touch(key)
+			count++
+		}
+	}
+	database.DB.Mu.Unlock()
+
+	return common.NewIntegerValue(int64(count))
+}
+
+// Unlink handles the UNLINK command.
+// Asynchronously deletes keys (but implemented synchronously here).
+//
+// Syntax:
+//
+//	UNLINK <key> [key ...]
+//
+// Returns:
+//
+//	Number of keys unlinked
+func Unlink(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	// Same as DEL for now
+	return Del(c, v, state)
+}
+
+// RandomKey handles the RANDOMKEY command.
+// Returns a random key from the database.
+//
+// Syntax:
+//
+//	RANDOMKEY
+//
+// Returns:
+//
+//	A random key, or nil if DB is empty
+func RandomKey(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) != 0 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'randomkey' command")
+	}
+
+	database.DB.Mu.RLock()
+	defer database.DB.Mu.RUnlock()
+
+	if len(database.DB.Store) == 0 {
+		return common.NewNullValue()
+	}
+
+	// Get all keys
+	keys := make([]string, 0, len(database.DB.Store))
+	for k := range database.DB.Store {
+		keys = append(keys, k)
+	}
+
+	randomKey := keys[rand.Intn(len(keys))]
+	return common.NewBulkValue(randomKey)
+}
+
+// Sort handles the SORT command.
+// Sorts a collection (list, set, zset).
+//
+// Syntax:
+//
+//	SORT <key> [ALPHA]
+//
+// Returns:
+//
+//	Array of sorted elements
+func Sort(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) < 1 || len(args) > 2 {
+		return common.NewErrorValue("ERR invalid args for SORT")
+	}
+	key := args[0].Blk
+	alpha := len(args) == 2 && strings.ToUpper(args[1].Blk) == "ALPHA"
+
+	database.DB.Mu.RLock()
+	item, ok := database.DB.Store[key]
+	if !ok {
+		database.DB.Mu.RUnlock()
+		return common.NewErrorValue("ERR no such key")
+	}
+
+	if item.IsExpired() {
+		database.DB.Mu.RUnlock()
+		database.DB.RemIfExpired(key, item, state)
+		return common.NewErrorValue("ERR no such key")
+	}
+
+	var elements []string
+
+	switch item.Type {
+	case "list":
+		elements = make([]string, len(item.List))
+		copy(elements, item.List)
+	case "set":
+		elements = make([]string, 0, len(item.ItemSet))
+		for k := range item.ItemSet {
+			elements = append(elements, k)
+		}
+	case "zset":
+		elements = make([]string, 0, len(item.ZSet))
+		for k := range item.ZSet {
+			elements = append(elements, k)
+		}
+	default:
+		database.DB.Mu.RUnlock()
+		return common.NewErrorValue("ERR WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	database.DB.Mu.RUnlock()
+
+	if alpha {
+		sort.Strings(elements)
+	} else {
+		// Numeric sort
+		sort.Slice(elements, func(i, j int) bool {
+			a, errA := strconv.ParseFloat(elements[i], 64)
+			b, errB := strconv.ParseFloat(elements[j], 64)
+			if errA != nil || errB != nil {
+				// If not numeric, sort lexicographically
+				return elements[i] < elements[j]
+			}
+			return a < b
+		})
+	}
+
+	reply := common.Value{
+		Typ: common.ARRAY,
+	}
+	for _, elem := range elements {
+		reply.Arr = append(reply.Arr, common.Value{Typ: common.BULK, Blk: elem})
+	}
+	return &reply
 }
