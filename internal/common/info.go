@@ -52,8 +52,9 @@ func (info *RedisInfo) Build(state *AppState, usedMem int64, usedMemPeak int64) 
 		"author         ": "akashmaji(@iisc.ac.in)",
 		"process_id     ": strconv.Itoa(os.Getpid()),
 		"tcp_port       ": strconv.Itoa(state.Config.Port),
+		"tls_port       ": strconv.Itoa(state.Config.TlsPort),
 		"server_time    ": fmt.Sprint(time.Now().UnixMicro()),
-		"server_uptime  ": fmt.Sprint(int64(time.Since(state.ServerStartTime).Seconds())),
+		"server_uptime  ": fmt.Sprintf("%d sec", int64(time.Since(state.ServerStartTime).Seconds())),
 		"server_path    ": exePath,
 		"config_path    ": state.Config.Filepath,
 	}

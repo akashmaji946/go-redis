@@ -23,6 +23,7 @@ var GenericHandlers = map[string]common.Handler{
 	"SELECT":  Select,
 	"SIZE":    Size,
 	"ECHO":    Echo,
+	"TIME":    Time,
 }
 
 // Info handles the INFO command.
@@ -420,4 +421,50 @@ func Echo(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 	}
 	msg := args[0].Blk
 	return common.NewBulkValue(msg)
+}
+
+// Time handles the TIME command.
+// Returns the current server time and uptime.
+//
+// Syntax:
+//
+//	TIME
+//
+// Parameters:
+//   - None (takes no arguments)
+//
+// Returns:
+//
+//	Array: Two elements:
+//	  - server_time: Current Unix timestamp in seconds
+//	  - server_uptime: Server uptime in seconds since startup
+//
+// Example:
+//
+//	127.0.0.1:6379> TIME
+//	1) "server_time: 1704067200"
+//	2) "server_uptime: 3600 sec"
+//
+// Thread Safety:
+//   - Reads ServerStartTime from AppState (set at startup, immutable)
+//   - Safe to call from any client connection concurrently
+func Time(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) != 0 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'time' command")
+	}
+
+	// Get current Unix timestamp
+	serverTime := time.Now().Unix()
+
+	// Calculate uptime in seconds
+	serverUptime := int64(time.Since(state.ServerStartTime).Seconds())
+
+	// Return as array with formatted strings
+	result := []common.Value{
+		{Typ: common.BULK, Blk: fmt.Sprintf("server_time  : %d", serverTime)},
+		{Typ: common.BULK, Blk: fmt.Sprintf("server_uptime: %d sec", serverUptime)},
+	}
+
+	return common.NewArrayValue(result)
 }
