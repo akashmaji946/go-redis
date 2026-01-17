@@ -1,9 +1,24 @@
+/*
+author: akashmaji
+email: akashmaji@iisc.ac.in
+file: go-redis/internal/handlers/handler_transaction.go
+*/
+
 package handlers
 
 import (
 	"github.com/akashmaji946/go-redis/internal/common"
 	"github.com/akashmaji946/go-redis/internal/database"
 )
+
+// TransactionHandlers is the map of transaction command names to their handler functions.
+var TransactionHandlers = map[string]common.Handler{
+	"MULTI":   Multi,
+	"EXEC":    Exec,
+	"DISCARD": Discard,
+	"WATCH":   Watch,
+	"UNWATCH": Unwatch,
+}
 
 // Multi handles the MULTI command.
 // Begins a transaction by creating a new transaction context for the client.
@@ -124,7 +139,7 @@ func Exec(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 		return common.NewErrorValue("ERR Tx already NOT running")
 	}
 
-	return ExecuteTransaction(c, state)
+	return executeTransaction(c, state)
 }
 
 // Discard handles the DISCARD command.
@@ -192,6 +207,20 @@ func Discard(c *common.Client, v *common.Value, state *common.AppState) *common.
 }
 
 // Watch handles the WATCH command.
+// Marks the given keys to be watched for conditional execution of a transaction.
+// If any watched key is modified before EXEC, the transaction will fail.
+//
+// Syntax:
+//
+//	WATCH <key> [<key> ...]
+//
+// Returns:
+//
+//		+OK\r\n on success
+//	    (nil) on failure
+//		Error if called inside a transaction
+//
+// Behavior:
 func Watch(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) == 0 {
@@ -214,6 +243,24 @@ func Watch(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 }
 
 // Unwatch handles the UNWATCH command.
+// Resets all watched keys for the client.
+// Clears the client's watched keys and resets the transaction failure flag.
+//
+// Syntax:
+//
+//	UNWATCH
+//
+// Returns:
+//
+//	+OK\r\n on success
+//
+// Behavior:
+//   - Removes the client from all watched keys in the global watchers map
+//   - Clears the client's list of watched keys
+//   - Resets the TxFailed flag to false
+//
+// Use Cases:
+//   - Client wants to stop watching keys before starting a new transaction
 func Unwatch(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	unwatchClient(c)
 	return common.NewStringValue("OK")
@@ -244,7 +291,8 @@ func unwatchClient(c *common.Client) {
 	c.TxFailed = false
 }
 
-func ExecuteTransaction(client *common.Client, state *common.AppState) *common.Value {
+// executeTransaction executes all queued commands in the client's transaction.
+func executeTransaction(client *common.Client, state *common.AppState) *common.Value {
 	database.DB.TxMu.Lock()
 	defer database.DB.TxMu.Unlock()
 

@@ -1,7 +1,7 @@
 /*
 author: akashmaji
 email: akashmaji@iisc.ac.in
-file: go-redis/handler_string.go
+file: go-redis/internal/handlers/handler_string.go
 */
 package handlers
 
@@ -13,6 +13,30 @@ import (
 	"github.com/akashmaji946/go-redis/internal/common"
 	"github.com/akashmaji946/go-redis/internal/database"
 )
+
+// StringHandlers is the map of string command names to their handler functions.
+var StringHandlers = map[string]common.Handler{
+	"GET":         Get,
+	"SET":         Set,
+	"SETNX":       SetNX,
+	"SETEX":       SetEX,
+	"PSETEX":      PSetEX,
+	"GETSET":      GetSet,
+	"GETEX":       GetEX,
+	"GETDEL":      GetDel,
+	"APPEND":      Append,
+	"GETRANGE":    GetRange,
+	"SETRANGE":    SetRange,
+	"INCR":        Incr,
+	"DECR":        Decr,
+	"INCRBY":      IncrBy,
+	"DECRBY":      DecrBy,
+	"INCRBYFLOAT": IncrByFloat,
+	"MGET":        Mget,
+	"MSET":        Mset,
+	"MSETNX":      MSetNX,
+	"STRLEN":      Strlen,
+}
 
 // Get handles the GET command.
 // Retrieves the value for a key.
@@ -310,6 +334,10 @@ func Mset(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 // Syntax:
 //
 //	STRLEN <key>
+//
+// Returns:
+//
+//	Integer: Length of the string at key, or 0 if key does not exist
 func Strlen(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) != 1 {
@@ -328,59 +356,6 @@ func Strlen(c *common.Client, v *common.Value, state *common.AppState) *common.V
 		return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
 	return common.NewIntegerValue(int64(len(item.Str)))
-}
-
-// Helper function to handle INCRBY and DECRBY logic
-func incrDecrBy(c *common.Client, key string, delta int64, state *common.AppState, v *common.Value) *common.Value {
-	database.DB.Mu.Lock()
-	defer database.DB.Mu.Unlock()
-
-	var item *common.Item
-	var oldMemory int64 = 0
-
-	if existing, ok := database.DB.Store[key]; ok {
-		item = existing
-		if item.IsExpired() {
-			oldMemory = item.ApproxMemoryUsage(key)
-			item = common.NewStringItem("0")
-			database.DB.Store[key] = item
-		} else {
-			if !item.IsString() {
-				return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
-			}
-			oldMemory = item.ApproxMemoryUsage(key)
-		}
-	} else {
-		item = common.NewStringItem("0")
-		database.DB.Store[key] = item
-	}
-
-	val, err := common.ParseInt(item.Str)
-	if err != nil {
-		return common.NewErrorValue("ERR value is not an integer or out of range")
-	}
-
-	newVal := val + delta
-	item.Str = strconv.FormatInt(newVal, 10)
-
-	database.DB.Touch(key)
-	newMemory := item.ApproxMemoryUsage(key)
-	database.DB.Mem += (newMemory - oldMemory)
-	if database.DB.Mem > database.DB.Mempeak {
-		database.DB.Mempeak = database.DB.Mem
-	}
-
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
-
-	return common.NewIntegerValue(newVal)
 }
 
 // APPEND - Append value to existing string
@@ -514,7 +489,13 @@ func GetRange(c *common.Client, v *common.Value, state *common.AppState) *common
 	return common.NewBulkValue(substr)
 }
 
-// SETRANGE - Overwrite part of string
+// SetRange handles the SETRANGE command.
+// Sets the substring of the string value stored at key,
+// starting at the specified offset, to the given value.
+// Syntax:
+// SETRANGE <key> <offset> <value>
+// Returns:
+// Integer: Length of the string after the operation
 func SetRange(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) != 3 {
@@ -615,7 +596,16 @@ func SetRange(c *common.Client, v *common.Value, state *common.AppState) *common
 	}
 }
 
-// SETNX - Set if not exists
+// SetNX  handles the SETNX command.
+// Sets the value of a key, only if the key does not already exist.
+//
+// Syntax:
+//
+//	SETNX <key> <value>
+//
+// Returns:
+//
+//	Integer: 1 if the key was set, 0 if the key was not set
 func SetNX(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) != 2 {
@@ -650,7 +640,13 @@ func SetNX(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 	return common.NewIntegerValue(1)
 }
 
+// SetEx handles the SETEX command.
 // SETEX - Set with expiration (seconds)
+// Sets the value of a key with an expiration time in seconds.
+// Syntax:
+// SETEX <key> <seconds> <value>
+// Returns:
+// Simple String: OK
 func SetEX(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) != 3 {
@@ -683,7 +679,14 @@ func SetEX(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 	return common.NewStringValue("OK")
 }
 
+// PSetEX handles the PSETEX command.
 // PSETEX - Set with expiration (milliseconds)
+// Set with expiration (milliseconds)
+// Sets the value of a key with an expiration time in milliseconds.
+// Syntax:
+// PSETEX <key> <milliseconds> <value>
+// Returns:
+// Simple String: OK
 func PSetEX(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) != 3 {
@@ -716,7 +719,13 @@ func PSetEX(c *common.Client, v *common.Value, state *common.AppState) *common.V
 	return common.NewStringValue("OK")
 }
 
+// GetSet handles the GETSET command.
 // GETSET - Set new value and return old
+// Sets the value of a key, and returns its old value.
+// Syntax:
+// GETSET <key> <value>
+// Returns:
+// Bulk String: Old value of the key, or null if key did not exist
 func GetSet(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) != 2 {
@@ -768,7 +777,10 @@ func GetSet(c *common.Client, v *common.Value, state *common.AppState) *common.V
 // EXAT - unix timestamp in seconds
 // PXAT - unix timestamp in milliseconds
 // PERSIST - remove expiration
-// usage: GETEX <key> [EX seconds|PX milliseconds|EXAT unix-seconds|PXAT unix-milliseconds|PERSIST]
+// Syntax:
+// GETEX <key> [EX seconds|PX milliseconds|EXAT unix-seconds|PXAT unix-milliseconds|PERSIST]
+// Returns:
+// Bulk String: Value of the key, or null if key did not exist
 func GetEX(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) < 1 {
@@ -859,7 +871,13 @@ func GetEX(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 	return val
 }
 
+// GetDel handles the GETDEL command.
 // GETDEL - Get and delete
+// Retrieves the value of a key and deletes the key.
+// Syntax:
+// GETDEL <key>
+// Returns:
+// Bulk String: Value of the key, or null if key did not exist
 func GetDel(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) != 1 {
@@ -887,7 +905,13 @@ func GetDel(c *common.Client, v *common.Value, state *common.AppState) *common.V
 	return val
 }
 
+// IncrByFloat handles the INCRBYFLOAT command.
 // INCRBYFLOAT - Increment by float
+// Increments the float value of a key by the given amount.
+// Syntax:
+// INCRBYFLOAT <key> <increment>
+// Returns:
+// Bulk String: The value of key after the increment
 func IncrByFloat(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) != 2 {
@@ -951,7 +975,13 @@ func IncrByFloat(c *common.Client, v *common.Value, state *common.AppState) *com
 	return common.NewBulkValue(item.Str)
 }
 
+// MSetNX handles the MSETNX command.
 // MSETNX - Set multiple if none exist
+// Sets multiple keys to multiple values, only if none of the keys exist.
+// Syntax:
+// MSETNX <key> <value> [<key> <value> ...]
+// Returns:
+// Integer: 1 if all keys were set, 0 if no keys were set
 func MSetNX(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) == 0 || len(args)%2 != 0 {
@@ -983,4 +1013,57 @@ func MSetNX(c *common.Client, v *common.Value, state *common.AppState) *common.V
 	}
 
 	return common.NewIntegerValue(1)
+}
+
+// Helper function to handle INCRBY and DECRBY logic
+func incrDecrBy(c *common.Client, key string, delta int64, state *common.AppState, v *common.Value) *common.Value {
+	database.DB.Mu.Lock()
+	defer database.DB.Mu.Unlock()
+
+	var item *common.Item
+	var oldMemory int64 = 0
+
+	if existing, ok := database.DB.Store[key]; ok {
+		item = existing
+		if item.IsExpired() {
+			oldMemory = item.ApproxMemoryUsage(key)
+			item = common.NewStringItem("0")
+			database.DB.Store[key] = item
+		} else {
+			if !item.IsString() {
+				return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+			}
+			oldMemory = item.ApproxMemoryUsage(key)
+		}
+	} else {
+		item = common.NewStringItem("0")
+		database.DB.Store[key] = item
+	}
+
+	val, err := common.ParseInt(item.Str)
+	if err != nil {
+		return common.NewErrorValue("ERR value is not an integer or out of range")
+	}
+
+	newVal := val + delta
+	item.Str = strconv.FormatInt(newVal, 10)
+
+	database.DB.Touch(key)
+	newMemory := item.ApproxMemoryUsage(key)
+	database.DB.Mem += (newMemory - oldMemory)
+	if database.DB.Mem > database.DB.Mempeak {
+		database.DB.Mempeak = database.DB.Mem
+	}
+
+	if state.Config.AofEnabled {
+		state.Aof.W.Write(v)
+		if state.Config.AofFsync == common.Always {
+			state.Aof.W.Flush()
+		}
+	}
+	if len(state.Config.Rdb) > 0 {
+		database.DB.IncrTrackers()
+	}
+
+	return common.NewIntegerValue(newVal)
 }

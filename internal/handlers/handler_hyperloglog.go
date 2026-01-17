@@ -1,7 +1,7 @@
 /*
 author: akashmaji
 email: akashmaji@iisc.ac.in
-file: go-redis/handler_hyperloglog.go
+file: go-redis/internal/handlers/handler_hyperloglog.go
 
 HyperLogLog Implementation for go-redis
 Based on the HyperLogLog algorithm by Flajolet et al.
@@ -33,99 +33,12 @@ const (
 	HLL_SPARSE_THRESHOLD = 1024
 )
 
-// hllHash computes a 64-bit hash of the input element
-func hllHash(element string) uint64 {
-	h := fnv.New64a()
-	h.Write([]byte(element))
-	return h.Sum64()
-}
-
-// hllRho counts the position of the first 1-bit (leading zeros + 1)
-// in the remaining bits after extracting the register index
-func hllRho(hash uint64) uint8 {
-	// We use the remaining 50 bits (64 - 14 = 50)
-	// Shift left by HLL_P to get the remaining bits
-	w := hash << HLL_P
-
-	if w == 0 {
-		// All zeros, return max value (50 + 1 = 51)
-		return 51
-	}
-
-	// Count leading zeros + 1
-	rho := uint8(1)
-	for (w & (1 << 63)) == 0 {
-		rho++
-		w <<= 1
-	}
-	return rho
-}
-
-// hllEstimate computes the raw HyperLogLog estimate
-func hllEstimate(registers []uint8) float64 {
-	// Compute the harmonic mean of 2^(-M[i])
-	sum := 0.0
-	zeros := 0
-
-	for _, val := range registers {
-		sum += math.Pow(2.0, -float64(val))
-		if val == 0 {
-			zeros++
-		}
-	}
-
-	// Raw estimate: E = alpha * m^2 * (sum of 2^(-M[i]))^(-1)
-	estimate := HLL_ALPHA * float64(HLL_M) * float64(HLL_M) / sum
-
-	// Small cardinality correction (Linear Counting)
-	if estimate <= 2.5*float64(HLL_M) && zeros > 0 {
-		// Use linear counting: E' = m * ln(m/V)
-		estimate = float64(HLL_M) * math.Log(float64(HLL_M)/float64(zeros))
-	}
-
-	// Large cardinality correction
-	// If E > (1/30) * 2^64, apply correction
-	threshold := math.Pow(2, 64) / 30.0
-	if estimate > threshold {
-		estimate = -math.Pow(2, 64) * math.Log(1.0-estimate/math.Pow(2, 64))
-	}
-
-	return estimate
-}
-
-// hllMergeRegisters merges multiple register arrays by taking max of each position
-func hllMergeRegisters(registerSets ...[]uint8) []uint8 {
-	result := make([]uint8, HLL_M)
-
-	for _, registers := range registerSets {
-		for i := 0; i < HLL_M && i < len(registers); i++ {
-			if registers[i] > result[i] {
-				result[i] = registers[i]
-			}
-		}
-	}
-
-	return result
-}
-
-// sparseToRegisters converts sparse representation to dense registers
-func sparseToRegisters(sparse map[uint16]uint8) []uint8 {
-	registers := make([]uint8, HLL_M)
-	for idx, val := range sparse {
-		registers[idx] = val
-	}
-	return registers
-}
-
-// getHLLRegisters gets the registers from an item, handling both sparse and dense
-func getHLLRegisters(item *common.Item) []uint8 {
-	if item.HLLRegisters != nil {
-		return item.HLLRegisters
-	}
-	if item.HLLSparse != nil {
-		return sparseToRegisters(item.HLLSparse)
-	}
-	return make([]uint8, HLL_M)
+// HyperLogLogHandlers is the map of HyperLogLog command names to their handler functions.
+var HyperLogLogHandlers = map[string]common.Handler{
+	"PFADD":   PfAdd,
+	"PFCOUNT": PfCount,
+	"PFMERGE": PfMerge,
+	"PFDEBUG": PfDebug,
 }
 
 // PfAdd handles the PFADD command.
@@ -446,7 +359,7 @@ func PfDebug(c *common.Client, v *common.Value, state *common.AppState) *common.
 	return common.NewArrayValue(result)
 }
 
-// hllSerialize serializes HLL registers to bytes for RDB persistence
+// HLLSerialize serializes HLL registers to bytes for RDB persistence
 func HLLSerialize(item *common.Item) []byte {
 	registers := getHLLRegisters(item)
 
@@ -588,7 +501,102 @@ func HLLRestore(c *common.Client, v *common.Value, state *common.AppState) *comm
 	return common.NewStringValue("OK")
 }
 
-// Helper functions for parsing
+// hllHash computes a 64-bit hash of the input element
+func hllHash(element string) uint64 {
+	h := fnv.New64a()
+	h.Write([]byte(element))
+	return h.Sum64()
+}
+
+// hllRho counts the position of the first 1-bit (leading zeros + 1)
+// in the remaining bits after extracting the register index
+func hllRho(hash uint64) uint8 {
+	// We use the remaining 50 bits (64 - 14 = 50)
+	// Shift left by HLL_P to get the remaining bits
+	w := hash << HLL_P
+
+	if w == 0 {
+		// All zeros, return max value (50 + 1 = 51)
+		return 51
+	}
+
+	// Count leading zeros + 1
+	rho := uint8(1)
+	for (w & (1 << 63)) == 0 {
+		rho++
+		w <<= 1
+	}
+	return rho
+}
+
+// hllEstimate computes the raw HyperLogLog estimate
+func hllEstimate(registers []uint8) float64 {
+	// Compute the harmonic mean of 2^(-M[i])
+	sum := 0.0
+	zeros := 0
+
+	for _, val := range registers {
+		sum += math.Pow(2.0, -float64(val))
+		if val == 0 {
+			zeros++
+		}
+	}
+
+	// Raw estimate: E = alpha * m^2 * (sum of 2^(-M[i]))^(-1)
+	estimate := HLL_ALPHA * float64(HLL_M) * float64(HLL_M) / sum
+
+	// Small cardinality correction (Linear Counting)
+	if estimate <= 2.5*float64(HLL_M) && zeros > 0 {
+		// Use linear counting: E' = m * ln(m/V)
+		estimate = float64(HLL_M) * math.Log(float64(HLL_M)/float64(zeros))
+	}
+
+	// Large cardinality correction
+	// If E > (1/30) * 2^64, apply correction
+	threshold := math.Pow(2, 64) / 30.0
+	if estimate > threshold {
+		estimate = -math.Pow(2, 64) * math.Log(1.0-estimate/math.Pow(2, 64))
+	}
+
+	return estimate
+}
+
+// hllMergeRegisters merges multiple register arrays by taking max of each position
+func hllMergeRegisters(registerSets ...[]uint8) []uint8 {
+	result := make([]uint8, HLL_M)
+
+	for _, registers := range registerSets {
+		for i := 0; i < HLL_M && i < len(registers); i++ {
+			if registers[i] > result[i] {
+				result[i] = registers[i]
+			}
+		}
+	}
+
+	return result
+}
+
+// sparseToRegisters converts sparse representation to dense registers
+func sparseToRegisters(sparse map[uint16]uint8) []uint8 {
+	registers := make([]uint8, HLL_M)
+	for idx, val := range sparse {
+		registers[idx] = val
+	}
+	return registers
+}
+
+// getHLLRegisters gets the registers from an item, handling both sparse and dense
+func getHLLRegisters(item *common.Item) []uint8 {
+	if item.HLLRegisters != nil {
+		return item.HLLRegisters
+	}
+	if item.HLLSparse != nil {
+		return sparseToRegisters(item.HLLSparse)
+	}
+	return make([]uint8, HLL_M)
+}
+
+// splitString splits a string by a rune separator
 func splitString(s string, sep rune) []string {
 	var result []string
 	current := ""
@@ -606,6 +614,7 @@ func splitString(s string, sep rune) []string {
 	return result
 }
 
+// parseUint16 parses a string to uint16
 func parseUint16(s string) (uint16, error) {
 	val, err := common.ParseInt(s)
 	if err != nil {
@@ -614,6 +623,7 @@ func parseUint16(s string) (uint16, error) {
 	return uint16(val), nil
 }
 
+// parseUint8 parses a string to uint8
 func parseUint8(s string) (uint8, error) {
 	val, err := common.ParseInt(s)
 	if err != nil {

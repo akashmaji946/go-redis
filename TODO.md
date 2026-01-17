@@ -1,27 +1,20 @@
-# TODO: Implement String Handler Methods
+# Split Handlers Map Task
 
-- [x] APPEND: Append value to key's string (create if not exists), return new length
-- [x] GETRANGE: Return substring from start to end indices (support negative indices)
-- [x] SETRANGE: Overwrite string at offset with value (pad with zeros if needed), return new length
-- [x] SETNX: Set key only if it doesn't exist, return 1 if set, 0 if exists
-- [x] SETEX: Set key with expiration in seconds
-- [x] PSETEX: Set key with expiration in milliseconds
-- [x] GETSET: Return old value and set new value
-- [x] GETEX: Get value and optionally set expiration (EX, PX, EXAT, PXAT, PERSIST options)
-- [x] GETDEL: Get value and delete key
-- [x] INCRBYFLOAT: Increment key's float value by specified amount
-- [x] MSETNX: Set multiple keys only if none exist, return 1 if all set, 0 if any exist
+## Steps to Complete
 
-# TODO: Implement List Handler Methods
-
-- [x] LSET: Set element at index
-- [x] LINSERT: Insert before/after pivot
-- [x] LREM: Remove elements by value
-- [x] LTRIM: Trim list to range
-- [x] RPOPLPUSH: Pop from one list, push to another
-- [x] LMOVE: Move element between lists
-- [x] LPOS: Get index of element
-- [x] BLPOP: Blocking left pop
-- [x] BRPOP: Blocking right pop
-- [x] BLMOVE: Blocking list move
-- [x] Update handlers.go with new mappings
+- [x] Add StringHandlers map to internal/handlers/handler_string.go
+- [x] Add ListHandlers map to internal/handlers/handler_list.go
+- [x] Add SetHandlers map to internal/handlers/handler_set.go
+- [x] Add ZSetHandlers map to internal/handlers/handler_zset.go
+- [x] Add KeyHandlers map to internal/handlers/handler_key.go
+- [x] Add HashHandlers map to internal/handlers/handler_hash.go
+- [x] Add ConnectionHandlers map to internal/handlers/handler_connection.go
+- [x] Add TransactionHandlers map to internal/handlers/handler_transaction.go
+- [x] Add GenericHandlers map to internal/handlers/handler_generic.go
+- [x] Add PubSubHandlers map to internal/handlers/handler_pubsub.go
+- [x] Add PersistenceHandlers map to internal/handlers/handler_persistence.go
+- [x] Add BitmapHandlers map to internal/handlers/handler_bitmap.go
+- [x] Add GeoHandlers map to internal/handlers/handler_geo.go
+- [x] Add HyperLogLogHandlers map to internal/handlers/handler_hyperloglog.go
+- [x] Modify internal/handlers/handlers.go to merge all maps in init()
+- [x] Test compilation and basic functionality

@@ -1,7 +1,7 @@
 /*
 author: akashmaji
 email: akashmaji@iisc.ac.in
-file: go-redis/handler_persistence.go
+file: go-redis/internal/handlers/handler_persistence.go
 */
 package handlers
 
@@ -12,6 +12,13 @@ import (
 	"github.com/akashmaji946/go-redis/internal/common"
 	"github.com/akashmaji946/go-redis/internal/database"
 )
+
+// PersistenceHandlers is the map of persistence command names to their handler functions.
+var PersistenceHandlers = map[string]common.Handler{
+	"SAVE":         Save,
+	"BGSAVE":       BGSave,
+	"BGREWRITEAOF": BGRewriteAOF,
+}
 
 // Save handles the SAVE command.
 // Performs a synchronous RDB snapshot.

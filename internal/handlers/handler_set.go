@@ -1,7 +1,7 @@
 /*
 author: akashmaji
 email: akashmaji@iisc.ac.in
-file: go-redis/handler_set.go
+file: go-redis/internal/handlers/handler_set.go
 */
 package handlers
 
@@ -12,6 +12,19 @@ import (
 	"github.com/akashmaji946/go-redis/internal/common"
 	"github.com/akashmaji946/go-redis/internal/database"
 )
+
+// SetHandlers is the map of set command names to their handler functions.
+var SetHandlers = map[string]common.Handler{
+	"SADD":        Sadd,
+	"SREM":        Srem,
+	"SMEMBERS":    Smembers,
+	"SISMEMBER":   Sismember,
+	"SCARD":       Scard,
+	"SINTER":      Sinter,
+	"SUNION":      Sunion,
+	"SDIFF":       Sdiff,
+	"SRANDMEMBER": Srandmember,
+}
 
 // Sadd handles the SADD command.
 // Adds one or more members to a set.

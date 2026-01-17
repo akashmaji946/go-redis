@@ -1,7 +1,11 @@
 /*
 author: akashmaji
 email: akashmaji@iisc.ac.in
-file: go-redis/handler/connection.go
+file: go-redis/internal/handlers/connection.go
+*/
+
+/*
+Connection handlers for go-redis
 */
 package handlers
 
@@ -15,49 +19,17 @@ import (
 	"github.com/akashmaji946/go-redis/internal/database"
 )
 
-// can run these even if authenticated=0
-var safeCommands = []string{
-	"COMMAND",
-	"PING",
-	"COMMANDS",
-	"HELP",
-	"AUTH",
-	"PASSWD",
-	"WHOAMI",
-}
-
-// sensitiveCommands is a set of commands that need root user
-var sensitiveCommands = map[string]bool{
-	"FLUSHDB":  true,
-	"DROPDB":   true,
-	"FLUSHALL": true,
-
-	"USERADD": true,
-	"USERDEL": true,
-	"USERS":   true,
-
-	"BGREWRITEAOF": true,
-	"BGSAVE":       true,
-	"SAVE":         true,
-}
-
-// IsSafeCmd checks whether a command can be executed without authentication.
-func IsSafeCmd(cmd string, commands []string) bool {
-	for _, command := range commands {
-		if cmd == command {
-			return true
-		}
-	}
-	return false
-}
-
-func isAlphanumeric(s string) bool {
-	for _, r := range s {
-		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')) {
-			return false
-		}
-	}
-	return true
+var ConnectionHandlers = map[string]common.Handler{
+	"COMMAND":  Command,
+	"COMMANDS": Commands,
+	"FLUSHALL": FlushAll,
+	"PING":     Ping,
+	"AUTH":     Auth,
+	"USERADD":  UserAdd,
+	"USERDEL":  UserDel,
+	"PASSWD":   Passwd,
+	"USERS":    Users,
+	"WHOAMI":   WhoAmI,
 }
 
 // COMMAND DOCS
@@ -303,13 +275,4 @@ func WhoAmI(c *common.Client, v *common.Value, state *common.AppState) *common.V
 
 	details := getUserDetails(*c.User)
 	return common.NewArrayValue(details)
-}
-
-func getUserDetails(user common.User) []common.Value {
-	details := make([]common.Value, 0)
-	details = append(details, *common.NewBulkValue(fmt.Sprintf("Username  : %s", user.Username)))
-	details = append(details, *common.NewBulkValue(fmt.Sprintf("Client IP : %s", user.ClientIP)))
-	details = append(details, *common.NewBulkValue(fmt.Sprintf("Admin     : %v", user.Admin)))
-	details = append(details, *common.NewBulkValue(fmt.Sprintf("Full Name : %s", user.FullName)))
-	return details
 }

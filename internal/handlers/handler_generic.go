@@ -1,7 +1,7 @@
 /*
 author: akashmaji
 email: akashmaji@iisc.ac.in
-file: go-redis/handler_generic.go
+file: go-redis/internal/handlers/handler_generic.go
 */
 package handlers
 
@@ -13,6 +13,17 @@ import (
 	"github.com/akashmaji946/go-redis/internal/common"
 	"github.com/akashmaji946/go-redis/internal/database"
 )
+
+// GenericHandlers is the map of generic command names to their handler functions.
+var GenericHandlers = map[string]common.Handler{
+	"INFO":    Info,
+	"MONITOR": Monitor,
+	"FLUSHDB": FlushDB,
+	"DBSIZE":  DBSize,
+	"SELECT":  Select,
+	"SIZE":    Size,
+	"ECHO":    Echo,
+}
 
 // Info handles the INFO command.
 // Returns server information and statistics in a human-readable format.
@@ -402,7 +413,6 @@ func Size(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 // Returns:
 //
 //	Bulk string: The same message sent by the client
-
 func Echo(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) != 1 {

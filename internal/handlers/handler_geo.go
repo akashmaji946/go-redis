@@ -1,7 +1,7 @@
 /*
 author: akashmaji
 email: akashmaji@iisc.ac.in
-file: go-redis/handler_geo.go
+file: go-redis/internal/handlers/handler_geo.go
 */
 package handlers
 
@@ -21,137 +21,15 @@ const (
 	earthRadius = 6372797.560856
 )
 
-// encodeGeohash encodes latitude and longitude into a geohash string
-func encodeGeohash(lat, lng float64, precision int) string {
-	if precision <= 0 {
-		precision = 12
-	}
-	if precision > 12 {
-		precision = 12
-	}
-
-	minLat, maxLat := -90.0, 90.0
-	minLng, maxLng := -180.0, 180.0
-
-	var hash strings.Builder
-	bits := 0
-	bit := 0
-	ch := 0
-
-	for hash.Len() < precision {
-		if bit%2 == 0 {
-			// Even bit: longitude
-			mid := (minLng + maxLng) / 2
-			if lng > mid {
-				ch |= (1 << (4 - bits))
-				minLng = mid
-			} else {
-				maxLng = mid
-			}
-		} else {
-			// Odd bit: latitude
-			mid := (minLat + maxLat) / 2
-			if lat > mid {
-				ch |= (1 << (4 - bits))
-				minLat = mid
-			} else {
-				maxLat = mid
-			}
-		}
-
-		bits++
-		if bits == 5 {
-			hash.WriteByte(base32[ch])
-			bits = 0
-			ch = 0
-		}
-		bit++
-	}
-
-	return hash.String()
-}
-
-// decodeGeohash decodes a geohash string into latitude and longitude
-func decodeGeohash(hash string) (float64, float64) {
-	minLat, maxLat := -90.0, 90.0
-	minLng, maxLng := -180.0, 180.0
-
-	even := true
-	for _, ch := range hash {
-		cd := strings.IndexByte(base32, byte(ch))
-		if cd == -1 {
-			break
-		}
-
-		for i := 4; i >= 0; i-- {
-			bit := (cd >> uint(i)) & 1
-			if even {
-				// Longitude
-				mid := (minLng + maxLng) / 2
-				if bit == 1 {
-					minLng = mid
-				} else {
-					maxLng = mid
-				}
-			} else {
-				// Latitude
-				mid := (minLat + maxLat) / 2
-				if bit == 1 {
-					minLat = mid
-				} else {
-					maxLat = mid
-				}
-			}
-			even = !even
-		}
-	}
-
-	lat := (minLat + maxLat) / 2
-	lng := (minLng + maxLng) / 2
-	return lat, lng
-}
-
-// geohashToScore converts geohash to a score for zset
-func geohashToScore(hash string) float64 {
-	// Convert geohash to a numerical score
-	// Use the interleaved bits as a 64-bit integer, then to float64
-	score := 0.0
-	for i, ch := range hash {
-		cd := strings.IndexByte(base32, byte(ch))
-		if cd == -1 {
-			break
-		}
-		score += float64(cd) * math.Pow(32, float64(len(hash)-1-i))
-	}
-	return score
-}
-
-// scoreToGeohash converts score back to geohash (approximate)
-func scoreToGeohash(score float64, precision int) string {
-	if precision <= 0 {
-		precision = 12
-	}
-	hash := ""
-	val := score
-	for i := 0; i < precision; i++ {
-		idx := int(val) % 32
-		hash = string(base32[idx]) + hash
-		val /= 32
-	}
-	return hash
-}
-
-// haversineDistance calculates distance between two points in meters
-func haversineDistance(lat1, lng1, lat2, lng2 float64) float64 {
-	dLat := (lat2 - lat1) * math.Pi / 180
-	dLng := (lng2 - lng1) * math.Pi / 180
-
-	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
-		math.Cos(lat1*math.Pi/180)*math.Cos(lat2*math.Pi/180)*
-			math.Sin(dLng/2)*math.Sin(dLng/2)
-	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
-
-	return earthRadius * c
+// GeoHandlers is the map of geospatial command names to their handler functions.
+var GeoHandlers = map[string]common.Handler{
+	"GEOADD":         GeoAdd,
+	"GEOPOS":         GeoPos,
+	"GEODIST":        GeoDist,
+	"GEOHASH":        GeoHash,
+	"GEORADIUS":      GeoRadius,
+	"GEOSEARCH":      GeoSearch,
+	"GEOSEARCHSTORE": GeoSearchStore,
 }
 
 // GeoAdd handles the GEOADD command.
@@ -965,4 +843,137 @@ func GeoSearchStore(c *common.Client, v *common.Value, state *common.AppState) *
 	}
 
 	return common.NewIntegerValue(count)
+}
+
+// encodeGeohash encodes latitude and longitude into a geohash string
+func encodeGeohash(lat, lng float64, precision int) string {
+	if precision <= 0 {
+		precision = 12
+	}
+	if precision > 12 {
+		precision = 12
+	}
+
+	minLat, maxLat := -90.0, 90.0
+	minLng, maxLng := -180.0, 180.0
+
+	var hash strings.Builder
+	bits := 0
+	bit := 0
+	ch := 0
+
+	for hash.Len() < precision {
+		if bit%2 == 0 {
+			// Even bit: longitude
+			mid := (minLng + maxLng) / 2
+			if lng > mid {
+				ch |= (1 << (4 - bits))
+				minLng = mid
+			} else {
+				maxLng = mid
+			}
+		} else {
+			// Odd bit: latitude
+			mid := (minLat + maxLat) / 2
+			if lat > mid {
+				ch |= (1 << (4 - bits))
+				minLat = mid
+			} else {
+				maxLat = mid
+			}
+		}
+
+		bits++
+		if bits == 5 {
+			hash.WriteByte(base32[ch])
+			bits = 0
+			ch = 0
+		}
+		bit++
+	}
+
+	return hash.String()
+}
+
+// decodeGeohash decodes a geohash string into latitude and longitude
+func decodeGeohash(hash string) (float64, float64) {
+	minLat, maxLat := -90.0, 90.0
+	minLng, maxLng := -180.0, 180.0
+
+	even := true
+	for _, ch := range hash {
+		cd := strings.IndexByte(base32, byte(ch))
+		if cd == -1 {
+			break
+		}
+
+		for i := 4; i >= 0; i-- {
+			bit := (cd >> uint(i)) & 1
+			if even {
+				// Longitude
+				mid := (minLng + maxLng) / 2
+				if bit == 1 {
+					minLng = mid
+				} else {
+					maxLng = mid
+				}
+			} else {
+				// Latitude
+				mid := (minLat + maxLat) / 2
+				if bit == 1 {
+					minLat = mid
+				} else {
+					maxLat = mid
+				}
+			}
+			even = !even
+		}
+	}
+
+	lat := (minLat + maxLat) / 2
+	lng := (minLng + maxLng) / 2
+	return lat, lng
+}
+
+// geohashToScore converts geohash to a score for zset
+func geohashToScore(hash string) float64 {
+	// Convert geohash to a numerical score
+	// Use the interleaved bits as a 64-bit integer, then to float64
+	score := 0.0
+	for i, ch := range hash {
+		cd := strings.IndexByte(base32, byte(ch))
+		if cd == -1 {
+			break
+		}
+		score += float64(cd) * math.Pow(32, float64(len(hash)-1-i))
+	}
+	return score
+}
+
+// scoreToGeohash converts score back to geohash (approximate)
+func scoreToGeohash(score float64, precision int) string {
+	if precision <= 0 {
+		precision = 12
+	}
+	hash := ""
+	val := score
+	for i := 0; i < precision; i++ {
+		idx := int(val) % 32
+		hash = string(base32[idx]) + hash
+		val /= 32
+	}
+	return hash
+}
+
+// haversineDistance calculates distance between two points in meters
+func haversineDistance(lat1, lng1, lat2, lng2 float64) float64 {
+	dLat := (lat2 - lat1) * math.Pi / 180
+	dLng := (lng2 - lng1) * math.Pi / 180
+
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1*math.Pi/180)*math.Cos(lat2*math.Pi/180)*
+			math.Sin(dLng/2)*math.Sin(dLng/2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+
+	return earthRadius * c
 }

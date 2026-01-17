@@ -1,7 +1,7 @@
 /*
 author: akashmaji
 email: akashmaji@iisc.ac.in
-file: go-redis/handler_key.go
+file: go-redis/internal/handlers/handler_key.go
 */
 package handlers
 
@@ -14,6 +14,19 @@ import (
 	"github.com/akashmaji946/go-redis/internal/common"
 	"github.com/akashmaji946/go-redis/internal/database"
 )
+
+// KeyHandlers is the map of key command names to their handler functions.
+var KeyHandlers = map[string]common.Handler{
+	"TYPE":    Type,
+	"DELETE":  Del,
+	"DEL":     Del,
+	"RENAME":  Rename,
+	"EXISTS":  Exists,
+	"KEYS":    Keys,
+	"EXPIRE":  Expire,
+	"TTL":     Ttl,
+	"PERSIST": Persist,
+}
 
 // Del handles the DEL command.
 // Deletes one or more keys.

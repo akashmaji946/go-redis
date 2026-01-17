@@ -1,3 +1,9 @@
+/*
+author: akashmaji
+email: akashmaji@iisc.ac.in
+file: go-redis/internal/handlers/handler_pubsub.go
+*/
+
 package handlers
 
 import (
@@ -6,9 +12,27 @@ import (
 	"github.com/akashmaji946/go-redis/internal/common"
 )
 
+// PubSubHandlers is the map of pub/sub command names to their handler functions.
+var PubSubHandlers = map[string]common.Handler{
+	"PUBLISH":      Publish,
+	"SUBSCRIBE":    Subscribe,
+	"PSUBSCRIBE":   Psubscribe,
+	"PUNSUBSCRIBE": Punsubscribe,
+	"UNSUBSCRIBE":  Unsubscribe,
+}
+
 // PubSub commands
+
+// Publish handles the PUBLISH command.
 // Publish sends a message to all clients subscribed to the specified channel.
-// Syntax: PUBLISH channel message
+//
+// Syntax:
+// PUBLISH channel message
+//
+// Returns the number of clients that received the message.
+// Behavior:
+// - Sends message to all clients subscribed to the channel.
+// - Also sends to clients subscribed to matching patterns (topics).
 func Publish(client *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) != 2 {
@@ -56,8 +80,16 @@ func Publish(client *common.Client, v *common.Value, state *common.AppState) *co
 	return common.NewIntegerValue(totalSent)
 }
 
+// Subscribe handles the SUBSCRIBE command.
 // Subscribe subscribes the client to the specified channels.
-// Syntax: SUBSCRIBE channel [channel ...]
+//
+// Syntax:
+// SUBSCRIBE channel [channel ...]
+//
+// Returns subscription confirmations for each channel.
+// Behavior:
+// - Adds client to channel subscriber lists.
+// - Sends confirmation messages to client.
 func Subscribe(client *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) < 1 {
@@ -106,8 +138,16 @@ func Subscribe(client *common.Client, v *common.Value, state *common.AppState) *
 	return lastReply
 }
 
+// Psubscribe handles the PSUBSCRIBE command.
 // Psubscribe subscribes the client to the specified patterns (topics).
-// Syntax: PSUBSCRIBE pattern [pattern ...]
+//
+// Syntax:
+// PSUBSCRIBE pattern [pattern ...]
+//
+// Returns subscription confirmations for each pattern.
+// Behavior:
+// - Adds client to pattern subscriber lists.
+// - Sends confirmation messages to client.
 func Psubscribe(client *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) < 1 {
@@ -150,7 +190,17 @@ func Psubscribe(client *common.Client, v *common.Value, state *common.AppState) 
 	return lastReply
 }
 
+// Punsubscribe handles the PUNSUBSCRIBE command.
 // Punsubscribe unsubscribes the client from the specified patterns.
+//
+// Syntax:
+//
+// PUNSUBSCRIBE pattern [pattern ...]
+//
+// Returns unsubscription confirmations for each pattern.
+// Behavior:
+// - Removes client from pattern subscriber lists.
+// - Sends confirmation messages to client.
 func Punsubscribe(client *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) < 1 {
@@ -194,6 +244,16 @@ func Punsubscribe(client *common.Client, v *common.Value, state *common.AppState
 	return lastReply
 }
 
+// Unsubscribe handles the UNSUBSCRIBE command.
+// Unsubscribe unsubscribes the client from the specified channels.
+//
+// Syntax:
+// UNSUBSCRIBE channel [channel ...]
+//
+// Returns unsubscription confirmations for each channel.
+// Behavior:
+// - Removes client from channel subscriber lists.
+// - Sends confirmation messages to client.
 func Unsubscribe(client *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	args := v.Arr[1:]
 	if len(args) < 1 {

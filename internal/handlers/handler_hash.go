@@ -1,7 +1,7 @@
 /*
 author: akashmaji
 email: akashmaji@iisc.ac.in
-file: go-redis/handler_hash.go
+file: go-redis/internal/handlers/handler_hash.go
 */
 package handlers
 
@@ -13,6 +13,23 @@ import (
 	"github.com/akashmaji946/go-redis/internal/common"
 	"github.com/akashmaji946/go-redis/internal/database"
 )
+
+// HashHandlers is the map of hash command names to their handler functions.
+var HashHandlers = map[string]common.Handler{
+	"HSET":    Hset,
+	"HGET":    Hget,
+	"HDEL":    Hdel,
+	"HGETALL": Hgetall,
+	"HDELALL": Hdelall,
+	"HINCRBY": Hincrby,
+	"HMSET":   Hmset,
+	"HMGET":   Hmget,
+	"HEXISTS": Hexists,
+	"HLEN":    Hlen,
+	"HKEYS":   Hkeys,
+	"HVALS":   Hvals,
+	"HEXPIRE": Hexpire,
+}
 
 // Hset handles the HSET command.
 // Sets one or more field-value pairs in a hash.

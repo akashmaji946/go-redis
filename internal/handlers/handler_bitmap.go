@@ -2,7 +2,9 @@
 author: akashmaji
 email: akashmaji@iisc.ac.in
 file: go-redis/internal/handlers/handler_bitmap.go
+*/
 
+/*
 Bitmap Implementation for go-redis
 Bitmaps are not a separate data type in Redis, but rather a set of bit-oriented
 operations defined on the String type. Since strings are binary safe blobs and
@@ -22,6 +24,16 @@ import (
 	"github.com/akashmaji946/go-redis/internal/common"
 	"github.com/akashmaji946/go-redis/internal/database"
 )
+
+// BitmapHandlers is the map of bitmap command names to their handler functions.
+var BitmapHandlers = map[string]common.Handler{
+	"SETBIT":   SetBit,
+	"GETBIT":   GetBit,
+	"BITCOUNT": BitCount,
+	"BITOP":    BitOp,
+	"BITPOS":   BitPos,
+	"BITFIELD": BitField,
+}
 
 // SetBit handles the SETBIT command.
 // Sets or clears the bit at offset in the string value stored at key.

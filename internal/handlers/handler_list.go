@@ -1,7 +1,7 @@
 /*
 author: akashmaji
 email: akashmaji@iisc.ac.in
-file: go-redis/handler_list.go
+file: go-redis/internal/handlers/handler_list.go
 */
 package handlers
 
@@ -12,6 +12,28 @@ import (
 	"github.com/akashmaji946/go-redis/internal/common"
 	"github.com/akashmaji946/go-redis/internal/database"
 )
+
+// ListHandlers is the map of list command names to their handler functions.
+var ListHandlers = map[string]common.Handler{
+	"LPUSH":     Lpush,
+	"RPUSH":     Rpush,
+	"LPOP":      Lpop,
+	"RPOP":      Rpop,
+	"LRANGE":    Lrange,
+	"LLEN":      Llen,
+	"LINDEX":    Lindex,
+	"LGET":      Lget,
+	"LSET":      Lset,
+	"LINSERT":   Linsert,
+	"LREM":      Lrem,
+	"LTRIM":     Ltrim,
+	"RPOPLPUSH": RpopLpush,
+	"LMOVE":     Lmove,
+	"LPOS":      Lpos,
+	"BLPOP":     Blpop,
+	"BRPOP":     Brpop,
+	"BLMOVE":    Blmove,
+}
 
 // Lpush handles the LPUSH command.
 // Prepends one or more values to a list.
