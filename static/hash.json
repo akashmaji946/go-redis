@@ -63,5 +63,25 @@
         "usage": "HVALS <key>",
         "description": "Retrieve all values from a hash stored at the specified key. Returns an array containing all field values in the hash. Returns an empty array if the key does not exist. Returns an error if the key exists but is not a hash type. Expired fields (if field-level expiration is set) are automatically skipped and their values are not included in the result. The order of values in the result corresponds to the internal hash iteration order. This operation is thread-safe and uses a read lock.",
         "category": "hash"
+    },
+    "HSETNX": {
+        "usage": "HSETNX <key> <field> <value>",
+        "description": "Set the value of a hash field only if the field does not already exist. Returns 1 if the field was set successfully, or 0 if the field already exists. If the key does not exist, a new hash is created. Returns an error if the key exists but is not a hash type. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled.",
+        "category": "hash"
+    },
+    "HINCRBYFLOAT": {
+        "usage": "HINCRBYFLOAT <key> <field> <increment>",
+        "description": "Increment the floating-point value of a hash field by the specified amount. If the key does not exist, a new hash is created. If the field does not exist or has expired, it is initialized to 0 before the increment. The increment can be a positive or negative floating-point number. Returns the new value after the increment as a bulk string. Returns an error if the increment is not a valid float, if the field value cannot be parsed as a float, or if the key is not a hash type. This operation is atomic and thread-safe.",
+        "category": "hash"
+    },
+    "HSTRLEN": {
+        "usage": "HSTRLEN <key> <field>",
+        "description": "Return the length of the value associated with a hash field. Returns the string length in bytes of the field's value. Returns 0 if the key or field does not exist. Returns an error if the key exists but is not a hash type. This operation is thread-safe and uses a read lock.",
+        "category": "hash"
+    },
+    "HRANDFIELD": {
+        "usage": "HRANDFIELD <key> [count [WITHVALUES]]",
+        "description": "Return one or more random fields from a hash stored at the specified key. When called without count, returns a single random field name. When called with count, returns an array of up to count random field names. If count is negative, allows duplicates. If WITHVALUES is specified, returns field-value pairs. Returns an empty array if the key does not exist. Returns an error if the key exists but is not a hash type. Expired fields are automatically skipped. This operation is thread-safe and uses a read lock.",
+        "category": "hash"
     }
 }

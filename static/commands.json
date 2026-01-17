@@ -159,6 +159,26 @@
     "description": "Retrieve all values from a hash stored at the specified key. Returns an array containing all field values in the hash. Returns an empty array if the key does not exist. Returns an error if the key exists but is not a hash type. Expired fields (if field-level expiration is set) are automatically skipped and their values are not included in the result. The order of values in the result corresponds to the internal hash iteration order. This operation is thread-safe and uses a read lock.",
     "category": "hash"
   },
+  "HSETNX": {
+    "usage": "HSETNX <key> <field> <value>",
+    "description": "Set the value of a hash field only if the field does not already exist. Returns 1 if the field was set successfully, or 0 if the field already exists. If the key does not exist, a new hash is created. Returns an error if the key exists but is not a hash type. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled.",
+    "category": "hash"
+  },
+  "HINCRBYFLOAT": {
+    "usage": "HINCRBYFLOAT <key> <field> <increment>",
+    "description": "Increment the floating-point value of a hash field by the specified amount. If the key does not exist, a new hash is created. If the field does not exist or has expired, it is initialized to 0 before the increment. The increment can be a positive or negative floating-point number. Returns the new value after the increment as a bulk string. Returns an error if the increment is not a valid float, if the field value cannot be parsed as a float, or if the key is not a hash type. This operation is atomic and thread-safe.",
+    "category": "hash"
+  },
+  "HSTRLEN": {
+    "usage": "HSTRLEN <key> <field>",
+    "description": "Return the length of the value associated with a hash field. Returns the string length in bytes of the field's value. Returns 0 if the key or field does not exist. Returns an error if the key exists but is not a hash type. This operation is thread-safe and uses a read lock.",
+    "category": "hash"
+  },
+  "HRANDFIELD": {
+    "usage": "HRANDFIELD <key> [count [WITHVALUES]]",
+    "description": "Return one or more random fields from a hash stored at the specified key. When called without count, returns a single random field name. When called with count, returns an array of up to count random field names. If count is negative, allows duplicates. If WITHVALUES is specified, returns field-value pairs. Returns an empty array if the key does not exist. Returns an error if the key exists but is not a hash type. Expired fields are automatically skipped. This operation is thread-safe and uses a read lock.",
+    "category": "hash"
+  },
   "INCR": {
     "usage": "INCR <key>",
     "description": "Increment the integer value stored at the specified key by one. If the key does not exist, it is initialized to 0 before performing the increment operation, resulting in 1. Returns the new value after the increment as an integer. Returns an error if the key exists but contains a value that cannot be parsed as an integer, or if the key holds a non-string data type. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled and tracked for RDB saving.",
@@ -309,6 +329,56 @@
     "description": "Append one or more values to the tail (right side) of a list stored at the specified key. If the key does not exist, a new list is created. Multiple values are appended in left-to-right order, so 'RPUSH mylist a b c' results in 'c' being the last element. Returns an integer representing the length of the list after the push operations. Returns an error if the key exists but is not a list type. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
     "category": "list"
   },
+  "LSET": {
+    "usage": "LSET <key> <index> <value>",
+    "description": "Set the value of an element at the specified index in a list stored at the specified key. The index is zero-based, where 0 is the first element (head) and -1 is the last element (tail). Negative indices count from the end of the list. Returns 'OK' on success. Returns an error if the key does not exist, if the index is out of range, or if the key exists but is not a list type. This operation is atomic and thread-safe.",
+    "category": "list"
+  },
+  "LINSERT": {
+    "usage": "LINSERT <key> <BEFORE|AFTER> <pivot> <value>",
+    "description": "Insert a value into a list stored at the specified key either before or after the first occurrence of a pivot value. Returns the length of the list after the insert operation, or -1 if the pivot value was not found. If the key does not exist, no operation is performed and -1 is returned. Returns an error if the key exists but is not a list type. The BEFORE/AFTER keyword is case-sensitive. This operation is atomic and thread-safe.",
+    "category": "list"
+  },
+  "LREM": {
+    "usage": "LREM <key> <count> <value>",
+    "description": "Remove the first count occurrences of elements equal to value from a list stored at the specified key. If count is positive, removes elements moving from head to tail. If count is negative, removes elements moving from tail to head. If count is 0, removes all occurrences. Returns the number of elements removed. Returns 0 if the key does not exist. Returns an error if the key exists but is not a list type. If the list becomes empty after removal, the key is automatically deleted. This operation is atomic and thread-safe.",
+    "category": "list"
+  },
+  "LTRIM": {
+    "usage": "LTRIM <key> <start> <stop>",
+    "description": "Trim a list stored at the specified key so that it will contain only the specified range of elements. Both start and stop are zero-based indexes, inclusive. Negative indices count from the end of the list. If start is greater than stop or the range is completely outside the list bounds, the list becomes empty. Returns 'OK' on success. Returns an error if the key exists but is not a list type. If the trimmed list becomes empty, the key is automatically deleted. This operation is atomic and thread-safe.",
+    "category": "list"
+  },
+  "RPOPLPUSH": {
+    "usage": "RPOPLPUSH <source> <destination>",
+    "description": "Atomically remove the last element from the source list and push it to the head of the destination list. Returns the element that was moved as a bulk string, or NULL if the source list is empty. If source and destination are the same, rotates the list. Returns an error if either key exists but is not a list type. If the destination list does not exist, it is created. This operation is atomic and thread-safe.",
+    "category": "list"
+  },
+  "LMOVE": {
+    "usage": "LMOVE <source> <destination> <LEFT|RIGHT> <LEFT|RIGHT>",
+    "description": "Atomically move an element from one list to another. The first LEFT/RIGHT specifies which side to pop from the source list, the second specifies which side to push to the destination list. Returns the element that was moved as a bulk string, or NULL if the source list is empty. Returns an error if either key exists but is not a list type. If the destination list does not exist, it is created. This operation is atomic and thread-safe.",
+    "category": "list"
+  },
+  "LPOS": {
+    "usage": "LPOS <key> <element> [RANK rank] [COUNT count] [MAXLEN maxlen]",
+    "description": "Return the index of the first occurrence of element in a list stored at the specified key. Optional RANK specifies which occurrence to find (1 for first, 2 for second, etc., negative for counting from the end). Optional COUNT limits the number of matches returned. Optional MAXLEN limits the number of elements to scan. Returns an integer index, an array of indices, or NULL if not found. Returns an error if the key exists but is not a list type. This operation is thread-safe and uses a read lock.",
+    "category": "list"
+  },
+  "BLPOP": {
+    "usage": "BLPOP <key> [key ...] <timeout>",
+    "description": "Remove and return the first element of the first non-empty list from the specified keys. If no lists contain elements, wait up to timeout seconds for an element to become available. Returns an array containing the key name and the popped element, or NULL if timeout expires. Timeout of 0 means block indefinitely. Returns an error if timeout is not a valid number. This operation is atomic and thread-safe.",
+    "category": "list"
+  },
+  "BRPOP": {
+    "usage": "BRPOP <key> [key ...] <timeout>",
+    "description": "Remove and return the last element of the first non-empty list from the specified keys. If no lists contain elements, wait up to timeout seconds for an element to become available. Returns an array containing the key name and the popped element, or NULL if timeout expires. Timeout of 0 means block indefinitely. Returns an error if timeout is not a valid number. This operation is atomic and thread-safe.",
+    "category": "list"
+  },
+  "BLMOVE": {
+    "usage": "BLMOVE <source> <destination> <LEFT|RIGHT> <LEFT|RIGHT> <timeout>",
+    "description": "Atomically move an element from one list to another, blocking if the source list is empty. The first LEFT/RIGHT specifies which side to pop from the source list, the second specifies which side to push to the destination list. If the source list is empty, wait up to timeout seconds for an element to become available. Returns the element that was moved as a bulk string, or NULL if timeout expires. Timeout of 0 means block indefinitely. Returns an error if either key exists but is not a list type. This operation is atomic and thread-safe.",
+    "category": "list"
+  },
   "SADD": {
     "usage": "SADD <key> <member> [member ...]",
     "description": "Add one or more members to a set stored at the specified key. If the key does not exist, a new set is created. Members that are already present in the set are ignored. Returns an integer representing the number of members that were actually added to the set (not counting members already present). Returns an error if the key exists but is not a set type. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
@@ -379,6 +449,61 @@
     "description": "Return the length of the string value stored at the specified key. Returns an integer representing the string length in bytes. Returns 0 if the key does not exist or has expired. Returns an error if the key exists but holds a non-string data type. This operation is O(1) as the string length is tracked internally. This operation is thread-safe and uses a read lock.",
     "category": "string"
   },
+  "APPEND": {
+    "usage": "APPEND <key> <value>",
+    "description": "Append the specified value to the string value stored at the specified key. If the key does not exist, it is created with the value as the initial content. Returns the length of the string after the append operation. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled.",
+    "category": "string"
+  },
+  "GETEX": {
+    "usage": "GETEX <key> [EX seconds|PX milliseconds|EXAT unix-seconds|PXAT unix-milliseconds|PERSIST]",
+    "description": "Get the value of a key and optionally set its expiration time. Returns the value as a bulk string if the key exists, or NULL if the key does not exist. The optional expiration options allow setting expiration on the key after retrieval: EX (seconds), PX (milliseconds), EXAT (Unix timestamp in seconds), PXAT (Unix timestamp in milliseconds), or PERSIST to remove expiration. This operation is atomic and thread-safe.",
+    "category": "string"
+  },
+  "GETDEL": {
+    "usage": "GETDEL <key>",
+    "description": "Get the value of a key and delete the key. Returns the value as a bulk string if the key exists, or NULL if the key does not exist. This is equivalent to GET followed by DEL, but performed atomically. This operation is thread-safe.",
+    "category": "string"
+  },
+  "GETRANGE": {
+    "usage": "GETRANGE <key> <start> <end>",
+    "description": "Get a substring of the string value stored at the specified key. The substring is defined by the start and end offsets (inclusive). Negative offsets count from the end of the string. Returns the substring as a bulk string. Returns an empty string if the key does not exist or if the range is invalid. This operation is thread-safe and uses a read lock.",
+    "category": "string"
+  },
+  "GETSET": {
+    "usage": "GETSET <key> <value>",
+    "description": "Set the value of a key and return its old value. Returns the old value as a bulk string, or NULL if the key did not exist. The key is set to the new value regardless. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled.",
+    "category": "string"
+  },
+  "INCRBYFLOAT": {
+    "usage": "INCRBYFLOAT <key> <increment>",
+    "description": "Increment the floating-point value stored at the specified key by the given increment amount. If the key does not exist, it is initialized to 0 before performing the increment. The increment can be a positive or negative floating-point number. Returns the new value after the increment as a bulk string. Returns an error if the increment is not a valid float, if the stored value cannot be parsed as a float, or if the key holds a non-string data type. This operation is atomic and thread-safe.",
+    "category": "string"
+  },
+  "MSETNX": {
+    "usage": "MSETNX <key> <value> [key value ...]",
+    "description": "Set multiple key-value pairs only if none of the keys exist. Returns 1 if all keys were set successfully, or 0 if any key already exists (in which case no keys are set). This command is atomic - either all keys are set or none are. The number of arguments must be even (key-value pairs). This operation is thread-safe and uses a write lock.",
+    "category": "string"
+  },
+  "PSETEX": {
+    "usage": "PSETEX <key> <milliseconds> <value>",
+    "description": "Set the value of a key with an expiration time specified in milliseconds. If the key already exists, its value is overwritten and any previous expiration is discarded. Returns 'OK' on success. The expiration time must be a positive integer representing milliseconds. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled.",
+    "category": "string"
+  },
+  "SETEX": {
+    "usage": "SETEX <key> <seconds> <value>",
+    "description": "Set the value of a key with an expiration time specified in seconds. If the key already exists, its value is overwritten and any previous expiration is discarded. Returns 'OK' on success. The expiration time must be a positive integer representing seconds. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled.",
+    "category": "string"
+  },
+  "SETNX": {
+    "usage": "SETNX <key> <value>",
+    "description": "Set the value of a key only if the key does not already exist. Returns 1 if the key was set successfully, or 0 if the key already exists. If the key is set, any previous expiration is discarded. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled.",
+    "category": "string"
+  },
+  "SETRANGE": {
+    "usage": "SETRANGE <key> <offset> <value>",
+    "description": "Overwrite part of a string value stored at the specified key, starting at the specified offset. If the offset is beyond the current string length, the string is padded with zero bytes. Returns the length of the string after the operation. The offset must be a non-negative integer. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled.",
+    "category": "string"
+  },
   "SUB": {
     "usage": "SUB <channel> [channel ...]",
     "description": "Subscribe the client to one or more channels for receiving published messages. This is an alias for SUBSCRIBE with identical behavior. When a message is published to a subscribed channel, the client receives a 'message' notification containing the channel name and message. Returns a subscription confirmation for each channel. The client remains subscribed until UNSUB/UNSUBSCRIBE is called or the connection is closed.",
@@ -392,6 +517,36 @@
   "SUNION": {
     "usage": "SUNION <key> [key ...]",
     "description": "Return the members of the set resulting from the union of all specified sets. The union consists of all members that exist in at least one of the specified sets. Returns an array of members in the resulting set. Keys that do not exist are treated as empty sets. Returns an error if any key exists but is not a set type. At least one key must be specified. This operation is thread-safe and uses a read lock.",
+    "category": "set"
+  },
+  "SPOP": {
+    "usage": "SPOP <key> [count]",
+    "description": "Remove and return one or more random members from a set stored at the specified key. When called without count, returns a single random member as a bulk string, or NULL if the set is empty. When called with count, returns an array of up to count random members. If count is larger than the set size, returns all members. Returns NULL if the key does not exist. Returns an error if the key exists but is not a set type. If the set becomes empty after popping, the key is automatically deleted. This operation is atomic and thread-safe.",
+    "category": "set"
+  },
+  "SMOVE": {
+    "usage": "SMOVE <source> <destination> <member>",
+    "description": "Move a member from one set to another. Removes the member from the source set and adds it to the destination set. Returns 1 if the member was moved successfully, or 0 if the member does not exist in the source set. If the source and destination sets are the same, returns 0 without making changes. Returns an error if either key exists but is not a set type. If the destination set does not exist, it is created. If the source set becomes empty after the move, it is automatically deleted. This operation is atomic and thread-safe.",
+    "category": "set"
+  },
+  "SINTERSTORE": {
+    "usage": "SINTERSTORE <destination> <key> [key ...]",
+    "description": "Compute the intersection of all specified sets and store the result in the destination key. The destination key is overwritten with the intersection result. Returns the number of members in the resulting set. If any source key does not exist, the result is an empty set. Returns an error if any key exists but is not a set type. At least one source key must be specified. This operation is atomic and thread-safe.",
+    "category": "set"
+  },
+  "SUNIONSTORE": {
+    "usage": "SUNIONSTORE <destination> <key> [key ...]",
+    "description": "Compute the union of all specified sets and store the result in the destination key. The destination key is overwritten with the union result. Returns the number of members in the resulting set. Keys that do not exist are treated as empty sets. Returns an error if any key exists but is not a set type. At least one source key must be specified. This operation is atomic and thread-safe.",
+    "category": "set"
+  },
+  "SDIFFSTORE": {
+    "usage": "SDIFFSTORE <destination> <key> [key ...]",
+    "description": "Compute the difference between the first set and all subsequent sets, storing the result in the destination key. The difference consists of members that exist in the first set but not in any of the other sets. The destination key is overwritten with the result. Returns the number of members in the resulting set. If the first key does not exist, the result is an empty set. Returns an error if any key exists but is not a set type. At least one source key must be specified. This operation is atomic and thread-safe.",
+    "category": "set"
+  },
+  "SMISMEMBER": {
+    "usage": "SMISMEMBER <key> <member> [member ...]",
+    "description": "Check if multiple members are members of the set stored at the specified key. Returns an array of integers where each element is 1 if the corresponding member exists in the set, or 0 if it does not. If the key does not exist, all members are reported as not existing (0). Returns an error if the key exists but is not a set type. At least one member must be specified. This operation is thread-safe and uses a read lock.",
     "category": "set"
   },
   "TTL": {
@@ -479,6 +634,106 @@
     "description": "Return the score of a member in a sorted set stored at the specified key. Returns the score as a bulk string (floating-point number represented as string). Returns NULL if the key does not exist or the member is not present in the sorted set. Returns an error if the key exists but is not a sorted set type. This operation is O(1). This operation is thread-safe and uses a read lock.",
     "category": "zset"
   },
+  "ZINCRBY": {
+    "usage": "ZINCRBY <key> <increment> <member>",
+    "description": "Increment the score of a member in a sorted set stored at the specified key by the given increment amount. If the member does not exist, it is added with the increment as its score. If the key does not exist, a new sorted set is created. The increment can be a positive or negative floating-point number. Returns the new score of the member as a bulk string. Returns an error if the key exists but is not a sorted set type, or if the increment is not a valid float. This operation is atomic and thread-safe.",
+    "category": "zset"
+  },
+  "ZRANK": {
+    "usage": "ZRANK <key> <member>",
+    "description": "Return the rank of a member in a sorted set stored at the specified key, with scores ordered from low to high. Returns the zero-based rank of the member. Returns NULL if the key does not exist or the member is not present in the sorted set. Returns an error if the key exists but is not a sorted set type. This operation is O(log N). This operation is thread-safe and uses a read lock.",
+    "category": "zset"
+  },
+  "ZREVRANK": {
+    "usage": "ZREVRANK <key> <member>",
+    "description": "Return the rank of a member in a sorted set stored at the specified key, with scores ordered from high to low. Returns the zero-based rank of the member. Returns NULL if the key does not exist or the member is not present in the sorted set. Returns an error if the key exists but is not a sorted set type. This operation is O(log N). This operation is thread-safe and uses a read lock.",
+    "category": "zset"
+  },
+  "ZCOUNT": {
+    "usage": "ZCOUNT <key> <min> <max>",
+    "description": "Return the number of members in a sorted set stored at the specified key with scores between min and max (inclusive). Min and max can be -inf and +inf to specify unbounded ranges. Returns an integer count. Returns 0 if the key does not exist. Returns an error if the key exists but is not a sorted set type. This operation is O(log N). This operation is thread-safe and uses a read lock.",
+    "category": "zset"
+  },
+  "ZLEXCOUNT": {
+    "usage": "ZLEXCOUNT <key> <min> <max>",
+    "description": "Return the number of members in a sorted set stored at the specified key with values between min and max in lexicographical order. All members must have the same score. Min and max should be specified with bracket notation: '[' for inclusive, '(' for exclusive. Returns an integer count. Returns 0 if the key does not exist. Returns an error if the key exists but is not a sorted set type, or if members have different scores. This operation is O(log N). This operation is thread-safe and uses a read lock.",
+    "category": "zset"
+  },
+  "ZRANGEBYSCORE": {
+    "usage": "ZRANGEBYSCORE <key> <min> <max>",
+    "description": "Return all members in a sorted set stored at the specified key with scores between min and max (inclusive). Min and max can be -inf and +inf to specify unbounded ranges. Returns an array of members in score order. Returns an empty array if the key does not exist or no members match the range. Returns an error if the key exists but is not a sorted set type. This operation is O(log N + M) where M is the number of elements returned. This operation is thread-safe and uses a read lock.",
+    "category": "zset"
+  },
+  "ZREVRANGEBYSCORE": {
+    "usage": "ZREVRANGEBYSCORE <key> <max> <min>",
+    "description": "Return all members in a sorted set stored at the specified key with scores between max and min (inclusive), in reverse score order. Min and max can be -inf and +inf to specify unbounded ranges. Returns an array of members in reverse score order. Returns an empty array if the key does not exist or no members match the range. Returns an error if the key exists but is not a sorted set type. This operation is O(log N + M) where M is the number of elements returned. This operation is thread-safe and uses a read lock.",
+    "category": "zset"
+  },
+  "ZRANGEBYLEX": {
+    "usage": "ZRANGEBYLEX <key> <min> <max>",
+    "description": "Return all members in a sorted set stored at the specified key with values between min and max in lexicographical order. All members must have the same score. Min and max should be specified with bracket notation: '[' for inclusive, '(' for exclusive. Returns an array of members in lexicographical order. Returns an empty array if the key does not exist or no members match the range. Returns an error if the key exists but is not a sorted set type, or if members have different scores. This operation is O(log N + M) where M is the number of elements returned. This operation is thread-safe and uses a read lock.",
+    "category": "zset"
+  },
+  "ZREMRANGEBYRANK": {
+    "usage": "ZREMRANGEBYRANK <key> <start> <stop>",
+    "description": "Remove all members in a sorted set stored at the specified key with ranks between start and stop (inclusive). Ranks are zero-based and ordered by score from low to high. Negative indices count from the end. Returns the number of members removed. Returns 0 if the key does not exist. Returns an error if the key exists but is not a sorted set type. If the sorted set becomes empty, the key is automatically deleted. This operation is atomic and thread-safe.",
+    "category": "zset"
+  },
+  "ZREMRANGEBYSCORE": {
+    "usage": "ZREMRANGEBYSCORE <key> <min> <max>",
+    "description": "Remove all members in a sorted set stored at the specified key with scores between min and max (inclusive). Min and max can be -inf and +inf to specify unbounded ranges. Returns the number of members removed. Returns 0 if the key does not exist. Returns an error if the key exists but is not a sorted set type. If the sorted set becomes empty, the key is automatically deleted. This operation is atomic and thread-safe.",
+    "category": "zset"
+  },
+  "ZREMRANGEBYLEX": {
+    "usage": "ZREMRANGEBYLEX <key> <min> <max>",
+    "description": "Remove all members in a sorted set stored at the specified key with values between min and max in lexicographical order. All members must have the same score. Min and max should be specified with bracket notation: '[' for inclusive, '(' for exclusive. Returns the number of members removed. Returns 0 if the key does not exist. Returns an error if the key exists but is not a sorted set type, or if members have different scores. If the sorted set becomes empty, the key is automatically deleted. This operation is atomic and thread-safe.",
+    "category": "zset"
+  },
+  "ZPOPMIN": {
+    "usage": "ZPOPMIN <key> [count]",
+    "description": "Remove and return the members with the lowest scores from a sorted set stored at the specified key. When called without count, returns the member with the lowest score. When called with count, returns up to count members with the lowest scores. Returns an array of member-score pairs. Returns an empty array if the key does not exist or the sorted set is empty. Returns an error if the key exists but is not a sorted set type. If the sorted set becomes empty, the key is automatically deleted. This operation is atomic and thread-safe.",
+    "category": "zset"
+  },
+  "ZPOPMAX": {
+    "usage": "ZPOPMAX <key> [count]",
+    "description": "Remove and return the members with the highest scores from a sorted set stored at the specified key. When called without count, returns the member with the highest score. When called with count, returns up to count members with the highest scores. Returns an array of member-score pairs. Returns an empty array if the key does not exist or the sorted set is empty. Returns an error if the key exists but is not a sorted set type. If the sorted set becomes empty, the key is automatically deleted. This operation is atomic and thread-safe.",
+    "category": "zset"
+  },
+  "BZPOPMIN": {
+    "usage": "BZPOPMIN <key> [key ...] <timeout>",
+    "description": "Remove and return the member with the lowest score from the first non-empty sorted set from the specified keys. If no sorted sets contain members, wait up to timeout seconds for a member to become available. Returns an array containing the key name, member name, and score, or NULL if timeout expires. Timeout of 0 means block indefinitely. Returns an error if timeout is not a valid number or if any key exists but is not a sorted set type. This operation is atomic and thread-safe.",
+    "category": "zset"
+  },
+  "BZPOPMAX": {
+    "usage": "BZPOPMAX <key> [key ...] <timeout>",
+    "description": "Remove and return the member with the highest score from the first non-empty sorted set from the specified keys. If no sorted sets contain members, wait up to timeout seconds for a member to become available. Returns an array containing the key name, member name, and score, or NULL if timeout expires. Timeout of 0 means block indefinitely. Returns an error if timeout is not a valid number or if any key exists but is not a sorted set type. This operation is atomic and thread-safe.",
+    "category": "zset"
+  },
+  "ZINTERSTORE": {
+    "usage": "ZINTERSTORE <destination> <numkeys> <key> [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]",
+    "description": "Compute the intersection of the specified sorted sets and store the result in the destination key. The score of each member is computed using the specified weights and aggregate function. WEIGHTS assigns weights to each input set. AGGREGATE specifies how to combine scores (SUM, MIN, MAX). Returns the number of members in the resulting sorted set. Returns an error if any key exists but is not a sorted set type. The destination key is overwritten. This operation is atomic and thread-safe.",
+    "category": "zset"
+  },
+  "ZUNIONSTORE": {
+    "usage": "ZUNIONSTORE <destination> <numkeys> <key> [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]",
+    "description": "Compute the union of the specified sorted sets and store the result in the destination key. The score of each member is computed using the specified weights and aggregate function. WEIGHTS assigns weights to each input set. AGGREGATE specifies how to combine scores (SUM, MIN, MAX). Returns the number of members in the resulting sorted set. Returns an error if any key exists but is not a sorted set type. The destination key is overwritten. This operation is atomic and thread-safe.",
+    "category": "zset"
+  },
+  "ZMSCORE": {
+    "usage": "ZMSCORE <key> <member> [member ...]",
+    "description": "Return the scores of the specified members in a sorted set stored at the specified key. Returns an array of scores in the same order as the requested members. Returns NULL for members that do not exist. Returns an error if the key exists but is not a sorted set type. This operation is O(M) where M is the number of requested members. This operation is thread-safe and uses a read lock.",
+    "category": "zset"
+  },
+  "ZSCAN": {
+    "usage": "ZSCAN <key> <cursor> [MATCH pattern] [COUNT count]",
+    "description": "Incrementally iterate over the members of a sorted set stored at the specified key. Returns a cursor for the next iteration and an array of member-score pairs. MATCH filters members by glob pattern. COUNT suggests the number of elements to return per iteration. Returns an error if the key exists but is not a sorted set type. This operation is thread-safe and uses a read lock.",
+    "category": "zset"
+  },
+  "ZRANDMEMBER": {
+    "usage": "ZRANDMEMBER <key> [count]",
+    "description": "Return one or more random members from a sorted set stored at the specified key. When called without count, returns a single random member. When called with positive count, returns an array of distinct random members. When called with negative count, returns an array that may contain duplicates. Returns NULL if the key does not exist. Returns an error if the key exists but is not a sorted set type. This operation is O(N) where N is the number of members. This operation is thread-safe and uses a read lock.",
+    "category": "zset"
+  },
   "SETBIT": {
     "usage": "SETBIT <key> <offset> <value>",
     "description": "Sets or clears the bit at the specified offset in the string value stored at key. The offset is a zero-based bit position (0 to 2^32-1). The value must be 0 or 1. If the key does not exist, a new string value is created. The string is automatically extended with zero bytes to accommodate the bit at the specified offset. Returns the original bit value that was stored at the offset (0 or 1). The bit offset is calculated from left to right (MSB to LSB within each byte). Warning: Setting a bit at a very large offset can cause significant memory allocation. This operation is O(1) and is recorded to AOF if persistence is enabled.",
@@ -543,5 +798,10 @@
     "usage": "GEOSEARCHSTORE <destination> <source> FROMMEMBER <member> RADIUS <radius> <unit> [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT <count>] [ASC|DESC] [STOREDIST] | GEOSEARCHSTORE <destination> <source> FROMLONLAT <longitude> <latitude> RADIUS <radius> <unit> [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT <count>] [ASC|DESC] [STOREDIST] | GEOSEARCHSTORE <destination> <source> FROMMEMBER <member> BYBOX <width> <height> <unit> [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT <count>] [ASC|DESC] [STOREDIST] | GEOSEARCHSTORE <destination> <source> FROMLONLAT <longitude> <latitude> BYBOX <width> <height> <unit> [WITHCOORD] [WITHDIST] [WITHHASH] [COUNT <count>] [ASC|DESC] [STOREDIST]",
     "description": "Search for members within a radius or rectangular box and store the results in a destination key. The search area and options are the same as GEOSEARCH. The STOREDIST modifier stores distances as scores instead of geohash scores. The destination key is overwritten with the search results stored as a sorted set. Returns an integer representing the number of members stored in the destination key. Returns an error if the source key exists but is not a sorted set type. This operation is atomic and thread-safe.",
     "category": "geo"
+  },
+  "TIME":{
+    "usage": "TIME",
+    "description": "Return the current server time, and uptime",
+    "category": "server"
   }
 }

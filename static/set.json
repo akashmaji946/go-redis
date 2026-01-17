@@ -43,5 +43,35 @@
         "usage": "SUNION <key> [key ...]",
         "description": "Return the members of the set resulting from the union of all specified sets. The union consists of all members that exist in at least one of the specified sets. Returns an array of members in the resulting set. Keys that do not exist are treated as empty sets. Returns an error if any key exists but is not a set type. At least one key must be specified. This operation is thread-safe and uses a read lock.",
         "category": "set"
+    },
+    "SPOP": {
+        "usage": "SPOP <key> [count]",
+        "description": "Remove and return one or more random members from a set stored at the specified key. When called without count, returns a single random member as a bulk string, or NULL if the set is empty. When called with count, returns an array of up to count random members. If count is larger than the set size, returns all members. Returns NULL if the key does not exist. Returns an error if the key exists but is not a set type. If the set becomes empty after popping, the key is automatically deleted. This operation is atomic and thread-safe.",
+        "category": "set"
+    },
+    "SMOVE": {
+        "usage": "SMOVE <source> <destination> <member>",
+        "description": "Move a member from one set to another. Removes the member from the source set and adds it to the destination set. Returns 1 if the member was moved successfully, or 0 if the member does not exist in the source set. If the source and destination sets are the same, returns 0 without making changes. Returns an error if either key exists but is not a set type. If the destination set does not exist, it is created. If the source set becomes empty after the move, it is automatically deleted. This operation is atomic and thread-safe.",
+        "category": "set"
+    },
+    "SINTERSTORE": {
+        "usage": "SINTERSTORE <destination> <key> [key ...]",
+        "description": "Compute the intersection of all specified sets and store the result in the destination key. The destination key is overwritten with the intersection result. Returns the number of members in the resulting set. If any source key does not exist, the result is an empty set. Returns an error if any key exists but is not a set type. At least one source key must be specified. This operation is atomic and thread-safe.",
+        "category": "set"
+    },
+    "SUNIONSTORE": {
+        "usage": "SUNIONSTORE <destination> <key> [key ...]",
+        "description": "Compute the union of all specified sets and store the result in the destination key. The destination key is overwritten with the union result. Returns the number of members in the resulting set. Keys that do not exist are treated as empty sets. Returns an error if any key exists but is not a set type. At least one source key must be specified. This operation is atomic and thread-safe.",
+        "category": "set"
+    },
+    "SDIFFSTORE": {
+        "usage": "SDIFFSTORE <destination> <key> [key ...]",
+        "description": "Compute the difference between the first set and all subsequent sets, storing the result in the destination key. The difference consists of members that exist in the first set but not in any of the other sets. The destination key is overwritten with the result. Returns the number of members in the resulting set. If the first key does not exist, the result is an empty set. Returns an error if any key exists but is not a set type. At least one source key must be specified. This operation is atomic and thread-safe.",
+        "category": "set"
+    },
+    "SMISMEMBER": {
+        "usage": "SMISMEMBER <key> <member> [member ...]",
+        "description": "Check if multiple members are members of the set stored at the specified key. Returns an array of integers where each element is 1 if the corresponding member exists in the set, or 0 if it does not. If the key does not exist, all members are reported as not existing (0). Returns an error if the key exists but is not a set type. At least one member must be specified. This operation is thread-safe and uses a read lock.",
+        "category": "set"
     }
 }

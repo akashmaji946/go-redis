@@ -14,12 +14,16 @@ def split_json_by_category(input_file):
         # Add the command and its details to the respective category dictionary
         categorized_data[category][command] = details
 
+    totalRecord = 0
     # 3. Write each category to its own JSON file
     for category, records in categorized_data.items():
         filename = f"{category}.json"
         with open(filename, 'w') as out_file:
             json.dump(records, out_file, indent=4)
-        print(f"Created: {filename} with {len(records)} records.")
+        print(f"Created: {filename:<20}:{len(records):>3}")
+        totalRecord += len(records)
+    print(f"[INFO] Total records: {totalRecord}")
+
 
 # Usage:
 # Save your input data to 'commands.json' and run:

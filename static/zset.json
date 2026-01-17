@@ -33,5 +33,105 @@
         "usage": "ZSCORE <key> <member>",
         "description": "Return the score of a member in a sorted set stored at the specified key. Returns the score as a bulk string (floating-point number represented as string). Returns NULL if the key does not exist or the member is not present in the sorted set. Returns an error if the key exists but is not a sorted set type. This operation is O(1). This operation is thread-safe and uses a read lock.",
         "category": "zset"
+    },
+    "ZINCRBY": {
+        "usage": "ZINCRBY <key> <increment> <member>",
+        "description": "Increment the score of a member in a sorted set stored at the specified key by the given increment amount. If the member does not exist, it is added with the increment as its score. If the key does not exist, a new sorted set is created. The increment can be a positive or negative floating-point number. Returns the new score of the member as a bulk string. Returns an error if the key exists but is not a sorted set type, or if the increment is not a valid float. This operation is atomic and thread-safe.",
+        "category": "zset"
+    },
+    "ZRANK": {
+        "usage": "ZRANK <key> <member>",
+        "description": "Return the rank of a member in a sorted set stored at the specified key, with scores ordered from low to high. Returns the zero-based rank of the member. Returns NULL if the key does not exist or the member is not present in the sorted set. Returns an error if the key exists but is not a sorted set type. This operation is O(log N). This operation is thread-safe and uses a read lock.",
+        "category": "zset"
+    },
+    "ZREVRANK": {
+        "usage": "ZREVRANK <key> <member>",
+        "description": "Return the rank of a member in a sorted set stored at the specified key, with scores ordered from high to low. Returns the zero-based rank of the member. Returns NULL if the key does not exist or the member is not present in the sorted set. Returns an error if the key exists but is not a sorted set type. This operation is O(log N). This operation is thread-safe and uses a read lock.",
+        "category": "zset"
+    },
+    "ZCOUNT": {
+        "usage": "ZCOUNT <key> <min> <max>",
+        "description": "Return the number of members in a sorted set stored at the specified key with scores between min and max (inclusive). Min and max can be -inf and +inf to specify unbounded ranges. Returns an integer count. Returns 0 if the key does not exist. Returns an error if the key exists but is not a sorted set type. This operation is O(log N). This operation is thread-safe and uses a read lock.",
+        "category": "zset"
+    },
+    "ZLEXCOUNT": {
+        "usage": "ZLEXCOUNT <key> <min> <max>",
+        "description": "Return the number of members in a sorted set stored at the specified key with values between min and max in lexicographical order. All members must have the same score. Min and max should be specified with bracket notation: '[' for inclusive, '(' for exclusive. Returns an integer count. Returns 0 if the key does not exist. Returns an error if the key exists but is not a sorted set type, or if members have different scores. This operation is O(log N). This operation is thread-safe and uses a read lock.",
+        "category": "zset"
+    },
+    "ZRANGEBYSCORE": {
+        "usage": "ZRANGEBYSCORE <key> <min> <max>",
+        "description": "Return all members in a sorted set stored at the specified key with scores between min and max (inclusive). Min and max can be -inf and +inf to specify unbounded ranges. Returns an array of members in score order. Returns an empty array if the key does not exist or no members match the range. Returns an error if the key exists but is not a sorted set type. This operation is O(log N + M) where M is the number of elements returned. This operation is thread-safe and uses a read lock.",
+        "category": "zset"
+    },
+    "ZREVRANGEBYSCORE": {
+        "usage": "ZREVRANGEBYSCORE <key> <max> <min>",
+        "description": "Return all members in a sorted set stored at the specified key with scores between max and min (inclusive), in reverse score order. Min and max can be -inf and +inf to specify unbounded ranges. Returns an array of members in reverse score order. Returns an empty array if the key does not exist or no members match the range. Returns an error if the key exists but is not a sorted set type. This operation is O(log N + M) where M is the number of elements returned. This operation is thread-safe and uses a read lock.",
+        "category": "zset"
+    },
+    "ZRANGEBYLEX": {
+        "usage": "ZRANGEBYLEX <key> <min> <max>",
+        "description": "Return all members in a sorted set stored at the specified key with values between min and max in lexicographical order. All members must have the same score. Min and max should be specified with bracket notation: '[' for inclusive, '(' for exclusive. Returns an array of members in lexicographical order. Returns an empty array if the key does not exist or no members match the range. Returns an error if the key exists but is not a sorted set type, or if members have different scores. This operation is O(log N + M) where M is the number of elements returned. This operation is thread-safe and uses a read lock.",
+        "category": "zset"
+    },
+    "ZREMRANGEBYRANK": {
+        "usage": "ZREMRANGEBYRANK <key> <start> <stop>",
+        "description": "Remove all members in a sorted set stored at the specified key with ranks between start and stop (inclusive). Ranks are zero-based and ordered by score from low to high. Negative indices count from the end. Returns the number of members removed. Returns 0 if the key does not exist. Returns an error if the key exists but is not a sorted set type. If the sorted set becomes empty, the key is automatically deleted. This operation is atomic and thread-safe.",
+        "category": "zset"
+    },
+    "ZREMRANGEBYSCORE": {
+        "usage": "ZREMRANGEBYSCORE <key> <min> <max>",
+        "description": "Remove all members in a sorted set stored at the specified key with scores between min and max (inclusive). Min and max can be -inf and +inf to specify unbounded ranges. Returns the number of members removed. Returns 0 if the key does not exist. Returns an error if the key exists but is not a sorted set type. If the sorted set becomes empty, the key is automatically deleted. This operation is atomic and thread-safe.",
+        "category": "zset"
+    },
+    "ZREMRANGEBYLEX": {
+        "usage": "ZREMRANGEBYLEX <key> <min> <max>",
+        "description": "Remove all members in a sorted set stored at the specified key with values between min and max in lexicographical order. All members must have the same score. Min and max should be specified with bracket notation: '[' for inclusive, '(' for exclusive. Returns the number of members removed. Returns 0 if the key does not exist. Returns an error if the key exists but is not a sorted set type, or if members have different scores. If the sorted set becomes empty, the key is automatically deleted. This operation is atomic and thread-safe.",
+        "category": "zset"
+    },
+    "ZPOPMIN": {
+        "usage": "ZPOPMIN <key> [count]",
+        "description": "Remove and return the members with the lowest scores from a sorted set stored at the specified key. When called without count, returns the member with the lowest score. When called with count, returns up to count members with the lowest scores. Returns an array of member-score pairs. Returns an empty array if the key does not exist or the sorted set is empty. Returns an error if the key exists but is not a sorted set type. If the sorted set becomes empty, the key is automatically deleted. This operation is atomic and thread-safe.",
+        "category": "zset"
+    },
+    "ZPOPMAX": {
+        "usage": "ZPOPMAX <key> [count]",
+        "description": "Remove and return the members with the highest scores from a sorted set stored at the specified key. When called without count, returns the member with the highest score. When called with count, returns up to count members with the highest scores. Returns an array of member-score pairs. Returns an empty array if the key does not exist or the sorted set is empty. Returns an error if the key exists but is not a sorted set type. If the sorted set becomes empty, the key is automatically deleted. This operation is atomic and thread-safe.",
+        "category": "zset"
+    },
+    "BZPOPMIN": {
+        "usage": "BZPOPMIN <key> [key ...] <timeout>",
+        "description": "Remove and return the member with the lowest score from the first non-empty sorted set from the specified keys. If no sorted sets contain members, wait up to timeout seconds for a member to become available. Returns an array containing the key name, member name, and score, or NULL if timeout expires. Timeout of 0 means block indefinitely. Returns an error if timeout is not a valid number or if any key exists but is not a sorted set type. This operation is atomic and thread-safe.",
+        "category": "zset"
+    },
+    "BZPOPMAX": {
+        "usage": "BZPOPMAX <key> [key ...] <timeout>",
+        "description": "Remove and return the member with the highest score from the first non-empty sorted set from the specified keys. If no sorted sets contain members, wait up to timeout seconds for a member to become available. Returns an array containing the key name, member name, and score, or NULL if timeout expires. Timeout of 0 means block indefinitely. Returns an error if timeout is not a valid number or if any key exists but is not a sorted set type. This operation is atomic and thread-safe.",
+        "category": "zset"
+    },
+    "ZINTERSTORE": {
+        "usage": "ZINTERSTORE <destination> <numkeys> <key> [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]",
+        "description": "Compute the intersection of the specified sorted sets and store the result in the destination key. The score of each member is computed using the specified weights and aggregate function. WEIGHTS assigns weights to each input set. AGGREGATE specifies how to combine scores (SUM, MIN, MAX). Returns the number of members in the resulting sorted set. Returns an error if any key exists but is not a sorted set type. The destination key is overwritten. This operation is atomic and thread-safe.",
+        "category": "zset"
+    },
+    "ZUNIONSTORE": {
+        "usage": "ZUNIONSTORE <destination> <numkeys> <key> [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]",
+        "description": "Compute the union of the specified sorted sets and store the result in the destination key. The score of each member is computed using the specified weights and aggregate function. WEIGHTS assigns weights to each input set. AGGREGATE specifies how to combine scores (SUM, MIN, MAX). Returns the number of members in the resulting sorted set. Returns an error if any key exists but is not a sorted set type. The destination key is overwritten. This operation is atomic and thread-safe.",
+        "category": "zset"
+    },
+    "ZMSCORE": {
+        "usage": "ZMSCORE <key> <member> [member ...]",
+        "description": "Return the scores of the specified members in a sorted set stored at the specified key. Returns an array of scores in the same order as the requested members. Returns NULL for members that do not exist. Returns an error if the key exists but is not a sorted set type. This operation is O(M) where M is the number of requested members. This operation is thread-safe and uses a read lock.",
+        "category": "zset"
+    },
+    "ZSCAN": {
+        "usage": "ZSCAN <key> <cursor> [MATCH pattern] [COUNT count]",
+        "description": "Incrementally iterate over the members of a sorted set stored at the specified key. Returns a cursor for the next iteration and an array of member-score pairs. MATCH filters members by glob pattern. COUNT suggests the number of elements to return per iteration. Returns an error if the key exists but is not a sorted set type. This operation is thread-safe and uses a read lock.",
+        "category": "zset"
+    },
+    "ZRANDMEMBER": {
+        "usage": "ZRANDMEMBER <key> [count]",
+        "description": "Return one or more random members from a sorted set stored at the specified key. When called without count, returns a single random member. When called with positive count, returns an array of distinct random members. When called with negative count, returns an array that may contain duplicates. Returns NULL if the key does not exist. Returns an error if the key exists but is not a sorted set type. This operation is O(N) where N is the number of members. This operation is thread-safe and uses a read lock.",
+        "category": "zset"
     }
 }

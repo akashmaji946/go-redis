@@ -43,5 +43,60 @@
         "usage": "STRLEN <key>",
         "description": "Return the length of the string value stored at the specified key. Returns an integer representing the string length in bytes. Returns 0 if the key does not exist or has expired. Returns an error if the key exists but holds a non-string data type. This operation is O(1) as the string length is tracked internally. This operation is thread-safe and uses a read lock.",
         "category": "string"
+    },
+    "APPEND": {
+        "usage": "APPEND <key> <value>",
+        "description": "Append the specified value to the string value stored at the specified key. If the key does not exist, it is created with the value as the initial content. Returns the length of the string after the append operation. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled.",
+        "category": "string"
+    },
+    "GETEX": {
+        "usage": "GETEX <key> [EX seconds|PX milliseconds|EXAT unix-seconds|PXAT unix-milliseconds|PERSIST]",
+        "description": "Get the value of a key and optionally set its expiration time. Returns the value as a bulk string if the key exists, or NULL if the key does not exist. The optional expiration options allow setting expiration on the key after retrieval: EX (seconds), PX (milliseconds), EXAT (Unix timestamp in seconds), PXAT (Unix timestamp in milliseconds), or PERSIST to remove expiration. This operation is atomic and thread-safe.",
+        "category": "string"
+    },
+    "GETDEL": {
+        "usage": "GETDEL <key>",
+        "description": "Get the value of a key and delete the key. Returns the value as a bulk string if the key exists, or NULL if the key does not exist. This is equivalent to GET followed by DEL, but performed atomically. This operation is thread-safe.",
+        "category": "string"
+    },
+    "GETRANGE": {
+        "usage": "GETRANGE <key> <start> <end>",
+        "description": "Get a substring of the string value stored at the specified key. The substring is defined by the start and end offsets (inclusive). Negative offsets count from the end of the string. Returns the substring as a bulk string. Returns an empty string if the key does not exist or if the range is invalid. This operation is thread-safe and uses a read lock.",
+        "category": "string"
+    },
+    "GETSET": {
+        "usage": "GETSET <key> <value>",
+        "description": "Set the value of a key and return its old value. Returns the old value as a bulk string, or NULL if the key did not exist. The key is set to the new value regardless. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled.",
+        "category": "string"
+    },
+    "INCRBYFLOAT": {
+        "usage": "INCRBYFLOAT <key> <increment>",
+        "description": "Increment the floating-point value stored at the specified key by the given increment amount. If the key does not exist, it is initialized to 0 before performing the increment. The increment can be a positive or negative floating-point number. Returns the new value after the increment as a bulk string. Returns an error if the increment is not a valid float, if the stored value cannot be parsed as a float, or if the key holds a non-string data type. This operation is atomic and thread-safe.",
+        "category": "string"
+    },
+    "MSETNX": {
+        "usage": "MSETNX <key> <value> [key value ...]",
+        "description": "Set multiple key-value pairs only if none of the keys exist. Returns 1 if all keys were set successfully, or 0 if any key already exists (in which case no keys are set). This command is atomic - either all keys are set or none are. The number of arguments must be even (key-value pairs). This operation is thread-safe and uses a write lock.",
+        "category": "string"
+    },
+    "PSETEX": {
+        "usage": "PSETEX <key> <milliseconds> <value>",
+        "description": "Set the value of a key with an expiration time specified in milliseconds. If the key already exists, its value is overwritten and any previous expiration is discarded. Returns 'OK' on success. The expiration time must be a positive integer representing milliseconds. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled.",
+        "category": "string"
+    },
+    "SETEX": {
+        "usage": "SETEX <key> <seconds> <value>",
+        "description": "Set the value of a key with an expiration time specified in seconds. If the key already exists, its value is overwritten and any previous expiration is discarded. Returns 'OK' on success. The expiration time must be a positive integer representing seconds. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled.",
+        "category": "string"
+    },
+    "SETNX": {
+        "usage": "SETNX <key> <value>",
+        "description": "Set the value of a key only if the key does not already exist. Returns 1 if the key was set successfully, or 0 if the key already exists. If the key is set, any previous expiration is discarded. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled.",
+        "category": "string"
+    },
+    "SETRANGE": {
+        "usage": "SETRANGE <key> <offset> <value>",
+        "description": "Overwrite part of a string value stored at the specified key, starting at the specified offset. If the offset is beyond the current string length, the string is padded with zero bytes. Returns the length of the string after the operation. The offset must be a non-negative integer. This operation is atomic and thread-safe. The command is recorded to AOF if persistence is enabled.",
+        "category": "string"
     }
 }

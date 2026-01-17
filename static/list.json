@@ -38,5 +38,55 @@
         "usage": "RPUSH <key> <value> [value ...]",
         "description": "Append one or more values to the tail (right side) of a list stored at the specified key. If the key does not exist, a new list is created. Multiple values are appended in left-to-right order, so 'RPUSH mylist a b c' results in 'c' being the last element. Returns an integer representing the length of the list after the push operations. Returns an error if the key exists but is not a list type. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
         "category": "list"
+    },
+    "LSET": {
+        "usage": "LSET <key> <index> <value>",
+        "description": "Set the value of an element at the specified index in a list stored at the specified key. The index is zero-based, where 0 is the first element (head) and -1 is the last element (tail). Negative indices count from the end of the list. Returns 'OK' on success. Returns an error if the key does not exist, if the index is out of range, or if the key exists but is not a list type. This operation is atomic and thread-safe.",
+        "category": "list"
+    },
+    "LINSERT": {
+        "usage": "LINSERT <key> <BEFORE|AFTER> <pivot> <value>",
+        "description": "Insert a value into a list stored at the specified key either before or after the first occurrence of a pivot value. Returns the length of the list after the insert operation, or -1 if the pivot value was not found. If the key does not exist, no operation is performed and -1 is returned. Returns an error if the key exists but is not a list type. The BEFORE/AFTER keyword is case-sensitive. This operation is atomic and thread-safe.",
+        "category": "list"
+    },
+    "LREM": {
+        "usage": "LREM <key> <count> <value>",
+        "description": "Remove the first count occurrences of elements equal to value from a list stored at the specified key. If count is positive, removes elements moving from head to tail. If count is negative, removes elements moving from tail to head. If count is 0, removes all occurrences. Returns the number of elements removed. Returns 0 if the key does not exist. Returns an error if the key exists but is not a list type. If the list becomes empty after removal, the key is automatically deleted. This operation is atomic and thread-safe.",
+        "category": "list"
+    },
+    "LTRIM": {
+        "usage": "LTRIM <key> <start> <stop>",
+        "description": "Trim a list stored at the specified key so that it will contain only the specified range of elements. Both start and stop are zero-based indexes, inclusive. Negative indices count from the end of the list. If start is greater than stop or the range is completely outside the list bounds, the list becomes empty. Returns 'OK' on success. Returns an error if the key exists but is not a list type. If the trimmed list becomes empty, the key is automatically deleted. This operation is atomic and thread-safe.",
+        "category": "list"
+    },
+    "RPOPLPUSH": {
+        "usage": "RPOPLPUSH <source> <destination>",
+        "description": "Atomically remove the last element from the source list and push it to the head of the destination list. Returns the element that was moved as a bulk string, or NULL if the source list is empty. If source and destination are the same, rotates the list. Returns an error if either key exists but is not a list type. If the destination list does not exist, it is created. This operation is atomic and thread-safe.",
+        "category": "list"
+    },
+    "LMOVE": {
+        "usage": "LMOVE <source> <destination> <LEFT|RIGHT> <LEFT|RIGHT>",
+        "description": "Atomically move an element from one list to another. The first LEFT/RIGHT specifies which side to pop from the source list, the second specifies which side to push to the destination list. Returns the element that was moved as a bulk string, or NULL if the source list is empty. Returns an error if either key exists but is not a list type. If the destination list does not exist, it is created. This operation is atomic and thread-safe.",
+        "category": "list"
+    },
+    "LPOS": {
+        "usage": "LPOS <key> <element> [RANK rank] [COUNT count] [MAXLEN maxlen]",
+        "description": "Return the index of the first occurrence of element in a list stored at the specified key. Optional RANK specifies which occurrence to find (1 for first, 2 for second, etc., negative for counting from the end). Optional COUNT limits the number of matches returned. Optional MAXLEN limits the number of elements to scan. Returns an integer index, an array of indices, or NULL if not found. Returns an error if the key exists but is not a list type. This operation is thread-safe and uses a read lock.",
+        "category": "list"
+    },
+    "BLPOP": {
+        "usage": "BLPOP <key> [key ...] <timeout>",
+        "description": "Remove and return the first element of the first non-empty list from the specified keys. If no lists contain elements, wait up to timeout seconds for an element to become available. Returns an array containing the key name and the popped element, or NULL if timeout expires. Timeout of 0 means block indefinitely. Returns an error if timeout is not a valid number. This operation is atomic and thread-safe.",
+        "category": "list"
+    },
+    "BRPOP": {
+        "usage": "BRPOP <key> [key ...] <timeout>",
+        "description": "Remove and return the last element of the first non-empty list from the specified keys. If no lists contain elements, wait up to timeout seconds for an element to become available. Returns an array containing the key name and the popped element, or NULL if timeout expires. Timeout of 0 means block indefinitely. Returns an error if timeout is not a valid number. This operation is atomic and thread-safe.",
+        "category": "list"
+    },
+    "BLMOVE": {
+        "usage": "BLMOVE <source> <destination> <LEFT|RIGHT> <LEFT|RIGHT> <timeout>",
+        "description": "Atomically move an element from one list to another, blocking if the source list is empty. The first LEFT/RIGHT specifies which side to pop from the source list, the second specifies which side to push to the destination list. If the source list is empty, wait up to timeout seconds for an element to become available. Returns the element that was moved as a bulk string, or NULL if timeout expires. Timeout of 0 means block indefinitely. Returns an error if either key exists but is not a list type. This operation is atomic and thread-safe.",
+        "category": "list"
     }
 }

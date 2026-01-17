@@ -53,5 +53,10 @@
         "usage": "SIZE [db_index]",
         "description": "Return the number of configured databases on the server, or the number of keys in a specific database. When called without arguments, returns the total number of databases configured. When called with a database index, returns the number of keys in that specific database (equivalent to DBSIZE for that database). Returns an error if the database index is invalid or out of range. This operation is thread-safe.",
         "category": "server"
+    },
+    "TIME": {
+        "usage": "TIME",
+        "description": "Return the current server time, and uptime",
+        "category": "server"
     }
 }
