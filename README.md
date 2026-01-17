@@ -10,6 +10,7 @@ A Redis-compatible in-memory key-value store server written in Go. This implemen
 
 - Refer to our docs for full guide on usage and description of commands.
 - Access it here: [Docs](https://akashmaji946.github.io/go-redis/)
+- Download `go-client` to access `go-redis` server using Go-programs: `go get github.com/akashmaji946/go-redis/go-client@v1.0.1`
 
 ## Features
 

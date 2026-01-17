@@ -3,7 +3,7 @@ module github.com/akashmaji946/go-redis
 go 1.24.4
 
 require (
-	github.com/akashmaji946/go-redis/go-client v1.0.0
+	github.com/akashmaji946/go-redis/go-client v1.0.1
 	github.com/shirou/gopsutil/v4 v4.25.12
 )
 
