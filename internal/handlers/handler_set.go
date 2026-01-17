@@ -24,6 +24,12 @@ var SetHandlers = map[string]common.Handler{
 	"SUNION":      Sunion,
 	"SDIFF":       Sdiff,
 	"SRANDMEMBER": Srandmember,
+	"SPOP":        Spop,
+	"SMOVE":       Smove,
+	"SINTERSTORE": Sinterstore,
+	"SUNIONSTORE": Sunionstore,
+	"SDIFFSTORE":  Sdiffstore,
+	"SMISMEMBER":  Smismember,
 }
 
 // Sadd handles the SADD command.
@@ -525,6 +531,525 @@ func Srandmember(c *common.Client, v *common.Value, state *common.AppState) *com
 		for i := 0; i < count; i++ {
 			idx := rand.Intn(size)
 			result = append(result, common.Value{Typ: common.BULK, Blk: members[idx]})
+		}
+	}
+
+	return common.NewArrayValue(result)
+}
+
+// Spop handles the SPOP command.
+// Remove and return one or more random members from a set.
+//
+// Syntax:
+//
+//	SPOP <key> [count]
+//
+// Returns:
+//
+//	Bulk String: If no count is provided.
+//	Array: If count is provided.
+func Spop(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) == 0 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'spop' command")
+	}
+
+	key := args[0].Blk
+	count := 1
+	hasCount := false
+
+	if len(args) > 1 {
+		c, err := strconv.Atoi(args[1].Blk)
+		if err != nil {
+			return common.NewErrorValue("ERR value is not an integer or out of range")
+		}
+		if c < 0 {
+			return common.NewErrorValue("ERR value is out of range, must be positive")
+		}
+		count = c
+		hasCount = true
+	}
+
+	database.DB.Mu.Lock()
+	defer database.DB.Mu.Unlock()
+
+	item, ok := database.DB.Store[key]
+	if !ok {
+		if hasCount {
+			return common.NewArrayValue([]common.Value{})
+		}
+		return common.NewNullValue()
+	}
+	if item.Type != "set" {
+		return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	size := len(item.ItemSet)
+	if size == 0 {
+		if hasCount {
+			return common.NewArrayValue([]common.Value{})
+		}
+		return common.NewNullValue()
+	}
+
+	oldMemory := item.ApproxMemoryUsage(key)
+	result := make([]common.Value, 0)
+
+	// Collect members to remove
+	membersToRemove := make([]string, 0)
+	if count >= size {
+		// Remove all
+		for member := range item.ItemSet {
+			membersToRemove = append(membersToRemove, member)
+			result = append(result, common.Value{Typ: common.BULK, Blk: member})
+		}
+	} else {
+		// Remove count random members
+		members := make([]string, 0, size)
+		for member := range item.ItemSet {
+			members = append(members, member)
+		}
+		selected := make(map[int]bool)
+		for len(membersToRemove) < count {
+			idx := rand.Intn(size)
+			if !selected[idx] {
+				selected[idx] = true
+				member := members[idx]
+				membersToRemove = append(membersToRemove, member)
+				result = append(result, common.Value{Typ: common.BULK, Blk: member})
+			}
+		}
+	}
+
+	// Remove from set
+	for _, member := range membersToRemove {
+		delete(item.ItemSet, member)
+	}
+
+	database.DB.Touch(key)
+	if len(item.ItemSet) == 0 {
+		delete(database.DB.Store, key)
+		database.DB.Mem -= oldMemory
+	} else {
+		newMemory := item.ApproxMemoryUsage(key)
+		database.DB.Mem += (newMemory - oldMemory)
+	}
+
+	if state.Config.AofEnabled {
+		state.Aof.W.Write(v)
+		if state.Config.AofFsync == common.Always {
+			state.Aof.W.Flush()
+		}
+	}
+	if len(state.Config.Rdb) > 0 {
+		database.DB.IncrTrackers()
+	}
+
+	if hasCount {
+		return common.NewArrayValue(result)
+	}
+	if len(result) > 0 {
+		return common.NewBulkValue(result[0].Blk)
+	}
+	return common.NewNullValue()
+}
+
+// Smove handles the SMOVE command.
+// Move a member from one set to another.
+//
+// Syntax:
+//
+//	SMOVE <source> <destination> <member>
+//
+// Returns:
+//
+//	Integer: 1 if the element is moved. 0 if the element is not a member of source and no operation was performed.
+func Smove(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) != 3 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'smove' command")
+	}
+
+	sourceKey := args[0].Blk
+	destKey := args[1].Blk
+	member := args[2].Blk
+
+	database.DB.Mu.Lock()
+	defer database.DB.Mu.Unlock()
+
+	sourceItem, sourceOk := database.DB.Store[sourceKey]
+	if sourceOk && sourceItem.Type != "set" {
+		return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	destItem, destOk := database.DB.Store[destKey]
+	if destOk && destItem.Type != "set" {
+		return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	if !sourceOk || !sourceItem.ItemSet[member] {
+		return common.NewIntegerValue(0)
+	}
+
+	// Remove from source
+	oldSourceMemory := sourceItem.ApproxMemoryUsage(sourceKey)
+	delete(sourceItem.ItemSet, member)
+	database.DB.Touch(sourceKey)
+	if len(sourceItem.ItemSet) == 0 {
+		delete(database.DB.Store, sourceKey)
+		database.DB.Mem -= oldSourceMemory
+	} else {
+		newSourceMemory := sourceItem.ApproxMemoryUsage(sourceKey)
+		database.DB.Mem += (newSourceMemory - oldSourceMemory)
+	}
+
+	// Add to destination
+	var oldDestMemory int64 = 0
+	if !destOk {
+		destItem = &common.Item{
+			Type:    "set",
+			ItemSet: make(map[string]bool),
+		}
+		database.DB.Store[destKey] = destItem
+	} else {
+		oldDestMemory = destItem.ApproxMemoryUsage(destKey)
+	}
+	destItem.ItemSet[member] = true
+	database.DB.Touch(destKey)
+	newDestMemory := destItem.ApproxMemoryUsage(destKey)
+	database.DB.Mem += (newDestMemory - oldDestMemory)
+
+	if state.Config.AofEnabled {
+		state.Aof.W.Write(v)
+		if state.Config.AofFsync == common.Always {
+			state.Aof.W.Flush()
+		}
+	}
+	if len(state.Config.Rdb) > 0 {
+		database.DB.IncrTrackers()
+	}
+
+	return common.NewIntegerValue(1)
+}
+
+// Sinterstore handles the SINTERSTORE command.
+// Store the members of the set resulting from the intersection of all the given sets.
+//
+// Syntax:
+//
+//	SINTERSTORE <destination> <key> [<key> ...]
+//
+// Returns:
+//
+//	Integer: The number of elements in the resulting set.
+func Sinterstore(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) < 2 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'sinterstore' command")
+	}
+
+	destKey := args[0].Blk
+	sourceKeys := args[1:]
+
+	database.DB.Mu.Lock()
+	defer database.DB.Mu.Unlock()
+
+	// Check if destination exists and is not a set
+	if existing, ok := database.DB.Store[destKey]; ok && existing.Type != "set" {
+		return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	// Collect all source sets
+	var sets []map[string]bool
+	for _, arg := range sourceKeys {
+		key := arg.Blk
+		item, ok := database.DB.Store[key]
+		if !ok {
+			// If any key missing, intersection is empty
+			sets = nil
+			break
+		}
+		if item.Type != "set" {
+			return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
+		sets = append(sets, item.ItemSet)
+	}
+
+	var oldDestMemory int64 = 0
+	destItem, destOk := database.DB.Store[destKey]
+	if destOk {
+		oldDestMemory = destItem.ApproxMemoryUsage(destKey)
+	} else {
+		destItem = &common.Item{
+			Type:    "set",
+			ItemSet: make(map[string]bool),
+		}
+		database.DB.Store[destKey] = destItem
+	}
+
+	// Clear destination set
+	destItem.ItemSet = make(map[string]bool)
+
+	if sets != nil && len(sets) > 0 {
+		// Find smallest set
+		minIndex := 0
+		minLen := len(sets[0])
+		for i, s := range sets {
+			if len(s) < minLen {
+				minLen = len(s)
+				minIndex = i
+			}
+		}
+
+		// Perform intersection
+		for member := range sets[minIndex] {
+			presentInAll := true
+			for i, s := range sets {
+				if i == minIndex {
+					continue
+				}
+				if !s[member] {
+					presentInAll = false
+					break
+				}
+			}
+			if presentInAll {
+				destItem.ItemSet[member] = true
+			}
+		}
+	}
+
+	count := int64(len(destItem.ItemSet))
+	database.DB.Touch(destKey)
+	newDestMemory := destItem.ApproxMemoryUsage(destKey)
+	database.DB.Mem += (newDestMemory - oldDestMemory)
+
+	if state.Config.AofEnabled {
+		state.Aof.W.Write(v)
+		if state.Config.AofFsync == common.Always {
+			state.Aof.W.Flush()
+		}
+	}
+	if len(state.Config.Rdb) > 0 {
+		database.DB.IncrTrackers()
+	}
+
+	return common.NewIntegerValue(count)
+}
+
+// Sunionstore handles the SUNIONSTORE command.
+// Store the members of the set resulting from the union of all the given sets.
+//
+// Syntax:
+//
+//	SUNIONSTORE <destination> <key> [<key> ...]
+//
+// Returns:
+//
+//	Integer: The number of elements in the resulting set.
+func Sunionstore(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) < 2 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'sunionstore' command")
+	}
+
+	destKey := args[0].Blk
+	sourceKeys := args[1:]
+
+	database.DB.Mu.Lock()
+	defer database.DB.Mu.Unlock()
+
+	// Check if destination exists and is not a set
+	if existing, ok := database.DB.Store[destKey]; ok && existing.Type != "set" {
+		return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	var oldDestMemory int64 = 0
+	destItem, destOk := database.DB.Store[destKey]
+	if destOk {
+		oldDestMemory = destItem.ApproxMemoryUsage(destKey)
+	} else {
+		destItem = &common.Item{
+			Type:    "set",
+			ItemSet: make(map[string]bool),
+		}
+		database.DB.Store[destKey] = destItem
+	}
+
+	// Clear destination set
+	destItem.ItemSet = make(map[string]bool)
+
+	// Perform union
+	for _, arg := range sourceKeys {
+		key := arg.Blk
+		item, ok := database.DB.Store[key]
+		if !ok {
+			continue
+		}
+		if item.Type != "set" {
+			return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
+		for member := range item.ItemSet {
+			destItem.ItemSet[member] = true
+		}
+	}
+
+	count := int64(len(destItem.ItemSet))
+	database.DB.Touch(destKey)
+	newDestMemory := destItem.ApproxMemoryUsage(destKey)
+	database.DB.Mem += (newDestMemory - oldDestMemory)
+
+	if state.Config.AofEnabled {
+		state.Aof.W.Write(v)
+		if state.Config.AofFsync == common.Always {
+			state.Aof.W.Flush()
+		}
+	}
+	if len(state.Config.Rdb) > 0 {
+		database.DB.IncrTrackers()
+	}
+
+	return common.NewIntegerValue(count)
+}
+
+// Sdiffstore handles the SDIFFSTORE command.
+// Store the members of the set resulting from the difference between the first set and all the successive sets.
+//
+// Syntax:
+//
+//	SDIFFSTORE <destination> <key> [<key> ...]
+//
+// Returns:
+//
+//	Integer: The number of elements in the resulting set.
+func Sdiffstore(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) < 2 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'sdiffstore' command")
+	}
+
+	destKey := args[0].Blk
+	sourceKeys := args[1:]
+
+	database.DB.Mu.Lock()
+	defer database.DB.Mu.Unlock()
+
+	// Check if destination exists and is not a set
+	if existing, ok := database.DB.Store[destKey]; ok && existing.Type != "set" {
+		return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	var oldDestMemory int64 = 0
+	destItem, destOk := database.DB.Store[destKey]
+	if destOk {
+		oldDestMemory = destItem.ApproxMemoryUsage(destKey)
+	} else {
+		destItem = &common.Item{
+			Type:    "set",
+			ItemSet: make(map[string]bool),
+		}
+		database.DB.Store[destKey] = destItem
+	}
+
+	// Clear destination set
+	destItem.ItemSet = make(map[string]bool)
+
+	// Get first set
+	firstKey := sourceKeys[0].Blk
+	firstItem, ok := database.DB.Store[firstKey]
+	if !ok {
+		// If first key doesn't exist, result is empty
+		count := int64(0)
+		database.DB.Touch(destKey)
+		newDestMemory := destItem.ApproxMemoryUsage(destKey)
+		database.DB.Mem += (newDestMemory - oldDestMemory)
+		return common.NewIntegerValue(count)
+	}
+	if firstItem.Type != "set" {
+		return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	// Perform difference
+	for member := range firstItem.ItemSet {
+		presentInOthers := false
+		for _, arg := range sourceKeys[1:] {
+			otherKey := arg.Blk
+			otherItem, ok := database.DB.Store[otherKey]
+			if ok {
+				if otherItem.Type != "set" {
+					return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+				}
+				if otherItem.ItemSet[member] {
+					presentInOthers = true
+					break
+				}
+			}
+		}
+		if !presentInOthers {
+			destItem.ItemSet[member] = true
+		}
+	}
+
+	count := int64(len(destItem.ItemSet))
+	database.DB.Touch(destKey)
+	newDestMemory := destItem.ApproxMemoryUsage(destKey)
+	database.DB.Mem += (newDestMemory - oldDestMemory)
+
+	if state.Config.AofEnabled {
+		state.Aof.W.Write(v)
+		if state.Config.AofFsync == common.Always {
+			state.Aof.W.Flush()
+		}
+	}
+	if len(state.Config.Rdb) > 0 {
+		database.DB.IncrTrackers()
+	}
+
+	return common.NewIntegerValue(count)
+}
+
+// Smismember handles the SMISMEMBER command.
+// Check if multiple members are members of a set.
+//
+// Syntax:
+//
+//	SMISMEMBER <key> <member> [<member> ...]
+//
+// Returns:
+//
+//	Array: List of integers, 1 if the element is a member of the set, 0 if not.
+func Smismember(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) < 2 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'smismember' command")
+	}
+
+	key := args[0].Blk
+	members := args[1:]
+
+	database.DB.Mu.RLock()
+	defer database.DB.Mu.RUnlock()
+
+	item, ok := database.DB.Store[key]
+	if !ok {
+		// If key doesn't exist, all members are 0
+		result := make([]common.Value, len(members))
+		for i := range result {
+			result[i] = common.Value{Typ: common.INTEGER, Num: 0}
+		}
+		return common.NewArrayValue(result)
+	}
+	if item.Type != "set" {
+		return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	result := make([]common.Value, len(members))
+	for i, arg := range members {
+		member := arg.Blk
+		if item.ItemSet[member] {
+			result[i] = common.Value{Typ: common.INTEGER, Num: 1}
+		} else {
+			result[i] = common.Value{Typ: common.INTEGER, Num: 0}
 		}
 	}
 

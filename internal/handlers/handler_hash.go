@@ -7,7 +7,9 @@ package handlers
 
 import (
 	"fmt"
+	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/akashmaji946/go-redis/internal/common"
@@ -16,19 +18,23 @@ import (
 
 // HashHandlers is the map of hash command names to their handler functions.
 var HashHandlers = map[string]common.Handler{
-	"HSET":    Hset,
-	"HGET":    Hget,
-	"HDEL":    Hdel,
-	"HGETALL": Hgetall,
-	"HDELALL": Hdelall,
-	"HINCRBY": Hincrby,
-	"HMSET":   Hmset,
-	"HMGET":   Hmget,
-	"HEXISTS": Hexists,
-	"HLEN":    Hlen,
-	"HKEYS":   Hkeys,
-	"HVALS":   Hvals,
-	"HEXPIRE": Hexpire,
+	"HSET":         Hset,
+	"HGET":         Hget,
+	"HDEL":         Hdel,
+	"HGETALL":      Hgetall,
+	"HDELALL":      Hdelall,
+	"HINCRBY":      Hincrby,
+	"HMSET":        Hmset,
+	"HMGET":        Hmget,
+	"HEXISTS":      Hexists,
+	"HLEN":         Hlen,
+	"HKEYS":        Hkeys,
+	"HVALS":        Hvals,
+	"HEXPIRE":      Hexpire,
+	"HSETNX":       Hsetnx,
+	"HINCRBYFLOAT": Hincrbyfloat,
+	"HSTRLEN":      Hstrlen,
+	"HRANDFIELD":   Hrandfield,
 }
 
 // Hset handles the HSET command.
@@ -738,4 +744,304 @@ func Hexpire(c *common.Client, v *common.Value, state *common.AppState) *common.
 	database.DB.Touch(key)
 
 	return common.NewIntegerValue(1)
+}
+
+// Hincrbyfloat handles the HINCRBYFLOAT command.
+// Increments the float value of a hash field by the given amount.
+//
+// Syntax:
+//
+//	HINCRBYFLOAT <key> <field> <increment>
+//
+// Returns:
+//
+//	Bulk string: The new value after increment as a string
+//
+// Behavior:
+//   - Creates hash and field if they don't exist (initialized to 0)
+//   - Returns error if field value is not a valid float
+//   - Returns the new value as a string
+func Hincrbyfloat(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) != 3 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'hincrbyfloat' command")
+	}
+
+	key := args[0].Blk
+	field := args[1].Blk
+	incrStr := args[2].Blk
+
+	incr, err := common.ParseFloat(incrStr)
+	if err != nil {
+		return common.NewErrorValue("ERR value is not a valid float")
+	}
+
+	database.DB.Mu.Lock()
+	defer database.DB.Mu.Unlock()
+
+	var item *common.Item
+	var oldMemory int64 = 0
+	if existing, ok := database.DB.Store[key]; ok {
+		item = existing
+		oldMemory = existing.ApproxMemoryUsage(key)
+		if err := item.EnsureHash(); err != nil {
+			return common.NewErrorValue(err.Error())
+		}
+	} else {
+		item = common.NewHashItem()
+		database.DB.Store[key] = item
+	}
+
+	var fieldItem *common.Item
+	if existing, ok := item.Hash[field]; ok {
+		fieldItem = existing
+	} else {
+		fieldItem = common.NewHashFieldItem("0")
+		item.Hash[field] = fieldItem
+	}
+
+	// Check if field is expired
+	if fieldItem.IsExpired() {
+		fieldItem = common.NewHashFieldItem("0")
+		item.Hash[field] = fieldItem
+	}
+
+	current := float64(0)
+	if fieldItem.Str != "" {
+		current, err = common.ParseFloat(fieldItem.Str)
+		if err != nil {
+			return common.NewErrorValue("ERR hash value is not a float")
+		}
+	}
+
+	newVal := current + incr
+	fieldItem.Str = fmt.Sprintf("%g", newVal)
+
+	database.DB.Touch(key)
+	// Calculate new memory and update database.DB.Mem
+	newMemory := item.ApproxMemoryUsage(key)
+	database.DB.Mem -= oldMemory
+	database.DB.Mem += newMemory
+	if database.DB.Mem > database.DB.Mempeak {
+		database.DB.Mempeak = database.DB.Mem
+	}
+	logger.Warn("memory = %d\n", database.DB.Mem)
+
+	if state.Config.AofEnabled {
+		state.Aof.W.Write(v)
+		if state.Config.AofFsync == common.Always {
+			fmt.Println("AOF write for HINCRBYFLOAT")
+			state.Aof.W.Flush()
+		}
+	}
+	if len(state.Config.Rdb) > 0 {
+		database.DB.IncrTrackers()
+	}
+
+	return common.NewBulkValue(fieldItem.Str)
+}
+
+// Hsetnx handles the HSETNX command.
+// Sets the value of a hash field only if the field does not exist.
+//
+// Syntax:
+//
+//	HSETNX <key> <field> <value>
+//
+// Returns:
+//
+//	Integer: 1 if field was set, 0 if field already exists
+//
+// Behavior:
+//   - Creates hash if it doesn't exist
+//   - Does not overwrite existing fields
+func Hsetnx(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) != 3 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'hsetnx' command")
+	}
+
+	key := args[0].Blk
+	field := args[1].Blk
+	value := args[2].Blk
+
+	database.DB.Mu.Lock()
+	defer database.DB.Mu.Unlock()
+
+	// Calculate old memory before modification
+	var oldMemory int64 = 0
+	var item *common.Item
+	if existing, ok := database.DB.Store[key]; ok {
+		item = existing
+		oldMemory = existing.ApproxMemoryUsage(key)
+		if err := item.EnsureHash(); err != nil {
+			return common.NewErrorValue(err.Error())
+		}
+	} else {
+		item = common.NewHashItem()
+		database.DB.Store[key] = item
+	}
+
+	if _, exists := item.Hash[field]; exists {
+		return common.NewIntegerValue(0)
+	}
+
+	item.Hash[field] = common.NewHashFieldItem(value)
+
+	database.DB.Touch(key)
+	// Calculate new memory and update database.DB.Mem
+	newMemory := item.ApproxMemoryUsage(key)
+	database.DB.Mem -= oldMemory
+	database.DB.Mem += newMemory
+	if database.DB.Mem > database.DB.Mempeak {
+		database.DB.Mempeak = database.DB.Mem
+	}
+	logger.Warn("memory = %d\n", database.DB.Mem)
+
+	if state.Config.AofEnabled {
+		state.Aof.W.Write(v)
+		if state.Config.AofFsync == common.Always {
+			fmt.Println("AOF write for HSETNX")
+			state.Aof.W.Flush()
+		}
+	}
+	if len(state.Config.Rdb) > 0 {
+		database.DB.IncrTrackers()
+	}
+
+	return common.NewIntegerValue(1)
+}
+
+// Hstrlen handles the HSTRLEN command.
+// Returns the length of the value associated with a hash field.
+//
+// Syntax:
+//
+//	HSTRLEN <key> <field>
+//
+// Returns:
+//
+//	Integer: Length of the field's value, 0 if field doesn't exist
+func Hstrlen(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) != 2 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'hstrlen' command")
+	}
+
+	key := args[0].Blk
+	field := args[1].Blk
+
+	database.DB.Mu.RLock()
+	defer database.DB.Mu.RUnlock()
+
+	item, ok := database.DB.Store[key]
+	if !ok {
+		return common.NewIntegerValue(0)
+	}
+
+	if !item.IsHash() {
+		return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	fieldItem, exists := item.Hash[field]
+	if !exists {
+		return common.NewIntegerValue(0)
+	}
+
+	return common.NewIntegerValue(int64(len(fieldItem.Str)))
+}
+
+// Hrandfield handles the HRANDFIELD command.
+// Returns one or more random fields from the hash value stored at key.
+//
+// Syntax:
+//
+//	HRANDFIELD <key> [count [WITHVALUES]]
+//
+// Returns:
+//
+//	Array: List of random fields (and values if WITHVALUES is specified)
+//
+// Behavior:
+//   - If count is positive, returns up to count random fields
+//   - If count is negative, allows duplicates
+//   - WITHVALUES returns field-value pairs
+//   - If key doesn't exist, returns empty array
+func Hrandfield(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) < 1 || len(args) > 3 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'hrandfield' command")
+	}
+
+	key := args[0].Blk
+	count := 1
+	withValues := false
+
+	if len(args) >= 2 {
+		countStr := args[1].Blk
+		var err error
+		count, err = strconv.Atoi(countStr)
+		if err != nil {
+			return common.NewErrorValue("ERR value is not an integer or out of range")
+		}
+	}
+
+	if len(args) == 3 {
+		if strings.ToUpper(args[2].Blk) == "WITHVALUES" {
+			withValues = true
+		} else {
+			return common.NewErrorValue("ERR syntax error")
+		}
+	}
+
+	database.DB.Mu.RLock()
+	defer database.DB.Mu.RUnlock()
+
+	item, ok := database.DB.Store[key]
+	if !ok {
+		return common.NewArrayValue([]common.Value{})
+	}
+
+	if !item.IsHash() {
+		return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	// Collect non-expired fields
+	fields := make([]string, 0, len(item.Hash))
+	for field, fieldItem := range item.Hash {
+		if !fieldItem.IsExpired() {
+			fields = append(fields, field)
+		}
+	}
+
+	if len(fields) == 0 {
+		return common.NewArrayValue([]common.Value{})
+	}
+
+	result := make([]common.Value, 0)
+	absCount := count
+	if count < 0 {
+		absCount = -count
+	}
+
+	for i := 0; i < absCount; i++ {
+		idx := rand.Intn(len(fields))
+		field := fields[idx]
+		fieldItem := item.Hash[field]
+
+		result = append(result, common.Value{Typ: common.BULK, Blk: field})
+		if withValues {
+			result = append(result, common.Value{Typ: common.BULK, Blk: fieldItem.Str})
+		}
+
+		// If count is negative, allow duplicates; else remove selected field
+		if count > 0 {
+			fields = append(fields[:idx], fields[idx+1:]...)
+			if len(fields) == 0 {
+				break
+			}
+		}
+	}
+
+	return common.NewArrayValue(result)
 }
