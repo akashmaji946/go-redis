@@ -1,1 +1,1 @@
-sudo kill $(sudo lsof -t -i :6379)
+sudo kill $(sudo lsof -t -i :7379)

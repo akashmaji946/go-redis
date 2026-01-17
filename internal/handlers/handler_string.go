@@ -56,23 +56,24 @@ func Get(c *common.Client, v *common.Value, state *common.AppState) *common.Valu
 	// cmd := v.Arr[0].Blk
 	args := v.Arr[1:]
 	if len(args) != 1 {
-		return common.NewErrorValue("ERR invalid command usage with GET")
+		return common.NewErrorValue("ERR invalid 'GET' command usage, expected 1 argument")
 	}
 	key := args[0].Blk // grab the key
 
 	// get the item from the database
 	database.DB.Mu.RLock()
+	defer database.DB.Mu.RUnlock()
+
 	item, ok := database.DB.Poll(key)
 	// delete if expired
 	deleted := database.DB.RemIfExpired(key, item, state)
 	if deleted {
-		fmt.Println("Expired Key: ", key)
+		fmt.Println("[RUNTIME] Expired Key: ", key)
 		return common.NewNullValue()
 	}
-	database.DB.Mu.RUnlock()
 
 	if !ok {
-		fmt.Println("Not Found: ", key)
+		fmt.Println("[RUNTIME] Key Not Found: ", key)
 		return common.NewNullValue()
 	}
 
@@ -112,8 +113,10 @@ func Set(c *common.Client, v *common.Value, state *common.AppState) *common.Valu
 	database.DB.Mu.Lock()
 	// First check if key exists to get old memory usage
 	var oldItem *common.Item
+	oldMemory := int64(0)
 	if existing, ok := database.DB.Store[key]; ok {
 		oldItem = existing
+		oldMemory = int64(oldItem.ApproxMemoryUsage(key))
 	}
 	database.DB.Mu.Unlock()
 
@@ -126,11 +129,6 @@ func Set(c *common.Client, v *common.Value, state *common.AppState) *common.Valu
 	currentMem := database.DB.Mem
 	maxMem := state.Config.Maxmemory
 	database.DB.Mu.RUnlock()
-
-	oldMemory := int64(0)
-	if oldItem != nil {
-		oldMemory = int64(oldItem.ApproxMemoryUsage(key))
-	}
 
 	// Calculate new total memory
 	netNewMemory := newMemory - oldMemory
@@ -145,9 +143,10 @@ func Set(c *common.Client, v *common.Value, state *common.AppState) *common.Valu
 
 	// Now acquire lock and actually put the item
 	database.DB.Mu.Lock()
+	defer database.DB.Mu.Unlock()
+
 	err := database.DB.Put(key, val, state)
 	if err != nil {
-		database.DB.Mu.Unlock()
 		return common.NewErrorValue("ERR some error occured while PUT:" + err.Error())
 	}
 	database.DB.Touch(key)
@@ -164,8 +163,6 @@ func Set(c *common.Client, v *common.Value, state *common.AppState) *common.Valu
 	if len(state.Config.Rdb) > 0 {
 		database.DB.IncrTrackers()
 	}
-
-	database.DB.Mu.Unlock()
 
 	return common.NewStringValue("OK")
 }
@@ -1025,15 +1022,14 @@ func incrDecrBy(c *common.Client, key string, delta int64, state *common.AppStat
 
 	if existing, ok := database.DB.Store[key]; ok {
 		item = existing
+		oldMemory = item.ApproxMemoryUsage(key)
 		if item.IsExpired() {
-			oldMemory = item.ApproxMemoryUsage(key)
 			item = common.NewStringItem("0")
 			database.DB.Store[key] = item
 		} else {
 			if !item.IsString() {
 				return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
 			}
-			oldMemory = item.ApproxMemoryUsage(key)
 		}
 	} else {
 		item = common.NewStringItem("0")

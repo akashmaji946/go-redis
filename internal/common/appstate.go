@@ -51,11 +51,11 @@ type GeneralStats struct {
 //   - DBCopy: Copy of the databastructse used during background saves
 //     Contains a snapshot of DB.store taken at the start of BGSAVE
 //     Only populated during background saves, nil otherwise
-//   - tx: Current transaction context for this client connection
+//   - Tx: Current transaction context for this client connection
 //     Set to non-nil when MULTI is called, cleared by EXEC or DISCARD
 //     Each client connection has its own transaction state
-//
-// ... rest of existing documentation ...
+// 	 - Monitors:
+
 type AppState struct {
 	ServerStartTime time.Time
 
@@ -88,6 +88,7 @@ type AppState struct {
 
 	ActiveConns   map[net.Conn]struct{}
 	ActiveConnsMu sync.Mutex
+
 	// BGSaveFunc is an optional callback that performs a background RDB save.
 	// It's set by the application (main) to avoid import cycles between
 	// packages. If non-nil, `InitRDBTrackers` will call this to perform

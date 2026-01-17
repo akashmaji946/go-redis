@@ -55,8 +55,8 @@ func init() {
 //   - Server runs indefinitely until terminated (Ctrl+C or kill signal)
 //
 // Port:
-//   - Default Redis port: 6379
-//   - Listens on all network interfaces (":6379")
+//   - Default Redis port: 7379
+//   - Listens on all network interfaces (":7379")
 //
 // Error Handling:
 //   - Fatal errors (listen failure) cause server to exit

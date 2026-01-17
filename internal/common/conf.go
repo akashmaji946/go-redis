@@ -141,7 +141,7 @@ const (
 //	// Then populate via ReadConf() or manually
 func NewConfig() *Config {
 	return &Config{
-		Port:      6379, // Default Redis port
+		Port:      7379, // Default Redis port
 		Binds:     []string{},
 		Sensitive: true, // Default command case sensitivity
 		Databases: 16,   // Default number of databases
@@ -393,6 +393,8 @@ func parseLine(l string, config *Config) {
 	}
 }
 
+// parseMemory converts a string (1024mb, 1024KB, 1024Gb) into number of bytes
+// parses and multiplies by scaling factor based on unit at suffix
 func parseMemory(s string) (mem int64, err error) {
 	s = strings.TrimSpace(strings.ToLower(s))
 	var mult int64
