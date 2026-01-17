@@ -11,3 +11,17 @@
 - [x] GETDEL: Get value and delete key
 - [x] INCRBYFLOAT: Increment key's float value by specified amount
 - [x] MSETNX: Set multiple keys only if none exist, return 1 if all set, 0 if any exist
+
+# TODO: Implement List Handler Methods
+
+- [x] LSET: Set element at index
+- [x] LINSERT: Insert before/after pivot
+- [x] LREM: Remove elements by value
+- [x] LTRIM: Trim list to range
+- [x] RPOPLPUSH: Pop from one list, push to another
+- [x] LMOVE: Move element between lists
+- [x] LPOS: Get index of element
+- [x] BLPOP: Blocking left pop
+- [x] BRPOP: Blocking right pop
+- [x] BLMOVE: Blocking list move
+- [x] Update handlers.go with new mappings
