@@ -34,6 +34,11 @@
         "description": "Rename a key to a new name. If the source and destination keys are the same, returns 1 without making changes. Returns 1 if the key was successfully renamed. Returns 0 if the source key does not exist, if the source key has expired, or if the destination key already exists (to prevent accidental overwrites). The operation preserves the value, type, and expiration of the original key. Memory tracking is updated to reflect the key name change. The operation is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
         "category": "key"
     },
+    "SCAN": {
+        "usage": "SCAN <cursor> [MATCH pattern] [COUNT count] [TYPE type]",
+        "description": "Incrementally iterate over the keys in the database. Returns a cursor for the next iteration and an array of keys. MATCH filters keys by glob pattern. COUNT suggests the number of keys to return per iteration. TYPE filters keys by data type. This operation is thread-safe and uses a read lock.",
+        "category": "key"
+    },
     "TTL": {
         "usage": "TTL <key>",
         "description": "Return the remaining time to live (in seconds) of a key that has an expiration set. Returns a positive integer representing the remaining seconds until expiration. Returns -1 if the key exists but has no associated expiration (persistent key). Returns -2 if the key does not exist or has already expired (and was deleted). If the key has expired but not yet been lazily deleted, it is deleted and -2 is returned. This operation is thread-safe.",

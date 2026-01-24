@@ -149,6 +149,11 @@
     "description": "Set multiple field-value pairs in a hash stored at the specified key. If the key does not exist, a new hash is created. If any specified fields already exist, their values are overwritten. This command is deprecated in favor of HSET which now supports multiple field-value pairs, but is kept for backward compatibility. Returns 'OK' on success. Returns an error if the number of arguments is not valid (must have an even number of field-value pairs after the key). This operation is atomic and thread-safe.",
     "category": "hash"
   },
+  "HSCAN": {
+    "usage": "HSCAN <key> <cursor> [MATCH pattern] [COUNT count]",
+    "description": "Incrementally iterate over fields and values of a hash stored at the specified key. Returns a cursor for the next iteration and an array of field-value pairs. MATCH filters fields by glob pattern. COUNT suggests the number of elements to return per iteration. Returns an error if the key exists but is not a hash type. This operation is thread-safe and uses a read lock.",
+    "category": "hash"
+  },
   "HSET": {
     "usage": "HSET <key> <field> <value> [field value ...]",
     "description": "Set one or more field-value pairs in a hash stored at the specified key. If the key does not exist, a new hash is created. If any specified fields already exist, their values are overwritten. Returns an integer representing the number of new fields that were added (not counting fields that were updated). Returns an error if the number of arguments is not valid (must have an odd number of arguments: key followed by field-value pairs). The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
@@ -389,6 +394,11 @@
     "description": "Synchronously save the current database state to disk as an RDB (Redis Database) snapshot file. This command blocks the server during the save operation, preventing any other commands from being processed. Returns 'OK' on success. This command requires admin privileges. For production environments, use BGSAVE instead to perform a non-blocking background save. The save creates a point-in-time snapshot that can be used for backup or recovery purposes.",
     "category": "persistence"
   },
+  "SCAN": {
+    "usage": "SCAN <cursor> [MATCH pattern] [COUNT count] [TYPE type]",
+    "description": "Incrementally iterate over the keys in the database. Returns a cursor for the next iteration and an array of keys. MATCH filters keys by glob pattern. COUNT suggests the number of keys to return per iteration. TYPE filters keys by data type. This operation is thread-safe and uses a read lock.",
+    "category": "key"
+  },
   "SCARD": {
     "usage": "SCARD <key>",
     "description": "Return the cardinality (number of members) of a set stored at the specified key. Returns an integer representing the set size. Returns 0 if the key does not exist (treating a non-existent key as an empty set). Returns an error if the key exists but is not a set type. This operation is O(1) as the cardinality is tracked internally. This operation is thread-safe and uses a read lock.",
@@ -442,6 +452,11 @@
   "SREM": {
     "usage": "SREM <key> <member> [member ...]",
     "description": "Remove one or more members from a set stored at the specified key. Members that do not exist in the set are silently ignored. Returns an integer representing the number of members that were actually removed from the set. Returns 0 if the key does not exist. Returns an error if the key exists but is not a set type. If the set becomes empty after removal, the key is automatically deleted. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
+    "category": "set"
+  },
+  "SSCAN": {
+    "usage": "SSCAN <key> <cursor> [MATCH pattern] [COUNT count]",
+    "description": "Incrementally iterate over members of a set stored at the specified key. Returns a cursor for the next iteration and an array of members. MATCH filters members by glob pattern. COUNT suggests the number of elements to return per iteration. Returns an error if the key exists but is not a set type. This operation is thread-safe and uses a read lock.",
     "category": "set"
   },
   "STRLEN": {

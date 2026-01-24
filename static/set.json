@@ -39,6 +39,11 @@
         "description": "Remove one or more members from a set stored at the specified key. Members that do not exist in the set are silently ignored. Returns an integer representing the number of members that were actually removed from the set. Returns 0 if the key does not exist. Returns an error if the key exists but is not a set type. If the set becomes empty after removal, the key is automatically deleted. The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",
         "category": "set"
     },
+    "SSCAN": {
+        "usage": "SSCAN <key> <cursor> [MATCH pattern] [COUNT count]",
+        "description": "Incrementally iterate over members of a set stored at the specified key. Returns a cursor for the next iteration and an array of members. MATCH filters members by glob pattern. COUNT suggests the number of elements to return per iteration. Returns an error if the key exists but is not a set type. This operation is thread-safe and uses a read lock.",
+        "category": "set"
+    },
     "SUNION": {
         "usage": "SUNION <key> [key ...]",
         "description": "Return the members of the set resulting from the union of all specified sets. The union consists of all members that exist in at least one of the specified sets. Returns an array of members in the resulting set. Keys that do not exist are treated as empty sets. Returns an error if any key exists but is not a set type. At least one key must be specified. This operation is thread-safe and uses a read lock.",

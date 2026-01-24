@@ -54,6 +54,11 @@
         "description": "Set multiple field-value pairs in a hash stored at the specified key. If the key does not exist, a new hash is created. If any specified fields already exist, their values are overwritten. This command is deprecated in favor of HSET which now supports multiple field-value pairs, but is kept for backward compatibility. Returns 'OK' on success. Returns an error if the number of arguments is not valid (must have an even number of field-value pairs after the key). This operation is atomic and thread-safe.",
         "category": "hash"
     },
+    "HSCAN": {
+        "usage": "HSCAN <key> <cursor> [MATCH pattern] [COUNT count]",
+        "description": "Incrementally iterate over fields and values of a hash stored at the specified key. Returns a cursor for the next iteration and an array of field-value pairs. MATCH filters fields by glob pattern. COUNT suggests the number of elements to return per iteration. Returns an error if the key exists but is not a hash type. This operation is thread-safe and uses a read lock.",
+        "category": "hash"
+    },
     "HSET": {
         "usage": "HSET <key> <field> <value> [field value ...]",
         "description": "Set one or more field-value pairs in a hash stored at the specified key. If the key does not exist, a new hash is created. If any specified fields already exist, their values are overwritten. Returns an integer representing the number of new fields that were added (not counting fields that were updated). Returns an error if the number of arguments is not valid (must have an odd number of arguments: key followed by field-value pairs). The operation updates memory tracking and is recorded to AOF if persistence is enabled. This operation is atomic and thread-safe.",

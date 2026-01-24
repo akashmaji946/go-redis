@@ -37,7 +37,7 @@ systemctl stop redis-server.service
 
 ## ANOTHER WAY:
 # find and kill forcefully
-sudo kill -9 $(sudo lsof -t -i :6379)
+sudo kill -9 $(sudo lsof -t -i :7379)
 # start it later
 - # systemctl start redis-server.service
 
