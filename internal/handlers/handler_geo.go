@@ -105,15 +105,7 @@ func GeoAdd(c *common.Client, v *common.Value, state *common.AppState) *common.V
 		database.DB.Mempeak = database.DB.Mem
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(addedCount)
 }
@@ -832,15 +824,7 @@ func GeoSearchStore(c *common.Client, v *common.Value, state *common.AppState) *
 		database.DB.Mempeak = database.DB.Mem
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(count)
 }

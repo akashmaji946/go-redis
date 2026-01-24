@@ -112,15 +112,7 @@ func Zadd(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 		database.DB.Mempeak = database.DB.Mem
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(addedCount)
 }
@@ -175,15 +167,7 @@ func Zrem(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 		database.DB.Mem += (newMemory - oldMemory)
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(removedCount)
 }
@@ -492,15 +476,7 @@ func Zincrby(c *common.Client, v *common.Value, state *common.AppState) *common.
 		database.DB.Mempeak = database.DB.Mem
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewBulkValue(strconv.FormatFloat(newScore, 'f', -1, 64))
 }
@@ -1000,15 +976,7 @@ func Zremrangebyrank(c *common.Client, v *common.Value, state *common.AppState) 
 		database.DB.Mem += (newMemory - oldMemory)
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(removed)
 }
@@ -1066,15 +1034,7 @@ func Zremrangebyscore(c *common.Client, v *common.Value, state *common.AppState)
 		database.DB.Mem += (newMemory - oldMemory)
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(removed)
 }
@@ -1139,15 +1099,7 @@ func Zremrangebylex(c *common.Client, v *common.Value, state *common.AppState) *
 		database.DB.Mem += (newMemory - oldMemory)
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(removed)
 }
@@ -1252,15 +1204,7 @@ func zpopGeneric(c *common.Client, v *common.Value, state *common.AppState, reve
 		database.DB.Mem += (newMemory - oldMemory)
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewArrayValue(result)
 }
@@ -1813,15 +1757,7 @@ func Zinterstore(c *common.Client, v *common.Value, state *common.AppState) *com
 
 	database.DB.Touch(dest)
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(int64(len(result)))
 }
@@ -1971,15 +1907,7 @@ func Zunionstore(c *common.Client, v *common.Value, state *common.AppState) *com
 
 	database.DB.Touch(dest)
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(int64(len(result)))
 }

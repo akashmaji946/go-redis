@@ -151,18 +151,7 @@ func Set(c *common.Client, v *common.Value, state *common.AppState) *common.Valu
 	}
 	database.DB.Touch(key)
 	// record it for AOF
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-
-		if state.Config.AofFsync == common.Always {
-			logger.Info("save AOF record on SET\n")
-			state.Aof.W.Flush()
-		}
-
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewStringValue("OK")
 }
@@ -313,15 +302,7 @@ func Mset(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 		database.DB.Put(key, val, state)
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 	return common.NewStringValue("OK")
 }
 
@@ -390,15 +371,7 @@ func Append(c *common.Client, v *common.Value, state *common.AppState) *common.V
 		if database.DB.Mem > database.DB.Mempeak {
 			database.DB.Mempeak = database.DB.Mem
 		}
-		if state.Config.AofEnabled {
-			state.Aof.W.Write(v)
-			if state.Config.AofFsync == common.Always {
-				state.Aof.W.Flush()
-			}
-		}
-		if len(state.Config.Rdb) > 0 {
-			database.DB.IncrTrackers()
-		}
+		saveDBState(state, v)
 		return common.NewIntegerValue(int64(len(value)))
 	} else {
 		if !item.IsString() {
@@ -413,15 +386,7 @@ func Append(c *common.Client, v *common.Value, state *common.AppState) *common.V
 			database.DB.Mempeak = database.DB.Mem
 		}
 		database.DB.Touch(key)
-		if state.Config.AofEnabled {
-			state.Aof.W.Write(v)
-			if state.Config.AofFsync == common.Always {
-				state.Aof.W.Flush()
-			}
-		}
-		if len(state.Config.Rdb) > 0 {
-			database.DB.IncrTrackers()
-		}
+		saveDBState(state, v)
 		return common.NewIntegerValue(int64(newLen))
 	}
 }
@@ -527,15 +492,7 @@ func SetRange(c *common.Client, v *common.Value, state *common.AppState) *common
 			if database.DB.Mem > database.DB.Mempeak {
 				database.DB.Mempeak = database.DB.Mem
 			}
-			if state.Config.AofEnabled {
-				state.Aof.W.Write(v)
-				if state.Config.AofFsync == common.Always {
-					state.Aof.W.Flush()
-				}
-			}
-			if len(state.Config.Rdb) > 0 {
-				database.DB.IncrTrackers()
-			}
+			saveDBState(state, v)
 			return common.NewIntegerValue(int64(len(str)))
 		} else {
 			newItem := common.NewStringItem(value)
@@ -546,15 +503,7 @@ func SetRange(c *common.Client, v *common.Value, state *common.AppState) *common
 			if database.DB.Mem > database.DB.Mempeak {
 				database.DB.Mempeak = database.DB.Mem
 			}
-			if state.Config.AofEnabled {
-				state.Aof.W.Write(v)
-				if state.Config.AofFsync == common.Always {
-					state.Aof.W.Flush()
-				}
-			}
-			if len(state.Config.Rdb) > 0 {
-				database.DB.IncrTrackers()
-			}
+			saveDBState(state, v)
 			return common.NewIntegerValue(int64(len(value)))
 		}
 	} else {
@@ -580,15 +529,7 @@ func SetRange(c *common.Client, v *common.Value, state *common.AppState) *common
 		if database.DB.Mem > database.DB.Mempeak {
 			database.DB.Mempeak = database.DB.Mem
 		}
-		if state.Config.AofEnabled {
-			state.Aof.W.Write(v)
-			if state.Config.AofFsync == common.Always {
-				state.Aof.W.Flush()
-			}
-		}
-		if len(state.Config.Rdb) > 0 {
-			database.DB.IncrTrackers()
-		}
+		saveDBState(state, v)
 		return common.NewIntegerValue(int64(len(item.Str)))
 	}
 }
@@ -626,13 +567,7 @@ func SetNX(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 	if err != nil {
 		return common.NewErrorValue("ERR some error occured while PUT:" + err.Error())
 	}
-
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(1)
 }
@@ -665,12 +600,7 @@ func SetEX(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 	}
 	database.DB.Store[key].Exp = time.Now().Add(time.Duration(ttl) * time.Second)
 	database.DB.Touch(key)
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
+	saveDBState(state, v)
 	database.DB.Mu.Unlock()
 
 	return common.NewStringValue("OK")
@@ -705,12 +635,7 @@ func PSetEX(c *common.Client, v *common.Value, state *common.AppState) *common.V
 	}
 	database.DB.Store[key].Exp = time.Now().Add(time.Duration(ttl) * time.Millisecond)
 	database.DB.Touch(key)
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
+	saveDBState(state, v)
 	database.DB.Mu.Unlock()
 
 	return common.NewStringValue("OK")
@@ -753,12 +678,7 @@ func GetSet(c *common.Client, v *common.Value, state *common.AppState) *common.V
 		return common.NewErrorValue("ERR some error occured while PUT:" + err.Error())
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
+	saveDBState(state, v)
 
 	return oldVal
 }
@@ -959,15 +879,7 @@ func IncrByFloat(c *common.Client, v *common.Value, state *common.AppState) *com
 		database.DB.Mempeak = database.DB.Mem
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewBulkValue(item.Str)
 }
@@ -1002,12 +914,7 @@ func MSetNX(c *common.Client, v *common.Value, state *common.AppState) *common.V
 		database.DB.Put(key, val, state)
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(1)
 }
@@ -1051,15 +958,7 @@ func incrDecrBy(c *common.Client, key string, delta int64, state *common.AppStat
 		database.DB.Mempeak = database.DB.Mem
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(newVal)
 }

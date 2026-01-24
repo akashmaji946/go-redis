@@ -86,15 +86,7 @@ func Sadd(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 		database.DB.Mempeak = database.DB.Mem
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(count)
 }
@@ -149,15 +141,7 @@ func Srem(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 		database.DB.Mem += (newMemory - oldMemory)
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(count)
 }
@@ -635,15 +619,7 @@ func Spop(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 		database.DB.Mem += (newMemory - oldMemory)
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	if hasCount {
 		return common.NewArrayValue(result)
@@ -719,15 +695,7 @@ func Smove(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 	newDestMemory := destItem.ApproxMemoryUsage(destKey)
 	database.DB.Mem += (newDestMemory - oldDestMemory)
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(1)
 }
@@ -824,15 +792,7 @@ func Sinterstore(c *common.Client, v *common.Value, state *common.AppState) *com
 	newDestMemory := destItem.ApproxMemoryUsage(destKey)
 	database.DB.Mem += (newDestMemory - oldDestMemory)
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(count)
 }
@@ -899,15 +859,7 @@ func Sunionstore(c *common.Client, v *common.Value, state *common.AppState) *com
 	newDestMemory := destItem.ApproxMemoryUsage(destKey)
 	database.DB.Mem += (newDestMemory - oldDestMemory)
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(count)
 }
@@ -995,15 +947,7 @@ func Sdiffstore(c *common.Client, v *common.Value, state *common.AppState) *comm
 	newDestMemory := destItem.ApproxMemoryUsage(destKey)
 	database.DB.Mem += (newDestMemory - oldDestMemory)
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(count)
 }

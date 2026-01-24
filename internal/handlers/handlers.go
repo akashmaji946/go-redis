@@ -240,3 +240,16 @@ func getUserDetails(user common.User) []common.Value {
 	details = append(details, *common.NewBulkValue(fmt.Sprintf("Full Name : %s", user.FullName)))
 	return details
 }
+
+// saveDBState will save AOF and RDB
+func saveDBState(state *common.AppState, v *common.Value) {
+	if state.Config.AofEnabled {
+		state.Aof.W.Write(v)
+		if state.Config.AofFsync == common.Always {
+			state.Aof.W.Flush()
+		}
+	}
+	if len(state.Config.Rdb) > 0 {
+		database.DB.IncrTrackers()
+	}
+}

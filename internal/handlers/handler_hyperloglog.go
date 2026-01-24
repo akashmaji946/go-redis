@@ -127,15 +127,7 @@ func PfAdd(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 		database.DB.Mempeak = database.DB.Mem
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	if changed {
 		return common.NewIntegerValue(1)
@@ -287,15 +279,7 @@ func PfMerge(c *common.Client, v *common.Value, state *common.AppState) *common.
 		database.DB.Mempeak = database.DB.Mem
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewStringValue("OK")
 }

@@ -86,15 +86,7 @@ func Lpush(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 		database.DB.Mempeak = database.DB.Mem
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(int64(len(item.List)))
 }
@@ -149,15 +141,7 @@ func Rpush(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 		database.DB.Mempeak = database.DB.Mem
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(int64(len(item.List)))
 }
@@ -212,15 +196,7 @@ func Lpop(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 		database.DB.Mem += (newMemory - oldMemory)
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewBulkValue(val)
 }
@@ -276,15 +252,7 @@ func Rpop(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 		database.DB.Mem += (newMemory - oldMemory)
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewBulkValue(val)
 }
@@ -565,16 +533,7 @@ func Lset(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 
 	database.DB.Touch(key)
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
-
+	saveDBState(state, v)
 	return common.NewStringValue("OK")
 }
 
@@ -663,15 +622,7 @@ func Linsert(c *common.Client, v *common.Value, state *common.AppState) *common.
 
 	database.DB.Touch(key)
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(int64(len(item.List)))
 }
@@ -788,15 +739,7 @@ func Lrem(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 
 	database.DB.Touch(key)
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(int64(removed))
 }
@@ -893,15 +836,7 @@ func Ltrim(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 		database.DB.Touch(key)
 	}
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewStringValue("OK")
 }
@@ -1001,15 +936,7 @@ func RpopLpush(c *common.Client, v *common.Value, state *common.AppState) *commo
 	database.DB.Touch(source)
 	database.DB.Touch(destination)
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewBulkValue(val)
 }
@@ -1123,15 +1050,7 @@ func Lmove(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 	database.DB.Touch(source)
 	database.DB.Touch(destination)
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewBulkValue(val)
 }
@@ -1368,15 +1287,7 @@ func Blpop(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 
 				database.DB.Touch(key)
 
-				if state.Config.AofEnabled {
-					state.Aof.W.Write(v)
-					if state.Config.AofFsync == common.Always {
-						state.Aof.W.Flush()
-					}
-				}
-				if len(state.Config.Rdb) > 0 {
-					database.DB.IncrTrackers()
-				}
+				saveDBState(state, v)
 
 				database.DB.Mu.Unlock()
 
@@ -1464,16 +1375,7 @@ func Brpop(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 				}
 
 				database.DB.Touch(key)
-
-				if state.Config.AofEnabled {
-					state.Aof.W.Write(v)
-					if state.Config.AofFsync == common.Always {
-						state.Aof.W.Flush()
-					}
-				}
-				if len(state.Config.Rdb) > 0 {
-					database.DB.IncrTrackers()
-				}
+				saveDBState(state, v)
 
 				database.DB.Mu.Unlock()
 
@@ -1597,15 +1499,7 @@ func Blmove(c *common.Client, v *common.Value, state *common.AppState) *common.V
 			database.DB.Touch(source)
 			database.DB.Touch(destination)
 
-			if state.Config.AofEnabled {
-				state.Aof.W.Write(v)
-				if state.Config.AofFsync == common.Always {
-					state.Aof.W.Flush()
-				}
-			}
-			if len(state.Config.Rdb) > 0 {
-				database.DB.IncrTrackers()
-			}
+			saveDBState(state, v)
 
 			database.DB.Mu.Unlock()
 			return common.NewBulkValue(val)

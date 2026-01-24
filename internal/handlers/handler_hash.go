@@ -96,16 +96,7 @@ func Hset(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 	}
 	logger.Warn("memory = %d\n", database.DB.Mem)
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			fmt.Println("AOF write for HSET")
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(count)
 }
@@ -217,16 +208,7 @@ func Hdel(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 	database.DB.Mem += newMemory
 	logger.Warn("memory = %d\n", database.DB.Mem)
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			fmt.Println("AOF write for HDEL")
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(count)
 }
@@ -323,13 +305,7 @@ func Hdelall(c *common.Client, v *common.Value, state *common.AppState) *common.
 	database.DB.Mem += newMemory
 	logger.Warn("memory = %d\n", database.DB.Mem)
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
-
+	saveDBState(state, v)
 	return common.NewIntegerValue(count)
 }
 
@@ -412,14 +388,7 @@ func Hincrby(c *common.Client, v *common.Value, state *common.AppState) *common.
 		database.DB.Mempeak = database.DB.Mem
 	}
 	logger.Warn("memory = %d\n", database.DB.Mem)
-
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
-
+	saveDBState(state, v)
 	return common.NewIntegerValue(newVal)
 }
 
@@ -475,12 +444,7 @@ func Hmset(c *common.Client, v *common.Value, state *common.AppState) *common.Va
 	}
 	logger.Warn("memory = %d\n", database.DB.Mem)
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewStringValue("OK")
 }
@@ -827,16 +791,7 @@ func Hincrbyfloat(c *common.Client, v *common.Value, state *common.AppState) *co
 	}
 	logger.Warn("memory = %d\n", database.DB.Mem)
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			fmt.Println("AOF write for HINCRBYFLOAT")
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewBulkValue(fieldItem.Str)
 }
@@ -898,16 +853,7 @@ func Hsetnx(c *common.Client, v *common.Value, state *common.AppState) *common.V
 	}
 	logger.Warn("memory = %d\n", database.DB.Mem)
 
-	if state.Config.AofEnabled {
-		state.Aof.W.Write(v)
-		if state.Config.AofFsync == common.Always {
-			fmt.Println("AOF write for HSETNX")
-			state.Aof.W.Flush()
-		}
-	}
-	if len(state.Config.Rdb) > 0 {
-		database.DB.IncrTrackers()
-	}
+	saveDBState(state, v)
 
 	return common.NewIntegerValue(1)
 }
