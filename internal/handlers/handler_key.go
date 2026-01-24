@@ -41,6 +41,7 @@ var KeyHandlers = map[string]common.Handler{
 	"UNLINK":      Unlink,
 	"RANDOMKEY":   RandomKey,
 	"SORT":        Sort,
+	"SCAN":        Scan,
 }
 
 // Del handles the DEL command.
@@ -166,6 +167,102 @@ func Keys(c *common.Client, v *common.Value, state *common.AppState) *common.Val
 		reply.Arr = append(reply.Arr, common.Value{Typ: common.BULK, Blk: key})
 	}
 	return &reply
+}
+
+// Scan handles the SCAN command.
+// Iterates over the keys in the database.
+//
+// Syntax:
+//
+//	SCAN <cursor> [MATCH pattern] [COUNT count]
+//
+// Returns:
+//
+//	Array: [new_cursor, [key1, key2, ...]]
+func Scan(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) < 1 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'scan' command")
+	}
+
+	cursorStr := args[0].Blk
+	cursor, err := strconv.Atoi(cursorStr)
+	if err != nil || cursor < 0 {
+		return common.NewErrorValue("ERR invalid cursor")
+	}
+
+	// Parse options
+	match := ""
+	count := 10
+	i := 1
+	for i < len(args) {
+		opt := strings.ToUpper(args[i].Blk)
+		switch opt {
+		case "MATCH":
+			if i+1 >= len(args) {
+				return common.NewErrorValue("ERR syntax error")
+			}
+			match = args[i+1].Blk
+			i += 2
+		case "COUNT":
+			if i+1 >= len(args) {
+				return common.NewErrorValue("ERR syntax error")
+			}
+			c, err := strconv.Atoi(args[i+1].Blk)
+			if err != nil || c <= 0 {
+				return common.NewErrorValue("ERR value is not an integer or out of range")
+			}
+			count = c
+			i += 2
+		default:
+			return common.NewErrorValue("ERR syntax error")
+		}
+	}
+
+	database.DB.Mu.RLock()
+	defer database.DB.Mu.RUnlock()
+
+	// Collect all keys and sort them for stable iteration
+	keys := make([]string, 0, len(database.DB.Store))
+	for k := range database.DB.Store {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var resultKeys []common.Value
+	var nextCursor int
+
+	if cursor >= len(keys) {
+		nextCursor = 0
+	} else {
+		end := cursor + count
+		if end > len(keys) {
+			end = len(keys)
+		}
+
+		for i := cursor; i < end; i++ {
+			key := keys[i]
+			if match != "" {
+				matched, _ := filepath.Match(match, key)
+				if !matched {
+					continue
+				}
+			}
+			resultKeys = append(resultKeys, *common.NewBulkValue(key))
+		}
+		nextCursor = end
+		if nextCursor >= len(keys) {
+			nextCursor = 0
+		}
+	}
+
+	return &common.Value{
+		Typ: common.ARRAY,
+		Arr: []common.Value{
+			*common.NewBulkValue(strconv.Itoa(nextCursor)),
+			*common.NewArrayValue(resultKeys),
+		},
+	}
 }
 
 // Type handles the TYPE command.

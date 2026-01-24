@@ -1219,7 +1219,7 @@ func zpopGeneric(c *common.Client, v *common.Value, state *common.AppState, reve
 // Returns:
 //
 //	Array: [key, member, score] or nil if timeout.
-func Bzpopmin(c *common.Client, v *common.Value, _ *common.AppState) *common.Value {
+func Bzpopmin(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
 	// For simplicity, implement as non-blocking
 	args := v.Arr[1:]
 	if len(args) < 2 {
@@ -1270,15 +1270,7 @@ func Bzpopmin(c *common.Client, v *common.Value, _ *common.AppState) *common.Val
 
 		// AOF and RDB for non-blocking version
 		// Since it's non-blocking, perhaps no need, but for consistency
-		// if state.Config.AofEnabled {
-		//     state.Aof.W.Write(v)
-		//     if state.Config.AofFsync == common.Always {
-		//         state.Aof.W.Flush()
-		//     }
-		// }
-		// if len(state.Config.Rdb) > 0 {
-		//     database.DB.IncrTrackers()
-		// }
+		saveDBState(state, v)
 
 		result := []common.Value{
 			{Typ: common.BULK, Blk: key},
@@ -1351,15 +1343,7 @@ func Bzpopmax(c *common.Client, v *common.Value, state *common.AppState) *common
 		}
 
 		// AOF and RDB for non-blocking version
-		// if state.Config.AofEnabled {
-		//     state.Aof.W.Write(v)
-		//     if state.Config.AofFsync == common.Always {
-		//         state.Aof.W.Flush()
-		//     }
-		// }
-		// if len(state.Config.Rdb) > 0 {
-		//     database.DB.IncrTrackers()
-		// }
+		saveDBState(state, v)
 
 		result := []common.Value{
 			{Typ: common.BULK, Blk: key},

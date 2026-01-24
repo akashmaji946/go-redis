@@ -8,6 +8,8 @@ package handlers
 import (
 	"fmt"
 	"math/rand"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -35,6 +37,7 @@ var HashHandlers = map[string]common.Handler{
 	"HINCRBYFLOAT": Hincrbyfloat,
 	"HSTRLEN":      Hstrlen,
 	"HRANDFIELD":   Hrandfield,
+	"HSCAN":        Hscan,
 }
 
 // Hset handles the HSET command.
@@ -254,6 +257,120 @@ func Hgetall(c *common.Client, v *common.Value, state *common.AppState) *common.
 	}
 
 	return common.NewArrayValue(result)
+}
+
+// Hscan handles the HSCAN command.
+// Iterates over the fields of a hash.
+//
+// Syntax:
+//
+//	HSCAN <key> <cursor> [MATCH pattern] [COUNT count]
+//
+// Returns:
+//
+//	Array: [new_cursor, [field1, value1, ...]]
+func Hscan(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) < 2 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'hscan' command")
+	}
+
+	key := args[0].Blk
+	cursorStr := args[1].Blk
+	cursor, err := strconv.Atoi(cursorStr)
+	if err != nil || cursor < 0 {
+		return common.NewErrorValue("ERR invalid cursor")
+	}
+
+	// Parse options
+	match := ""
+	count := 10
+	i := 2
+	for i < len(args) {
+		opt := strings.ToUpper(args[i].Blk)
+		switch opt {
+		case "MATCH":
+			if i+1 >= len(args) {
+				return common.NewErrorValue("ERR syntax error")
+			}
+			match = args[i+1].Blk
+			i += 2
+		case "COUNT":
+			if i+1 >= len(args) {
+				return common.NewErrorValue("ERR syntax error")
+			}
+			c, err := strconv.Atoi(args[i+1].Blk)
+			if err != nil || c <= 0 {
+				return common.NewErrorValue("ERR value is not an integer or out of range")
+			}
+			count = c
+			i += 2
+		default:
+			return common.NewErrorValue("ERR syntax error")
+		}
+	}
+
+	database.DB.Mu.RLock()
+	defer database.DB.Mu.RUnlock()
+
+	item, ok := database.DB.Store[key]
+	if !ok {
+		return &common.Value{
+			Typ: common.ARRAY,
+			Arr: []common.Value{
+				*common.NewBulkValue("0"),
+				*common.NewArrayValue([]common.Value{}),
+			},
+		}
+	}
+
+	if !item.IsHash() {
+		return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	// Collect all fields and sort them for stable iteration
+	fields := make([]string, 0, len(item.Hash))
+	for field := range item.Hash {
+		fields = append(fields, field)
+	}
+	sort.Strings(fields)
+
+	var resultPairs []common.Value
+	var nextCursor int
+
+	if cursor >= len(fields) {
+		nextCursor = 0
+	} else {
+		end := cursor + count
+		if end > len(fields) {
+			end = len(fields)
+		}
+
+		for i := cursor; i < end; i++ {
+			field := fields[i]
+			if match != "" {
+				matched, _ := filepath.Match(match, field)
+				if !matched {
+					continue
+				}
+			}
+			if fieldItem, exists := item.Hash[field]; exists && !fieldItem.IsExpired() {
+				resultPairs = append(resultPairs, *common.NewBulkValue(field), *common.NewBulkValue(fieldItem.Str))
+			}
+		}
+		nextCursor = end
+		if nextCursor >= len(fields) {
+			nextCursor = 0
+		}
+	}
+
+	return &common.Value{
+		Typ: common.ARRAY,
+		Arr: []common.Value{
+			*common.NewBulkValue(strconv.Itoa(nextCursor)),
+			*common.NewArrayValue(resultPairs),
+		},
+	}
 }
 
 // Hdelall handles the HDELALL command.

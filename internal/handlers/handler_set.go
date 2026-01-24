@@ -7,7 +7,10 @@ package handlers
 
 import (
 	"math/rand"
+	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/akashmaji946/go-redis/internal/common"
 	"github.com/akashmaji946/go-redis/internal/database"
@@ -30,6 +33,7 @@ var SetHandlers = map[string]common.Handler{
 	"SUNIONSTORE": Sunionstore,
 	"SDIFFSTORE":  Sdiffstore,
 	"SMISMEMBER":  Smismember,
+	"SSCAN":       Sscan,
 }
 
 // Sadd handles the SADD command.
@@ -182,6 +186,118 @@ func Smembers(c *common.Client, v *common.Value, state *common.AppState) *common
 	}
 
 	return common.NewArrayValue(result)
+}
+
+// Sscan handles the SSCAN command.
+// Iterates over the members of a set.
+//
+// Syntax:
+//
+//	SSCAN <key> <cursor> [MATCH pattern] [COUNT count]
+//
+// Returns:
+//
+//	Array: [new_cursor, [member1, member2, ...]]
+func Sscan(c *common.Client, v *common.Value, state *common.AppState) *common.Value {
+	args := v.Arr[1:]
+	if len(args) < 2 {
+		return common.NewErrorValue("ERR wrong number of arguments for 'sscan' command")
+	}
+
+	key := args[0].Blk
+	cursorStr := args[1].Blk
+	cursor, err := strconv.Atoi(cursorStr)
+	if err != nil || cursor < 0 {
+		return common.NewErrorValue("ERR invalid cursor")
+	}
+
+	// Parse options
+	match := ""
+	count := 10
+	i := 2
+	for i < len(args) {
+		opt := strings.ToUpper(args[i].Blk)
+		switch opt {
+		case "MATCH":
+			if i+1 >= len(args) {
+				return common.NewErrorValue("ERR syntax error")
+			}
+			match = args[i+1].Blk
+			i += 2
+		case "COUNT":
+			if i+1 >= len(args) {
+				return common.NewErrorValue("ERR syntax error")
+			}
+			c, err := strconv.Atoi(args[i+1].Blk)
+			if err != nil || c <= 0 {
+				return common.NewErrorValue("ERR value is not an integer or out of range")
+			}
+			count = c
+			i += 2
+		default:
+			return common.NewErrorValue("ERR syntax error")
+		}
+	}
+
+	database.DB.Mu.RLock()
+	defer database.DB.Mu.RUnlock()
+
+	item, ok := database.DB.Store[key]
+	if !ok {
+		return &common.Value{
+			Typ: common.ARRAY,
+			Arr: []common.Value{
+				*common.NewBulkValue("0"),
+				*common.NewArrayValue([]common.Value{}),
+			},
+		}
+	}
+
+	if item.Type != "set" {
+		return common.NewErrorValue("WRONGTYPE Operation against a key holding the wrong kind of value")
+	}
+
+	// Collect all members and sort them for stable iteration
+	members := make([]string, 0, len(item.ItemSet))
+	for member := range item.ItemSet {
+		members = append(members, member)
+	}
+	sort.Strings(members)
+
+	var resultMembers []common.Value
+	var nextCursor int
+
+	if cursor >= len(members) {
+		nextCursor = 0
+	} else {
+		end := cursor + count
+		if end > len(members) {
+			end = len(members)
+		}
+
+		for i := cursor; i < end; i++ {
+			member := members[i]
+			if match != "" {
+				matched, _ := filepath.Match(match, member)
+				if !matched {
+					continue
+				}
+			}
+			resultMembers = append(resultMembers, *common.NewBulkValue(member))
+		}
+		nextCursor = end
+		if nextCursor >= len(members) {
+			nextCursor = 0
+		}
+	}
+
+	return &common.Value{
+		Typ: common.ARRAY,
+		Arr: []common.Value{
+			*common.NewBulkValue(strconv.Itoa(nextCursor)),
+			*common.NewArrayValue(resultMembers),
+		},
+	}
 }
 
 // Sismember handles the SISMEMBER command.
